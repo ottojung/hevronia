@@ -8,11 +8,33 @@ import { fakeModel } from "@langchain/core/testing";
 import { AIMessage } from "@langchain/core/messages";
 
 import { createConversationLayer } from "../src/layer.js";
+import type { GeneratedTurn } from "../src/generated-turn.js";
+import type { SocialDecisionMaker } from "../src/social-decision.js";
 import { SUMMARY_PREFIX } from "../src/summary.js";
 import {
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromTelegramSender,
 } from "../src/identifiers.js";
+
+function replyText(turn: GeneratedTurn): string {
+  if (turn.outcome.action === "silence") {
+    assert.fail("expected a reply turn");
+  }
+  return turn.outcome.replyText;
+}
+
+const replyingDecisionMaker: SocialDecisionMaker = {
+  decide: async () => ({
+    action: "reply",
+    replyToMessageId: 1,
+    motive: "personal concern",
+    socialAction: "brief personal reaction",
+    adviceRequested: false,
+    askQuestion: false,
+    dreamRelevant: false,
+    backgroundRelevant: false,
+  }),
+};
 
 const userId = longTermMemoryUserIdFromTelegramSender(1);
 
@@ -30,18 +52,18 @@ test("thread continuity: a second turn sees the first turn", async () => {
   try {
     const model = fakeModel();
     const summary = fakeModel();
-    const layer = createConversationLayer({ dbPath: path, model, summaryModel: summary });
+    const layer = createConversationLayer({ decisionMaker: replyingDecisionMaker, dbPath: path, model, summaryModel: summary });
 
     model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    assert.equal((await layer.respond({ threadId: thread(1), userId, messageText: "перше повідомлення" })).replyText, "saw 2 messages");
+    assert.equal(replyText(await layer.respond({ threadId: thread(1), userId, messageId: 1, speakerName: "Віталик", messageText: "перше повідомлення" })), "saw 2 messages");
 
     model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    assert.equal((await layer.respond({ threadId: thread(1), userId, messageText: "друге повідомлення" })).replyText, "saw 4 messages");
+    assert.equal(replyText(await layer.respond({ threadId: thread(1), userId, messageId: 1, speakerName: "Віталик", messageText: "друге повідомлення" })), "saw 4 messages");
 
     const messages = await layer.getMessages(thread(1));
     assert.equal(messages.length, 4);
-    assert.equal(messages[0]?.content, "перше повідомлення");
-    assert.equal(messages[2]?.content, "друге повідомлення");
+    assert.match(String(messages[0]?.content), /\[message 1\] Віталик: перше повідомлення/);
+    assert.match(String(messages[2]?.content), /\[message 1\] Віталик: друге повідомлення/);
     await layer.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -53,17 +75,17 @@ test("thread isolation: different chats do not share context", async () => {
   try {
     const model = fakeModel();
     const summary = fakeModel();
-    const layer = createConversationLayer({ dbPath: path, model, summaryModel: summary });
+    const layer = createConversationLayer({ decisionMaker: replyingDecisionMaker, dbPath: path, model, summaryModel: summary });
 
     model.respond(new AIMessage("reply 111"));
-    await layer.respond({ threadId: thread(111), userId, messageText: "hello from 111" });
+    await layer.respond({ threadId: thread(111), userId, messageId: 1, speakerName: "Віталик", messageText: "hello from 111" });
 
     model.respond(new AIMessage("reply 222"));
-    await layer.respond({ threadId: thread(222), userId, messageText: "hello from 222" });
+    await layer.respond({ threadId: thread(222), userId, messageId: 1, speakerName: "Віталик", messageText: "hello from 222" });
 
     model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    const reply = await layer.respond({ threadId: thread(111), userId, messageText: "again from 111" });
-    assert.equal(reply.replyText, "saw 4 messages");
+    const reply = await layer.respond({ threadId: thread(111), userId, messageId: 1, speakerName: "Віталик", messageText: "again from 111" });
+    assert.equal(replyText(reply), "saw 4 messages");
 
     const messages = await layer.getMessages(thread(111));
     const text = messages.map((m) => m.content).join("\n");
@@ -79,19 +101,19 @@ test("persistence: state survives layer recreation", async () => {
   try {
     const firstModel = fakeModel();
     firstModel.respond(new AIMessage("запам'ятано: манго"));
-    const firstLayer = createConversationLayer({ dbPath: path, model: firstModel, summaryModel: fakeModel() });
-    await firstLayer.respond({ threadId: thread(3), userId, messageText: "Мій улюблений фрукт — манго." });
+    const firstLayer = createConversationLayer({ decisionMaker: replyingDecisionMaker, dbPath: path, model: firstModel, summaryModel: fakeModel() });
+    await firstLayer.respond({ threadId: thread(3), userId, messageId: 1, speakerName: "Віталик", messageText: "Мій улюблений фрукт — манго." });
     await firstLayer.close();
 
     const secondModel = fakeModel();
     secondModel.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    const secondLayer = createConversationLayer({ dbPath: path, model: secondModel, summaryModel: fakeModel() });
-    const reply = await secondLayer.respond({ threadId: thread(3), userId, messageText: "Який мій улюблений фрукт?" });
-    assert.equal(reply.replyText, "saw 4 messages");
+    const secondLayer = createConversationLayer({ decisionMaker: replyingDecisionMaker, dbPath: path, model: secondModel, summaryModel: fakeModel() });
+    const reply = await secondLayer.respond({ threadId: thread(3), userId, messageId: 1, speakerName: "Віталик", messageText: "Який мій улюблений фрукт?" });
+    assert.equal(replyText(reply), "saw 4 messages");
 
     const messages = await secondLayer.getMessages(thread(3));
     assert.equal(messages.length, 4);
-    assert.equal(messages[0]?.content, "Мій улюблений фрукт — манго.");
+    assert.match(String(messages[0]?.content), /Віталик: Мій улюблений фрукт — манго\./);
     await secondLayer.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -103,7 +125,7 @@ test("compaction: older messages are summarized, recent messages stay verbatim",
   try {
     const model = fakeModel();
     const summary = fakeModel();
-    const layer = createConversationLayer({
+    const layer = createConversationLayer({ decisionMaker: replyingDecisionMaker,
       dbPath: path,
       model,
       summaryModel: summary,
@@ -120,7 +142,7 @@ test("compaction: older messages are summarized, recent messages stay verbatim",
     }
 
     for (let i = 0; i < 8; i += 1) {
-      await layer.respond({ threadId: thread(4), userId, messageText: `улюблений фрукт манго повідомлення номер ${i}` });
+      await layer.respond({ threadId: thread(4), userId, messageId: 1, speakerName: "Віталик", messageText: `улюблений фрукт манго повідомлення номер ${i}` });
     }
 
     const messages = await layer.getMessages(thread(4));
@@ -153,14 +175,14 @@ test("failure does not write a fake assistant reply into memory", async () => {
   try {
     const model = fakeModel();
     const summary = fakeModel();
-    const layer = createConversationLayer({ dbPath: path, model, summaryModel: summary });
+    const layer = createConversationLayer({ decisionMaker: replyingDecisionMaker, dbPath: path, model, summaryModel: summary });
 
     model.respond(new Error("openai boom"));
-    await assert.rejects(() => layer.respond({ threadId: thread(5), userId, messageText: "привіт" }));
+    await assert.rejects(() => layer.respond({ threadId: thread(5), userId, messageId: 1, speakerName: "Віталик", messageText: "привіт" }));
 
     model.respond(new AIMessage("відповідь після збою"));
-    const reply = await layer.respond({ threadId: thread(5), userId, messageText: "знову привіт" });
-    assert.equal(reply.replyText, "відповідь після збою");
+    const reply = await layer.respond({ threadId: thread(5), userId, messageId: 1, speakerName: "Віталик", messageText: "знову привіт" });
+    assert.equal(replyText(reply), "відповідь після збою");
 
     const messages = await layer.getMessages(thread(5));
     const assistantTexts = messages

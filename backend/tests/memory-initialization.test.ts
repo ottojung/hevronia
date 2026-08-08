@@ -25,6 +25,7 @@ function fakeConversationLayer(): ConversationLayer {
     respond: async () =>
       GeneratedTurn.fromGeneratedResponse(
         "reply",
+        1,
         async () => undefined,
         new PendingMemoryWrites(),
       ),

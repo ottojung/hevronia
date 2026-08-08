@@ -1,16 +1,10 @@
-import {
-  createAgent,
-  summarizationMiddleware,
-} from "langchain";
-import { ChatOpenAI } from "@langchain/openai";
 import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
 import { HumanMessage, isBaseMessage, type BaseMessage } from "@langchain/core/messages";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { MODEL, openAiKeyFromEnv } from "./model.js";
 import { SYSTEM_PROMPT } from "./personality.js";
-import { COMPACTION, DEFAULT_DB_PATH, SUMMARY_PREFIX, SUMMARY_PROMPT } from "./summary.js";
+import { DEFAULT_DB_PATH } from "./summary.js";
 import { extractReplyText } from "./text.js";
 import type {
   ConversationLayer,
@@ -21,70 +15,72 @@ import { recallForTurn, rememberDeliveredUserMessage } from "./long-term-memory/
 import { PendingMemoryWrites } from "./long-term-memory/pending.js";
 import { GeneratedTurn } from "./generated-turn.js";
 import {
-  invocationContextSchema,
-  recalledMemoryPromptMiddleware,
-} from "./long-term-memory/context.js";
+  createSocialDecisionMaker,
+  renderDecisionForRealization,
+  renderObservedTranscript,
+} from "./social-decision.js";
+import { renderTelegramTextEvent } from "./telegram-event.js";
+import { createConversationAgent } from "./conversation-agent.js";
 
 export function createConversationLayer(options: ConversationLayerOptions = {}): ConversationLayer {
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
   const systemPrompt = options.systemPrompt ?? SYSTEM_PROMPT;
-  const triggerTokens = options.triggerTokens ?? COMPACTION.triggerTokens;
-  const keepTokens = options.keepTokens ?? COMPACTION.keepTokens;
-  const trimTokensToSummarize =
-    options.trimTokensToSummarize ?? COMPACTION.trimTokensToSummarize;
   const longTermMemory = options.longTermMemory;
   const pendingMemoryWrites = options.pendingMemoryWrites ?? new PendingMemoryWrites();
 
   mkdirSync(dirname(dbPath), { recursive: true });
   const checkpointer = SqliteSaver.fromConnString(dbPath);
+  const { agent, model, triggerTokens, keepTokens, trimTokensToSummarize } =
+    createConversationAgent(options, checkpointer, systemPrompt);
   console.log(`Conversation memory initialized; checkpoint database opened: ${dbPath}`);
   console.log(
     `Compaction configuration loaded: trigger=${triggerTokens} tokens, keep=${keepTokens} tokens, trim=${trimTokensToSummarize} tokens`,
   );
 
-  const model =
-    options.model ??
-    new ChatOpenAI({
-      apiKey: openAiKeyFromEnv(),
-      model: MODEL,
-    });
-  const summaryModel =
-    options.summaryModel ??
-    new ChatOpenAI({
-      apiKey: openAiKeyFromEnv(),
-      model: MODEL,
-      temperature: 0,
-    });
-
-  const agent = createAgent({
-    model,
-    tools: [],
-    contextSchema: invocationContextSchema,
-    checkpointer,
-    middleware: [
-      recalledMemoryPromptMiddleware(systemPrompt),
-      summarizationMiddleware({
-        model: summaryModel,
-        trigger: { tokens: triggerTokens },
-        keep: { tokens: keepTokens },
-        trimTokensToSummarize,
-        summaryPrefix: SUMMARY_PREFIX,
-        summaryPrompt: SUMMARY_PROMPT,
-        tokenCounter: options.tokenCounter,
-      }),
-    ],
-  });
+  const decisionMaker = options.decisionMaker ?? createSocialDecisionMaker(model);
 
   return {
-    async respond({ threadId, userId, messageText }: RespondInput): Promise<GeneratedTurn> {
+    async respond(input: RespondInput): Promise<GeneratedTurn> {
+      const { threadId, userId, messageText } = input;
       const recalledMemories = await recallForTurn(longTermMemory, userId, messageText);
+      const tuple = await checkpointer.getTuple({ configurable: { thread_id: threadId.toPersistenceKey() } });
+      const stored = tuple?.checkpoint.channel_values["messages"];
+      const history = Array.isArray(stored) ? stored.filter(isBaseMessage) : [];
+      const observedEvent = renderTelegramTextEvent({
+        messageId: input.messageId,
+        speakerName: input.speakerName,
+        text: messageText,
+      });
+      const invocationConfig = {
+        configurable: { thread_id: threadId.toPersistenceKey() },
+        context: { recalledMemories },
+      };
+      const rememberSilence = async (): Promise<GeneratedTurn> => {
+        await agent.updateState(invocationConfig, { messages: [new HumanMessage(observedEvent)] });
+        return GeneratedTurn.fromSilence(
+          () => rememberDeliveredUserMessage(longTermMemory, userId, threadId, messageText),
+          pendingMemoryWrites,
+        );
+      };
+      let decision;
+      try {
+        decision = await decisionMaker.decide(renderObservedTranscript(history, observedEvent));
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        console.warn(`Social decision failed safely to silence: ${detail}`);
+        return rememberSilence();
+      }
+      if (decision.action === "silence") {
+        return rememberSilence();
+      }
       const result = await agent.invoke(
-        { messages: [new HumanMessage(messageText)] },
-        { configurable: { thread_id: threadId.toPersistenceKey() }, context: { recalledMemories } },
+        { messages: [new HumanMessage(renderDecisionForRealization(observedEvent, decision))] },
+        invocationConfig,
       );
       const replyText = extractReplyText(result.messages);
       return GeneratedTurn.fromGeneratedResponse(
         replyText,
+        decision.replyToMessageId,
         () => rememberDeliveredUserMessage(longTermMemory, userId, threadId, messageText),
         pendingMemoryWrites,
       );

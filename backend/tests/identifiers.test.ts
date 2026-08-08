@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  conversationThreadIdFromTelegramGroupChat,
   conversationThreadIdFromTelegramPrivateChat,
   isInvalidIntegrationTestIdentifierError,
   isInvalidTelegramIdentifierError,
@@ -11,14 +12,20 @@ import {
 
 test("Telegram identifiers construct distinct canonical persistence namespaces", () => {
   const threadId = conversationThreadIdFromTelegramPrivateChat(123);
+  const groupThreadId = conversationThreadIdFromTelegramGroupChat(-456);
   const userId = longTermMemoryUserIdFromTelegramSender(123);
   assert.equal(threadId.toPersistenceKey(), "telegram-private:123");
+  assert.equal(groupThreadId.toPersistenceKey(), "telegram-group:-456");
   assert.equal(userId.toPersistenceKey(), "telegram-user:123");
 });
 
 test("Telegram identifier factories reject invalid persisted identifiers", () => {
   assert.throws(
     () => conversationThreadIdFromTelegramPrivateChat(0),
+    isInvalidTelegramIdentifierError,
+  );
+  assert.throws(
+    () => conversationThreadIdFromTelegramGroupChat(456),
     isInvalidTelegramIdentifierError,
   );
   assert.throws(

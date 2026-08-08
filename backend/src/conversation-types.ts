@@ -10,6 +10,8 @@ import type { ConversationThreadId, LongTermMemoryUserId } from "./identifiers.j
 export interface RespondInput {
   threadId: ConversationThreadId;
   userId: LongTermMemoryUserId;
+  messageId: number;
+  speakerName: string;
   messageText: string;
 }
 
@@ -24,6 +26,7 @@ export interface ConversationLayerOptions {
   tokenCounter?: TokenCounter;
   longTermMemory?: LongTermMemory;
   pendingMemoryWrites?: PendingMemoryWrites;
+  decisionMaker?: import("./social-decision.js").SocialDecisionMaker;
 }
 
 export interface ConversationLayer {

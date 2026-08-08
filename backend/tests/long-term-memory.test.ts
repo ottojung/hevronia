@@ -8,6 +8,8 @@ import { AIMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
 
 import { createConversationLayer } from "../src/layer.js";
+import type { GeneratedTurn } from "../src/generated-turn.js";
+import type { SocialDecisionMaker } from "../src/social-decision.js";
 import { extractText } from "../src/text.js";
 import {
   createMem0Config,
@@ -23,6 +25,26 @@ import {
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromTelegramSender,
 } from "../src/identifiers.js";
+
+function replyText(turn: GeneratedTurn): string {
+  if (turn.outcome.action === "silence") {
+    assert.fail("expected a reply turn");
+  }
+  return turn.outcome.replyText;
+}
+
+const replyingDecisionMaker: SocialDecisionMaker = {
+  decide: async () => ({
+    action: "reply",
+    replyToMessageId: 1,
+    motive: "personal concern",
+    socialAction: "brief personal reaction",
+    adviceRequested: false,
+    askQuestion: false,
+    dreamRelevant: false,
+    backgroundRelevant: false,
+  }),
+};
 
 interface SearchCall {
   userId: LongTermMemoryUserId;
@@ -101,7 +123,7 @@ function fixture(
 } {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-ltm-"));
   const model = fakeModel();
-  const layer = createConversationLayer({
+  const layer = createConversationLayer({ decisionMaker: replyingDecisionMaker,
     dbPath: path.join(dir, "checkpoints.sqlite"),
     model,
     summaryModel: fakeModel(),
@@ -129,7 +151,7 @@ test("retrieval uses top five and reaches the model through ephemeral system con
     await layer.respond({
       threadId: thread(1),
       userId: user(111),
-      messageText: "Який колір мені пасує?",
+      messageId: 1, speakerName: "Віталик", messageText: "Який колір мені пасує?",
     });
     assert.equal(memory.searchCalls[0]?.topK, LONG_TERM_MEMORY_TOP_K);
 
@@ -159,9 +181,9 @@ test("recalled memories are delimited as untrusted JSON data", async () => {
     const turn = await layer.respond({
       threadId: thread(1),
       userId: user(1),
-      messageText: "hello",
+      messageId: 1, speakerName: "Віталик", messageText: "hello",
     });
-    assert.equal(turn.replyText, "safe reply");
+    assert.equal(replyText(turn), "safe reply");
     await layer.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -186,9 +208,9 @@ test("users are isolated while one user can share memory across separate threads
       return new AIMessage("other user");
     });
 
-    await layer.respond({ threadId: thread(1), userId: user(111), messageText: "a" });
-    await layer.respond({ threadId: thread(2), userId: user(111), messageText: "b" });
-    await layer.respond({ threadId: thread(3), userId: user(222), messageText: "c" });
+    await layer.respond({ threadId: thread(1), userId: user(111), messageId: 1, speakerName: "Віталик", messageText: "a" });
+    await layer.respond({ threadId: thread(2), userId: user(111), messageId: 1, speakerName: "Віталик", messageText: "b" });
+    await layer.respond({ threadId: thread(3), userId: user(222), messageId: 1, speakerName: "Віталик", messageText: "c" });
 
     assert.deepEqual(
       memory.searchCalls.map(({ userId }) => userId.toPersistenceKey()),
@@ -207,7 +229,7 @@ test("successful delivery stores user evidence once without the assistant recomm
   const { dir, model, layer } = fixture(memory);
   try {
     model.respond(new AIMessage("Assistant recommendation: buy the purple one."));
-    const turn = await layer.respond({ threadId: thread(1), userId: user(1), messageText: "user text" });
+    const turn = await layer.respond({ threadId: thread(1), userId: user(1), messageId: 1, speakerName: "Віталик", messageText: "user text" });
     assert.equal(memory.rememberCalls.length, 0);
     await turn.postSend();
     const call = memory.rememberCalls[0];
@@ -233,13 +255,13 @@ test("generation returns before post-send ingestion and undelivered turns are no
     const deliveredTurn = await layer.respond({
       threadId: thread(4),
       userId: user(1),
-      messageText: "hello",
+      messageId: 1, speakerName: "Віталик", messageText: "hello",
     });
-    assert.equal(deliveredTurn.replyText, "delivered reply");
+    assert.equal(replyText(deliveredTurn), "delivered reply");
     assert.equal(memory.rememberCalls.length, 0);
 
     model.respond(new AIMessage("undelivered reply"));
-    await layer.respond({ threadId: thread(5), userId: user(1), messageText: "again" });
+    await layer.respond({ threadId: thread(5), userId: user(1), messageId: 1, speakerName: "Віталик", messageText: "again" });
     assert.equal(memory.rememberCalls.length, 0);
 
     let writeCompleted = false;
@@ -266,7 +288,7 @@ test("shutdown drains a tracked post-send write", async () => {
   const { dir, model, layer } = fixture(memory, undefined, tracker);
   try {
     model.respond(new AIMessage("reply"));
-    const turn = await layer.respond({ threadId: thread(6), userId: user(1), messageText: "hello" });
+    const turn = await layer.respond({ threadId: thread(6), userId: user(1), messageId: 1, speakerName: "Віталик", messageText: "hello" });
     const postSend = turn.postSend();
     let closed = false;
     const close = layer.close().then(() => {
@@ -288,7 +310,7 @@ test("failed generation is not offered for long-term storage", async () => {
   try {
     model.respond(new Error("generation failed"));
     await assert.rejects(() =>
-      layer.respond({ threadId: thread(1), userId: user(1), messageText: "hello" }),
+      layer.respond({ threadId: thread(1), userId: user(1), messageId: 1, speakerName: "Віталик", messageText: "hello" }),
     );
     assert.equal(memory.rememberCalls.length, 0);
     await layer.close();
@@ -310,9 +332,9 @@ test("search and ingestion failures independently degrade gracefully", async () 
     const reply = await layer.respond({
       threadId: thread(1),
       userId: user(1),
-      messageText: "hello",
+      messageId: 1, speakerName: "Віталик", messageText: "hello",
     });
-    assert.equal(reply.replyText, "valid reply");
+    assert.equal(replyText(reply), "valid reply");
     assert.equal(memory.rememberCalls.length, 0);
     await reply.postSend();
     assert.equal(memory.rememberCalls.length, 1);

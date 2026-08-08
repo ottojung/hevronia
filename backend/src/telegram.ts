@@ -3,23 +3,13 @@ import { Bot } from "grammy";
 import { respond } from "./respond.js";
 import { isTransientError, sleep } from "./retry.js";
 import {
+  conversationThreadIdFromTelegramGroupChat,
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromTelegramSender,
 } from "./identifiers.js";
-
-const EXPECTED_NAME = "Хевронія";
-const EXPECTED_USERNAME = "hevronia_bot";
-
-export function tokenFromEnv(): string {
-  const token = process.env["TELEGRAM_BOT_TOKEN"];
-  if (!token) {
-    throw new Error(
-      "TELEGRAM_BOT_TOKEN is not set in the environment. " +
-        "Provide the bot token before starting the bot.",
-    );
-  }
-  return token;
-}
+import { deliverGeneratedTurn } from "./telegram-delivery.js";
+import { logBotIdentity, tokenFromEnv } from "./telegram-config.js";
+export { tokenFromEnv } from "./telegram-config.js";
 
 export async function startBot(): Promise<void> {
   const bot = new Bot(tokenFromEnv());
@@ -43,29 +33,37 @@ export async function startBot(): Promise<void> {
   });
 
   const me = await bot.api.getMe();
-  console.log(
-    `Authenticated with Telegram: id=${me.id}, name="${me.first_name}", username=@${me.username}`,
-  );
-  if (me.first_name !== EXPECTED_NAME || me.username !== EXPECTED_USERNAME) {
-    console.warn(
-      `Unexpected bot identity — expected "${EXPECTED_NAME}" / @${EXPECTED_USERNAME}, ` +
-        `got "${me.first_name}" / @${me.username}`,
-    );
-  }
+  logBotIdentity(me);
 
   bot.on("message:text", async (ctx) => {
-    if (ctx.chat.type !== "private") {
-      return;
-    }
     const updateId = ctx.update.update_id;
     const messageId = ctx.message.message_id;
     console.log(`Handling private text message update=${updateId} message=${messageId}`);
     try {
-      await ctx.replyWithChatAction("typing");
-      const threadId = conversationThreadIdFromTelegramPrivateChat(ctx.chat.id);
+      const threadId = ctx.chat.type === "private"
+        ? conversationThreadIdFromTelegramPrivateChat(ctx.chat.id)
+        : conversationThreadIdFromTelegramGroupChat(ctx.chat.id);
       const userId = longTermMemoryUserIdFromTelegramSender(ctx.from.id);
-      const turn = await respond({ threadId, userId, messageText: ctx.message.text });
-      await ctx.reply(turn.replyText);
+      const turn = await respond({
+        threadId,
+        userId,
+        messageId,
+        speakerName: ctx.from.first_name,
+        messageText: ctx.message.text,
+      });
+      const sent = await deliverGeneratedTurn(turn, {
+        showTyping: async () => {
+          await ctx.replyWithChatAction("typing");
+        },
+        reply: async (text, replyToMessageId) => {
+          await ctx.reply(text, { reply_parameters: { message_id: replyToMessageId } });
+        },
+      });
+      if (!sent) {
+        console.log(`Observed message=${messageId}; chose silence`);
+        void turn.postSend();
+        return;
+      }
       console.log(`Handled message=${messageId}`);
       void turn.postSend();
     } catch (error) {
