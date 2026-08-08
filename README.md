@@ -12,7 +12,7 @@ recalls a small relevant set for the Telegram user in future conversations.
 ```
 Telegram private chat
     ├── thread_id → LangGraph recent messages + rolling summary
-    └── user_id   → Mem0 semantic search (top 5, local Qdrant)
+    └── user_id   → Mem0 semantic search (top 5, Qdrant service)
                               ↓
               ephemeral dynamic system context
                               ↓
@@ -42,8 +42,9 @@ hevronia/
 
 ## Prerequisites
 
-- Node.js >= 20 (tested on Node 22)
+- Node.js >= 22.13
 - npm
+- Qdrant (the provided Compose service is the simplest local option)
 
 ## Installation
 
@@ -64,6 +65,8 @@ MY_OPENAI_API_KEY
 - `MY_OPENAI_API_KEY` is passed explicitly to the LangChain `ChatOpenAI`
   integration and to both Mem0's extraction LLM and OpenAI embedder.
   `OPENAI_API_KEY` is neither expected nor used.
+- `QDRANT_URL` selects the Qdrant HTTP endpoint and defaults to
+  `http://127.0.0.1:6333`.
 
 The bot fails fast at startup if either variable is absent. Secrets are never
 printed, logged, or stored, and should never be committed.
@@ -78,6 +81,7 @@ In the normal working environment both variables are already provided through
 ## Running locally
 
 ```bash
+docker compose up -d qdrant
 npm run dev        # development (tsx watch, no build step)
 ```
 
@@ -93,12 +97,13 @@ Both connect to Telegram via long polling (no webhooks). On startup the bot:
 1. authenticates with Telegram;
 2. verifies the identity matches `Хевронія` / `@hevronia_bot`;
 3. validates that `MY_OPENAI_API_KEY` is present;
-4. opens the conversation-memory database;
+4. connects Mem0 to Qdrant and opens the conversation-memory databases;
 5. starts long polling for message updates;
 6. replies to each private text message.
 
-It shuts down gracefully on `SIGINT`/`SIGTERM`. While generating a reply the
-bot sends a Telegram `typing` chat action.
+It shuts down gracefully on `SIGINT`/`SIGTERM`, including a bounded wait for
+pending long-term-memory writes. While generating a reply the bot sends a
+Telegram `typing` chat action.
 
 ## Memory
 
@@ -113,10 +118,15 @@ LangGraph owns thread-scoped conversational continuity under
 `telegram-private:<chat id>` and persists it in the ignored
 `backend/.data/checkpoints.sqlite`. Mem0 owns durable semantic knowledge under
 `telegram-user:<sender id>`. It extracts concise facts only from completed
-user/assistant turns, records audit history at `backend/.data/mem0/history.db`,
-and stores embeddings in the versioned Qdrant collection under
-`backend/.data/mem0/qdrant/`. All paths are module-relative, local, persistent,
-and ignored by Git.
+user/assistant turns and records audit history at
+`backend/.data/mem0/history.db`. A real Qdrant service stores the versioned
+vector collection. The provided Compose service persists Qdrant data at
+`backend/.data/qdrant/`; `QDRANT_URL` may instead select another deployment.
+
+Each turn retrieves memories, generates a reply, sends it through Telegram,
+and only then starts Mem0 extraction. Undelivered replies are not memorized.
+Memory-write failures are logged without delaying or invalidating a delivered
+reply, and pending writes receive a bounded drain during shutdown.
 
 Admission is deliberately conservative, retrieval is bounded, and there is no
 arbitrary size cap. Expiration and garbage collection are deferred until real
@@ -137,6 +147,7 @@ same chat.
 | `npm run build`         | compile the backend to `backend/dist/`    |
 | `npm start`             | run the compiled build                    |
 | `npm test`              | run backend unit tests (no network)       |
+| `npm run test:memory-integration` | live Mem0 persistence check       |
 | `npm run lint`          | ESLint across the repository              |
 | `npm run lint:fix`      | ESLint with `--fix`                       |
 | `npm run static-analysis` | `tsc --noEmit` + ESLint (no warnings)  |

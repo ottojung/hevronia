@@ -18,6 +18,8 @@ import type {
   RespondInput,
 } from "./conversation-types.js";
 import { recallForTurn, rememberSuccessfulTurn } from "./long-term-memory/operations.js";
+import { PendingMemoryWrites } from "./long-term-memory/pending.js";
+import { GeneratedTurn } from "./generated-turn.js";
 import {
   invocationContextSchema,
   recalledMemoryPromptMiddleware,
@@ -31,6 +33,7 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
   const trimTokensToSummarize =
     options.trimTokensToSummarize ?? COMPACTION.trimTokensToSummarize;
   const longTermMemory = options.longTermMemory;
+  const pendingMemoryWrites = options.pendingMemoryWrites ?? new PendingMemoryWrites();
 
   mkdirSync(dirname(dbPath), { recursive: true });
   const checkpointer = SqliteSaver.fromConnString(dbPath);
@@ -57,7 +60,6 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
   const agent = createAgent({
     model,
     tools: [],
-    systemPrompt,
     contextSchema: invocationContextSchema,
     checkpointer,
     middleware: [
@@ -75,15 +77,18 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
   });
 
   return {
-    async respond({ threadId, userId, messageText }: RespondInput): Promise<string> {
+    async respond({ threadId, userId, messageText }: RespondInput): Promise<GeneratedTurn> {
       const recalledMemories = await recallForTurn(longTermMemory, userId, messageText);
       const result = await agent.invoke(
         { messages: [new HumanMessage(messageText)] },
         { configurable: { thread_id: threadId }, context: { recalledMemories } },
       );
       const replyText = extractReplyText(result.messages);
-      await rememberSuccessfulTurn(longTermMemory, userId, threadId, messageText, replyText);
-      return replyText;
+      return GeneratedTurn.fromGeneratedResponse(
+        replyText,
+        () => rememberSuccessfulTurn(longTermMemory, userId, threadId, messageText, replyText),
+        pendingMemoryWrites,
+      );
     },
     async getMessages(threadId: string): Promise<BaseMessage[]> {
       const tuple = await checkpointer.getTuple({ configurable: { thread_id: threadId } });
@@ -94,6 +99,7 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
       return stored.filter(isBaseMessage);
     },
     async close(): Promise<void> {
+      await pendingMemoryWrites.drain();
       checkpointer.db.close();
     },
   };

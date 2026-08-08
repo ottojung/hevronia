@@ -16,8 +16,8 @@ export async function recallForTurn(
     const recalled = await memory.search(userId, query, LONG_TERM_MEMORY_TOP_K);
     console.log(`Recalled ${recalled.length} long-term memories`);
     return recalled;
-  } catch {
-    console.warn("Long-term memory retrieval failed; continuing without recalled memories");
+  } catch (error) {
+    console.warn(`Long-term-memory search failed: ${operationalErrorDetail(error)}`);
     return [];
   }
 }
@@ -34,7 +34,21 @@ export async function rememberSuccessfulTurn(
   }
   try {
     await memory.rememberTurn(userId, threadId, userMessage, assistantMessage);
-  } catch {
-    console.warn("Long-term memory ingestion failed; returning the generated reply");
+  } catch (error) {
+    console.warn(`Long-term-memory ingestion failed: ${operationalErrorDetail(error)}`);
   }
+}
+
+function operationalErrorDetail(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return "non-Error failure";
+  }
+  let detail = `${error.name}: ${error.message}`;
+  for (const secretName of ["MY_OPENAI_API_KEY", "TELEGRAM_BOT_TOKEN"]) {
+    const secret = process.env[secretName];
+    if (secret) {
+      detail = detail.replaceAll(secret, "[redacted]");
+    }
+  }
+  return detail;
 }

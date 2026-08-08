@@ -22,10 +22,10 @@ test("thread continuity: a second turn sees the first turn", async () => {
     const layer = createConversationLayer({ dbPath: path, model, summaryModel: summary });
 
     model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    assert.equal(await layer.respond({ threadId: "thread-a", userId: "test-user", messageText: "перше повідомлення" }), "saw 2 messages");
+    assert.equal((await layer.respond({ threadId: "thread-a", userId: "test-user", messageText: "перше повідомлення" })).replyText, "saw 2 messages");
 
     model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    assert.equal(await layer.respond({ threadId: "thread-a", userId: "test-user", messageText: "друге повідомлення" }), "saw 4 messages");
+    assert.equal((await layer.respond({ threadId: "thread-a", userId: "test-user", messageText: "друге повідомлення" })).replyText, "saw 4 messages");
 
     const messages = await layer.getMessages("thread-a");
     assert.equal(messages.length, 4);
@@ -52,7 +52,7 @@ test("thread isolation: different chats do not share context", async () => {
 
     model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
     const reply = await layer.respond({ threadId: "telegram-private:111", userId: "test-user", messageText: "again from 111" });
-    assert.equal(reply, "saw 4 messages");
+    assert.equal(reply.replyText, "saw 4 messages");
 
     const messages = await layer.getMessages("telegram-private:111");
     const text = messages.map((m) => m.content).join("\n");
@@ -76,7 +76,7 @@ test("persistence: state survives layer recreation", async () => {
     secondModel.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
     const secondLayer = createConversationLayer({ dbPath: path, model: secondModel, summaryModel: fakeModel() });
     const reply = await secondLayer.respond({ threadId: "thread-p", userId: "test-user", messageText: "Який мій улюблений фрукт?" });
-    assert.equal(reply, "saw 4 messages");
+    assert.equal(reply.replyText, "saw 4 messages");
 
     const messages = await secondLayer.getMessages("thread-p");
     assert.equal(messages.length, 4);
@@ -149,7 +149,7 @@ test("failure does not write a fake assistant reply into memory", async () => {
 
     model.respond(new AIMessage("відповідь після збою"));
     const reply = await layer.respond({ threadId: "thread-f", userId: "test-user", messageText: "знову привіт" });
-    assert.equal(reply, "відповідь після збою");
+    assert.equal(reply.replyText, "відповідь після збою");
 
     const messages = await layer.getMessages("thread-f");
     const assistantTexts = messages

@@ -19,6 +19,8 @@ Telegram private chat
                                     ↓
                          OpenAI → Хевронія response
                                     ↓
+                           Telegram delivery
+                                    ↓
                          Mem0 extraction and Qdrant
 ```
 
@@ -29,18 +31,21 @@ Telegram private chat
 - `backend/src/respond.ts` — the conversational entry point.
 - `backend/src/layer.ts` — the LangChain agent, `summarizationMiddleware`,
   ephemeral memory-prompt middleware, and the SQLite checkpointer.
-- `backend/src/long-term-memory/` — the Mem0 boundary, persistent local Qdrant
-  configuration, and conservative extraction policy.
+- `backend/src/long-term-memory/` — the Mem0 boundary, Qdrant service
+  configuration, pending-write lifecycle, and conservative extraction policy.
 - `backend/src/personality.ts` — Хевронія's system prompt.
 
 Conversation state is owned by LangGraph and persisted in the ignored
 `backend/.data/checkpoints.sqlite`. It survives process restarts.
 
 Mem0 owns durable knowledge about a person, scoped by
-`telegram-user:<sender id>`. Its Qdrant vectors and SQLite history live beneath
-the ignored `backend/.data/mem0/`. Recalled facts exist only in the dynamic
-system prompt for one invocation, so they cannot enter checkpoints or rolling
-summaries. Search or ingestion failures degrade to normal thread-only behavior.
+`telegram-user:<sender id>`. Its SQLite history lives beneath the ignored
+`backend/.data/mem0/`; the Qdrant service provided by Compose persists vectors
+under `backend/.data/qdrant/`. Recalled facts exist only in the dynamic system
+prompt for one invocation, so they cannot enter checkpoints or rolling
+summaries. Only successfully delivered turns are offered to Mem0. Search or
+ingestion failures degrade to normal thread-only behavior, and shutdown drains
+pending writes with a bounded wait.
 There is no automatic expiration or garbage collection: conservative admission
 and top-five retrieval control the initial data set until operational evidence
 supports a more precise lifecycle policy.

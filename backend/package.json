@@ -9,7 +9,8 @@
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test-only": "node --import tsx --test tests/*.test.ts"
+    "test-only": "node --import tsx --test tests/*.test.ts",
+    "test:memory-integration": "node --import tsx scripts/memory-integration.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.2.5",

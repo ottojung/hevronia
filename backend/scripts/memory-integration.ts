@@ -1,0 +1,34 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+
+import { createMem0LongTermMemory } from "../src/long-term-memory/index.js";
+
+const userId = `integration-test:${randomUUID()}`;
+const query = "улюблений фрукт";
+
+const firstMemory = createMem0LongTermMemory();
+try {
+  await firstMemory.rememberTurn(
+    userId,
+    "integration-test:initial",
+    "Мій улюблений тестовий фрукт — манго.",
+    "Добре, запам'ятаю.",
+  );
+  console.log("Mem0 add succeeded");
+
+  const initialResults = await firstMemory.search(userId, query, 5);
+  assert.ok(initialResults.length > 0, "Mem0 search should recall the test fact");
+  console.log(`Mem0 search returned ${initialResults.length} result(s)`);
+
+  const recreatedMemory = createMem0LongTermMemory();
+  const persistedResults = await recreatedMemory.search(userId, query, 5);
+  assert.ok(persistedResults.length > 0, "memory should survive service recreation");
+  console.log(`Mem0 recreation search returned ${persistedResults.length} result(s)`);
+
+  await recreatedMemory.deleteAll(userId);
+  const cleanedResults = await recreatedMemory.search(userId, query, 5);
+  assert.equal(cleanedResults.length, 0, "cleanup should remove the disposable user's memories");
+  console.log("Mem0 cleanup succeeded");
+} finally {
+  await firstMemory.deleteAll(userId).catch(() => undefined);
+}

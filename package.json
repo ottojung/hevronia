@@ -2,6 +2,9 @@
   "name": "hevronia",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "description": "Хевронія (@hevronia_bot) — a Telegram bot with persistent conversational memory",
   "workspaces": [
     "backend",
@@ -15,6 +18,7 @@
     "static-analysis": "tsc --noEmit && eslint . --max-warnings 0",
     "test": "npm run test -w backend",
     "test-only": "npm run test-only -w backend",
+    "test:memory-integration": "npm run test:memory-integration -w backend",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix --max-warnings 0",
     "docs:dev": "npm run dev -w docs",

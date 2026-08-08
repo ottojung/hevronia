@@ -16,6 +16,7 @@ import {
   type RecalledMemory,
 } from "../src/long-term-memory/index.js";
 import { LONG_TERM_MEMORY_POLICY } from "../src/long-term-memory/policy.js";
+import { PendingMemoryWrites } from "../src/long-term-memory/pending.js";
 
 interface SearchCall {
   userId: string;
@@ -30,12 +31,28 @@ interface RememberCall {
   assistantMessage: string;
 }
 
+class DeferredWrite {
+  readonly promise: Promise<void>;
+  private resolve: (() => void) | undefined;
+
+  constructor() {
+    this.promise = new Promise((resolve) => {
+      this.resolve = resolve;
+    });
+  }
+
+  finish(): void {
+    this.resolve?.();
+  }
+}
+
 class FakeLongTermMemory implements LongTermMemory {
   readonly searchCalls: SearchCall[] = [];
   readonly rememberCalls: RememberCall[] = [];
   readonly memoriesByUser = new Map<string, RecalledMemory[]>();
   searchFailure: Error | undefined;
   rememberFailure: Error | undefined;
+  rememberPromise: Promise<void> | undefined;
 
   async search(userId: string, query: string, topK: number): Promise<RecalledMemory[]> {
     this.searchCalls.push({ userId, query, topK });
@@ -44,6 +61,8 @@ class FakeLongTermMemory implements LongTermMemory {
     }
     return this.memoriesByUser.get(userId) ?? [];
   }
+
+  async deleteAll(_userId: string): Promise<void> {}
 
   async rememberTurn(
     userId: string,
@@ -55,10 +74,15 @@ class FakeLongTermMemory implements LongTermMemory {
     if (this.rememberFailure !== undefined) {
       throw this.rememberFailure;
     }
+    await this.rememberPromise;
   }
 }
 
-function fixture(memory: LongTermMemory): {
+function fixture(
+  memory: LongTermMemory,
+  systemPrompt?: string,
+  pendingMemoryWrites?: PendingMemoryWrites,
+): {
   dir: string;
   model: ReturnType<typeof fakeModel>;
   layer: ReturnType<typeof createConversationLayer>;
@@ -70,19 +94,24 @@ function fixture(memory: LongTermMemory): {
     model,
     summaryModel: fakeModel(),
     longTermMemory: memory,
+    systemPrompt,
+    pendingMemoryWrites,
   });
   return { dir, model, layer };
 }
 
 test("retrieval uses top five and reaches the model through ephemeral system context", async () => {
+  const sentinel = "BASE_SYSTEM_PROMPT_SENTINEL";
   const memory = new FakeLongTermMemory();
   memory.memoriesByUser.set("telegram-user:111", [
     { text: "User's favourite colour is purple." },
   ]);
-  const { dir, model, layer } = fixture(memory);
+  const { dir, model, layer } = fixture(memory, sentinel);
   try {
     model.respond((messages) => {
-      assert.ok(messages.map((message) => extractText(message.content)).join("\n").includes("favourite colour is purple"));
+      const visibleText = messages.map((message) => extractText(message.content)).join("\n");
+      assert.equal(visibleText.split(sentinel).length - 1, 1);
+      assert.equal(visibleText.split("favourite colour is purple").length - 1, 1);
       return new AIMessage("Фіолетовий.");
     });
     await layer.respond({
@@ -141,7 +170,9 @@ test("successful turns are offered for storage exactly once", async () => {
   const { dir, model, layer } = fixture(memory);
   try {
     model.respond(new AIMessage("assistant reply"));
-    await layer.respond({ threadId: "thread-a", userId: "user-a", messageText: "user text" });
+    const turn = await layer.respond({ threadId: "thread-a", userId: "user-a", messageText: "user text" });
+    assert.equal(memory.rememberCalls.length, 0);
+    await turn.postSend();
     assert.deepEqual(memory.rememberCalls, [
       {
         userId: "user-a",
@@ -151,6 +182,59 @@ test("successful turns are offered for storage exactly once", async () => {
       },
     ]);
     await layer.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("generation returns before post-send ingestion and undelivered turns are not stored", async () => {
+  const memory = new FakeLongTermMemory();
+  const pendingWrite = new DeferredWrite();
+  memory.rememberPromise = pendingWrite.promise;
+  const { dir, model, layer } = fixture(memory);
+  try {
+    model.respond(new AIMessage("delivered reply"));
+    const deliveredTurn = await layer.respond({
+      threadId: "delivered",
+      userId: "user-a",
+      messageText: "hello",
+    });
+    assert.equal(deliveredTurn.replyText, "delivered reply");
+    assert.equal(memory.rememberCalls.length, 0);
+
+    model.respond(new AIMessage("undelivered reply"));
+    await layer.respond({ threadId: "failed-send", userId: "user-a", messageText: "again" });
+    assert.equal(memory.rememberCalls.length, 0);
+
+    const postSend = deliveredTurn.postSend();
+    assert.equal(memory.rememberCalls.length, 1);
+    pendingWrite.finish();
+    await postSend;
+    await layer.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shutdown drains a tracked post-send write", async () => {
+  const memory = new FakeLongTermMemory();
+  const pendingWrite = new DeferredWrite();
+  memory.rememberPromise = pendingWrite.promise;
+  const tracker = new PendingMemoryWrites();
+  const { dir, model, layer } = fixture(memory, undefined, tracker);
+  try {
+    model.respond(new AIMessage("reply"));
+    const turn = await layer.respond({ threadId: "thread", userId: "user", messageText: "hello" });
+    const postSend = turn.postSend();
+    let closed = false;
+    const close = layer.close().then(() => {
+      closed = true;
+    });
+    await Promise.resolve();
+    assert.equal(closed, false);
+    pendingWrite.finish();
+    await Promise.all([postSend, close]);
+    assert.equal(closed, true);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -186,7 +270,9 @@ test("search and ingestion failures independently degrade gracefully", async () 
       userId: "user-a",
       messageText: "hello",
     });
-    assert.equal(reply, "valid reply");
+    assert.equal(reply.replyText, "valid reply");
+    assert.equal(memory.rememberCalls.length, 0);
+    await reply.postSend();
     assert.equal(memory.rememberCalls.length, 1);
     await layer.close();
   } finally {
@@ -195,9 +281,11 @@ test("search and ingestion failures independently degrade gracefully", async () 
 });
 
 test("Mem0 production configuration carries the extraction policy and explicit credentials", () => {
-  const config = createMem0Config("test-key");
+  const config = createMem0Config("test-key", "http://qdrant.test:6333");
   assert.equal(config.customInstructions, LONG_TERM_MEMORY_POLICY);
   assert.equal(config.llm.config.apiKey, "test-key");
   assert.equal(config.embedder.config.apiKey, "test-key");
   assert.equal(config.vectorStore.provider, "qdrant");
+  assert.equal(config.vectorStore.config["url"], "http://qdrant.test:6333");
+  assert.equal(config.vectorStore.config["path"], undefined);
 });

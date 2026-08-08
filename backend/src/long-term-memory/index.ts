@@ -1,18 +1,18 @@
-import { mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 
 import { Memory, type MemoryConfig, type MemoryItem } from "mem0ai/oss";
 
 import { MODEL, openAiKeyFromEnv } from "../model.js";
 import { LONG_TERM_MEMORY_POLICY, MEMORY_POLICY_VERSION } from "./policy.js";
+import { qdrantUrlFromEnv } from "./qdrant.js";
 
 export const LONG_TERM_MEMORY_TOP_K = 5;
 export const MEMORY_MODEL = MODEL;
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSION = 1536;
 export const QDRANT_COLLECTION = "hevronia-long-term-memory-v1";
-export const MEM0_DIRECTORY = fileURLToPath(new URL("../../.data/mem0/", import.meta.url));
-export const QDRANT_PATH = fileURLToPath(new URL("../../.data/mem0/qdrant/", import.meta.url));
 export const HISTORY_DB_PATH = fileURLToPath(
   new URL("../../.data/mem0/history.db", import.meta.url),
 );
@@ -29,9 +29,10 @@ export interface LongTermMemory {
     userMessage: string,
     assistantMessage: string,
   ): Promise<void>;
+  deleteAll(userId: string): Promise<void>;
 }
 
-export function createMem0Config(apiKey: string): MemoryConfig {
+export function createMem0Config(apiKey: string, qdrantUrl: string): MemoryConfig {
   return {
     llm: {
       provider: "openai",
@@ -46,8 +47,7 @@ export function createMem0Config(apiKey: string): MemoryConfig {
       config: {
         collectionName: QDRANT_COLLECTION,
         dimension: EMBEDDING_DIMENSION,
-        path: QDRANT_PATH,
-        onDisk: true,
+        url: qdrantUrl,
       },
     },
     historyDbPath: HISTORY_DB_PATH,
@@ -55,10 +55,18 @@ export function createMem0Config(apiKey: string): MemoryConfig {
   };
 }
 
-export function createMem0LongTermMemory(): LongTermMemory {
-  mkdirSync(QDRANT_PATH, { recursive: true });
-  const memory = new Memory(createMem0Config(openAiKeyFromEnv()));
-  console.log(`Long-term memory initialized; local data directory: ${MEM0_DIRECTORY}`);
+export interface Mem0LongTermMemoryOptions {
+  apiKey?: string;
+  qdrantUrl?: string;
+}
+
+export function createMem0LongTermMemory(
+  options: Mem0LongTermMemoryOptions = {},
+): LongTermMemory {
+  const qdrantUrl = options.qdrantUrl ?? qdrantUrlFromEnv();
+  mkdirSync(dirname(HISTORY_DB_PATH), { recursive: true });
+  const memory = new Memory(createMem0Config(options.apiKey ?? openAiKeyFromEnv(), qdrantUrl));
+  console.log("Long-term memory configured using Qdrant service");
 
   return {
     async search(userId, query, topK) {
@@ -83,6 +91,9 @@ export function createMem0LongTermMemory(): LongTermMemory {
           },
         },
       );
+    },
+    async deleteAll(userId) {
+      await memory.deleteAll({ userId });
     },
   };
 }
