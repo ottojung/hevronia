@@ -42,7 +42,9 @@ test("user and send-as-chat identities remain distinct and chat senders skip Mem
     await layer.respond({ threadId, message: sendAsChat,
       hevroniaSender: { kind: "user", id: 999 } });
     await layer.close();
-    assert.deepEqual(calls, ["search:telegram-user:101", "write:telegram-user:101"]);
+    assert.deepEqual(calls, ["search:telegram-user:101", "write:telegram-user:101",
+      "search:telegram-user:101"]);
+    assert.ok(calls.every((call) => !call.includes("telegram-chat")));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

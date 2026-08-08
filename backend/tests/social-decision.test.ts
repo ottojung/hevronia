@@ -64,7 +64,9 @@ test("real planner receives canonical personality, background, and recalled memo
   const planner = createSocialDecisionMaker(model, SYSTEM_PROMPT);
   await planner.decide({ boundedHistory: [], currentMessage: message(),
     replyCandidates: [{ key: "candidate-0", messageId: 10, sender: { kind: "user", id: 88 },
-      senderDisplayName: "Іра", text: "та ні" }], recalledMemories: [{ text: "Іра боїться павуків" }] });
+      senderDisplayName: "Іра", text: "та ні" }], participantMemories: [{
+        participant: { kind: "user", id: 88 }, memories: [{ text: "Іра боїться павуків" }],
+      }] });
 });
 
 test("a non-candidate planner target cannot reach Telegram delivery", async () => {
@@ -178,7 +180,8 @@ test("recalled memory reaches the planner before silence decision", async () => 
     rememberUserMessage: async () => undefined, deleteAll: async () => undefined };
   let recalled = "";
   const planner: SocialDecisionMaker = { decide: async (context) => {
-    recalled = context.recalledMemories.map(({ text }) => text).join();
+    recalled = context.participantMemories.flatMap(({ memories }) =>
+      memories.map(({ text }) => text)).join();
     return { action: "silence" };
   } };
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),

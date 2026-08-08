@@ -10,7 +10,7 @@ import { fakeModel } from "@langchain/core/testing";
 import { createConversationLayer } from "../src/layer.js";
 import type { SocialDecisionContext, SocialDecisionMaker } from "../src/social-decision.js";
 import { SUMMARY_PREFIX } from "../src/summary.js";
-import type { ObservedTelegramMessage } from "../src/telegram-event.js";
+import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../src/telegram-event.js";
 import {
   conversationThreadIdFromTelegramGroupChat,
   conversationThreadIdFromTelegramPrivateChat,
@@ -108,6 +108,44 @@ test("forum topics in one group have isolated histories and reply candidates", a
     assert.deepEqual(seen.get("22"), ["тільки B"]);
     assert.equal((await layer.getMessages(topicA)).length, 1);
     assert.equal((await layer.getMessages(topicB)).length, 1);
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("compaction preserves user and chat sender kinds with duplicate names", async () => {
+  const { dir, db } = tempPath();
+  const summary = fakeModel();
+  for (let index = 0; index < 10; index += 1) {
+    summary.respond((messages) => {
+      const input = messages.map(({ content }) => String(content)).join("\n");
+      assert.match(input, /telegram-user:11/);
+      assert.match(input, /telegram-chat:-22/);
+      return new AIMessage(
+        "telegram-user:11 Новини любить чай; telegram-chat:-22 Новини не любить чай",
+      );
+    });
+  }
+  const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
+    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 100,
+    tokenCounter: (messages) => messages.length * 10 });
+  try {
+    for (let index = 0; index < 6; index += 1) {
+      const sender: TelegramSenderIdentity = index % 2 === 0
+        ? { kind: "user", id: 11 } : { kind: "chat", id: -22 };
+      const observed: ObservedTelegramMessage = { ...event(`факт ${index}`, index + 1, 11, "Новини"),
+        sender };
+      await layer.respond({ threadId, message: observed,
+        hevroniaSender: { kind: "user", id: 999 } });
+    }
+    const compacted = (await layer.getMessages(threadId)).find((message) =>
+      message.additional_kwargs["lc_source"] === "summarization");
+    assert.ok(compacted);
+    assert.match(String(compacted.content), /telegram-user:11 Новини любить чай/);
+    assert.match(String(compacted.content), /telegram-chat:-22 Новини не любить чай/);
+    assert.doesNotMatch(String(compacted.content), /telegram-user:-22/);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });

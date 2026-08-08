@@ -6,6 +6,7 @@ import { deliverFallbackMessage, deliverGeneratedTurn } from "./telegram-deliver
 import { logBotIdentity, tokenFromEnv } from "./telegram-config.js";
 import { createObservedTelegramMessage, hasDirectMention, telegramDisplayName, telegramSenderIdentity } from "./telegram-observation.js";
 import { installTelegramRetry } from "./telegram-retry.js";
+import { isConversationThreadPersistenceError } from "./pending-conversation-writes.js";
 import type { TelegramSenderIdentity } from "./telegram-event.js";
 export { tokenFromEnv } from "./telegram-config.js";
 
@@ -60,6 +61,7 @@ export async function startBot(): Promise<void> {
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       console.error(`Failed to handle message=${messageId}: ${detail}`);
+      if (isConversationThreadPersistenceError(error)) return;
       const fallbackText = "Щось я зараз зависла. Спробуй ще раз за хвилину.";
       const fallbackThreadId = conversationThreadIdFromTelegramChat(ctx.chat.type, ctx.chat.id, messageThreadId);
       const fallbackTargetSender: TelegramSenderIdentity = telegramSenderIdentity(

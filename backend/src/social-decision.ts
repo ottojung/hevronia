@@ -3,8 +3,8 @@ import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import { createAgent, providerStrategy } from "langchain";
 import { z } from "zod";
 
-import type { RecalledMemory } from "./long-term-memory/index.js";
-import { renderRecalledMemoryContext } from "./long-term-memory/render-context.js";
+import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
+import type { ParticipantMemoryContext } from "./participant-memory.js";
 import { extractText } from "./text.js";
 import {
   deserializeTelegramEvent,
@@ -40,7 +40,7 @@ export interface SocialDecisionContext {
   boundedHistory: BaseMessage[];
   currentMessage: ObservedTelegramMessage;
   replyCandidates: ReplyCandidate[];
-  recalledMemories: RecalledMemory[];
+  participantMemories: ParticipantMemoryContext[];
 }
 
 export interface SocialDecisionMaker {
@@ -82,7 +82,7 @@ export function renderDecisionContext(context: SocialDecisionContext): string {
     `Directly addressed: ${context.currentMessage.directlyAddressed}`,
     `Reply relationship: ${JSON.stringify(context.currentMessage.replyTo)}`,
     `Eligible reply candidates: ${JSON.stringify(context.replyCandidates)}`,
-    renderRecalledMemoryContext(context.recalledMemories),
+    renderParticipantMemoryContexts(context.participantMemories),
     "Bounded canonical conversation:",
     renderBoundedConversation(context.boundedHistory),
   ].join("\n");

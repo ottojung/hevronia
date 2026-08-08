@@ -1,10 +1,22 @@
 import { type BaseMessage } from "@langchain/core/messages";
 
 import { extractText } from "./text.js";
-import { renderRecalledMemoryContext } from "./long-term-memory/render-context.js";
+import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
+import type { ParticipantMemoryContext } from "./participant-memory.js";
 import { deserializeTelegramEvent } from "./telegram-event.js";
 import { renderBoundedConversation, type ReplyCandidate, type ResolvedSocialDecision, type SocialDecision } from "./social-decision.js";
 import type { DeliveredHevroniaMessage, ObservedTelegramMessage, ReplyRelationship } from "./telegram-event.js";
+
+export class InvalidRealizationResponseError extends Error {
+  constructor() {
+    super("Realization model returned no Telegram message");
+    this.name = "InvalidRealizationResponseError";
+  }
+}
+
+export function isInvalidRealizationResponseError(error: unknown): error is InvalidRealizationResponseError {
+  return error instanceof InvalidRealizationResponseError;
+}
 
 export function replyCandidates(messages: BaseMessage[]): ReplyCandidate[] {
   const candidates: ReplyCandidate[] = [];
@@ -26,11 +38,11 @@ export function replyCandidates(messages: BaseMessage[]): ReplyCandidate[] {
 
 export function realizationContext(
   history: BaseMessage[],
-  memories: { text: string }[],
+  memories: ParticipantMemoryContext[],
   decision: ResolvedSocialDecision,
 ): string {
   return `Observed bounded Telegram conversation:\n${renderBoundedConversation(history)}\n\n` +
-    `${renderRecalledMemoryContext(memories)}\n\n` +
+    `${renderParticipantMemoryContexts(memories)}\n\n` +
     `Resolved reply target and social decision: ${JSON.stringify(decision)}\n\n` +
     "Realize that decision. Return only the Telegram text Хевронія sends; never expose planning metadata.";
 }

@@ -7,24 +7,17 @@ import { dirname } from "node:path";
 import type { ConversationLayer, ConversationLayerOptions, RespondInput } from "./conversation-types.js";
 import { createConversationStore } from "./conversation-store.js";
 import { GeneratedTurn } from "./generated-turn.js";
-import { memoryUserIdForSender, recallForTurn, scheduleRememberedMessage } from "./long-term-memory/operations.js";
+import { memoryUserIdForSender, scheduleRememberedMessage } from "./long-term-memory/operations.js";
 import { PendingMemoryWrites } from "./long-term-memory/pending.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
+import { memoriesForTarget, recallForCandidates } from "./participant-memory.js";
 import { MODEL, openAiKeyFromEnv } from "./model.js";
 import { SYSTEM_PROMPT } from "./personality.js";
 import { createSocialDecisionMaker } from "./social-decision.js";
 import { COMPACTION, DEFAULT_DB_PATH } from "./summary.js";
 import { extractText } from "./text.js";
-import { deliveredEvent, realizationContext, replyCandidates, replyRelationship, resolveDecision } from "./turn-context.js";
-
-export class InvalidRealizationResponseError extends Error {
-  constructor() {
-    super("Realization model returned no Telegram message"); this.name = "InvalidRealizationResponseError";
-  }
-}
-export function isInvalidRealizationResponseError(error: unknown): error is InvalidRealizationResponseError {
-  return error instanceof InvalidRealizationResponseError;
-}
+import { InvalidRealizationResponseError, deliveredEvent, realizationContext,
+  replyCandidates, replyRelationship, resolveDecision } from "./turn-context.js";
 
 export function createConversationLayer(options: ConversationLayerOptions = {}): ConversationLayer {
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
@@ -47,18 +40,18 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
 
   return {
     async respond(input: RespondInput): Promise<GeneratedTurn> {
-      await canonicalWrites.waitForThread(input.threadId);
-      await store.append(input.threadId, input.message);
+      await canonicalWrites.submitAndWait(
+        input.threadId, () => store.append(input.threadId, input.message),
+      );
       const history = await store.getMessages(input.threadId);
       const userId = memoryUserIdForSender(input.message.sender);
-      const recalled = userId === undefined ? []
-        : await recallForTurn(options.longTermMemory, userId, input.message.text);
       const candidates = replyCandidates(history);
+      const participantMemories = await recallForCandidates(options.longTermMemory, candidates);
       let decision: Awaited<ReturnType<typeof planner.decide>>;
       try {
         decision = await planner.decide({
           boundedHistory: history, currentMessage: input.message,
-          replyCandidates: candidates, recalledMemories: recalled,
+          replyCandidates: candidates, participantMemories,
         });
       } catch (error) {
         console.warn(`Social decision failed safely to silence: ${String(error)}`);
@@ -78,7 +71,9 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
       }
       const response = await model.invoke([
         new SystemMessage(personality),
-        new HumanMessage(realizationContext(history, recalled, resolved)),
+        new HumanMessage(realizationContext(
+          history, memoriesForTarget(participantMemories, resolved.target), resolved,
+        )),
       ]);
       if (!isBaseMessage(response)) throw new InvalidRealizationResponseError();
       const replyText = extractText(response.content).trim();

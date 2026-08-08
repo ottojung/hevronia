@@ -66,3 +66,37 @@ test("confirmed outgoing persistence retries before the next planner context", a
     await layer.close();
   }
 });
+
+test("incoming canonical persistence recovers before planning", async () => {
+  const events: CanonicalTelegramEvent[] = [];
+  let attempts = 0;
+  let planned = false;
+  const store: ConversationStore = {
+    append: async (_threadId, event) => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("temporary incoming failure");
+      if (!events.some(({ kind, messageId }) => kind === event.kind && messageId === event.messageId)) {
+        events.push(event);
+      }
+    },
+    getMessages: async () => events.map((event) => new HumanMessage({
+      content: serializeTelegramEvent(event), id: `${event.kind}:${event.messageId}`,
+    })),
+  };
+  const planner: SocialDecisionMaker = { decide: async () => {
+    planned = true;
+    assert.equal(events.length, 1);
+    return { action: "silence" };
+  } };
+  const layer = createConversationLayer({ model: fakeModel(), summaryModel: fakeModel(),
+    conversationStore: store, decisionMaker: planner });
+  try {
+    await layer.respond({ threadId, message: message(4, "вхідне"),
+      hevroniaSender: { kind: "user", id: 999 } });
+    assert.equal(attempts, 2);
+    assert.equal(planned, true);
+    assert.equal(events.filter(({ kind }) => kind === "participant").length, 1);
+  } finally {
+    await layer.close();
+  }
+});

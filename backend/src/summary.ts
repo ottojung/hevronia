@@ -24,7 +24,7 @@ export const SUMMARY_PROMPT = `Create a compact continuity summary of the earlie
 Preserve information that may matter later:
 
 - concrete facts established by any participant, always attributed to that
-  participant's stable telegram-user or telegram-chat identifier;
+  participant's canonical stable Telegram sender identity;
 - display names and relationships, retaining stable identifiers when names collide;
 - preferences, dislikes, habits, and boundaries;
 - plans, promises, decisions, and intentions;
@@ -47,10 +47,11 @@ Compress aggressively:
 - distinguish hypothetical statements from actual facts;
 - retain exact wording only when the wording itself matters.
 
-For every participant-specific preference, correction, plan, emotional context,
-relationship, unfinished thread, or opinion, retain the stable telegram-user
-identifier of the person it belongs to. Never merge participants because their
-display names match or because their statements conflict.
+For every sender-specific preference, correction, plan, emotional context,
+relationship, unfinished thread, or opinion, retain the original canonical sender
+kind and ID exactly: telegram-user:<id> for a user or telegram-chat:<id> for a chat
+or channel sender. Never convert one kind into the other. Never merge senders
+because their display names match or because their statements conflict.
 
 The summary is internal memory, not a Telegram message. Do not imitate any participant's voice.
 
