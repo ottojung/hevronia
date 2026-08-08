@@ -28,6 +28,16 @@ export const socialDecisionSchema = z.discriminatedUnion("action", [
 
 export type SocialDecision = z.infer<typeof socialDecisionSchema>;
 
+// Provider structured outputs require the root JSON Schema to be an object.
+// A top-level discriminated union serializes to `anyOf`, which OpenAI rejects.
+// The wrapper keeps the domain union intact while giving the provider an
+// object root; callers stay on `SocialDecision` via the unwrapped domain schema.
+// Exported so tests can verify the provider-visible schema through the real
+// conversion path (`providerStrategy` / `toJsonSchema`).
+export const socialDecisionResponseSchema = z.object({
+  decision: socialDecisionSchema,
+}).strict();
+
 export interface ReplyCandidate {
   key: string;
   messageId: number;
@@ -96,14 +106,15 @@ export function createSocialDecisionMaker(
     model,
     tools: [],
     systemPrompt: `${personality}\n\n${PLANNING_MODE}`,
-    responseFormat: providerStrategy(socialDecisionSchema),
+    responseFormat: providerStrategy(socialDecisionResponseSchema),
   });
   return {
     async decide(context): Promise<SocialDecision> {
       const result = await agent.invoke({
         messages: [new HumanMessage(renderDecisionContext(context))],
       });
-      return socialDecisionSchema.parse(result.structuredResponse);
+      const response = socialDecisionResponseSchema.parse(result.structuredResponse);
+      return response.decision;
     },
   };
 }

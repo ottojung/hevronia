@@ -59,7 +59,7 @@ test("real planner receives canonical personality, background, and recalled memo
     assert.match(input, /Warcraft is a hidden layer/);
     assert.match(input, /telegram-user:88/);
     assert.match(input, /боїться павуків/);
-    return new AIMessage(JSON.stringify({ action: "silence" }));
+    return new AIMessage(JSON.stringify({ decision: { action: "silence" } }));
   });
   const planner = createSocialDecisionMaker(model, SYSTEM_PROMPT);
   await planner.decide({ boundedHistory: [], currentMessage: message(),
@@ -168,6 +168,25 @@ test("silence and delivered reply persist the same canonical incoming representa
     assert.match(contents[2] ?? "", /"kind":"hevronia"/);
     assert.deepEqual(sentTexts, ["ага"]);
     assert.ok(!sentTexts.join().includes("motive"));
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a planner exception fails safely to silence instead of crashing", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-planner-crash-"));
+  const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
+    model: fakeModel(), summaryModel: fakeModel(),
+    decisionMaker: { decide: async () => { throw new Error("planner boom"); } } });
+  try {
+    const turn = await layer.respond({ threadId, message: message(),
+      hevroniaSender: { kind: "user", id: 999 } });
+    let delivered = false;
+    const sent = await deliverGeneratedTurn(turn, { showTyping: async () => undefined,
+      reply: async () => { delivered = true; return 100; } });
+    assert.deepEqual(sent, { status: "silence" });
+    assert.equal(delivered, false);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });

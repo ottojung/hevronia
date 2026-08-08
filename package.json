@@ -19,6 +19,7 @@
     "test": "npm run test -w backend",
     "test-only": "npm run test-only -w backend",
     "test:memory-integration": "npm run test:memory-integration -w backend",
+    "test:structured-output-integration": "npm run test:structured-output-integration -w backend",
     "lint": "eslint . --max-warnings 0",
     "lint:fix": "eslint . --fix --max-warnings 0",
     "docs:dev": "npm run dev -w docs",
