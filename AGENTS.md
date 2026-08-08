@@ -33,9 +33,8 @@ npm install
 - Conversation state is owned by LangGraph and persisted in the ignored
   `backend/.data/checkpoints.sqlite`; it is never reimplemented by hand.
 - Durable user-scoped semantic memory is owned by Mem0 in
-  `backend/src/long-term-memory/`; its history is under the ignored
-  `backend/.data/mem0/`, while Qdrant persists vectors through its configured
-  HTTP service. It remains separate from LangGraph thread state.
+  `backend/src/long-term-memory/`; its history and persistent SQLite vectors are
+  under the ignored `backend/.data/mem0/`. It remains separate from LangGraph thread state.
 - ESLint enforces custom rules from `tools/eslint-plugin-hevronia/` (see
   `docs/linting.md`). Run `npm run static-analysis` and `npm run rules:test`
   before finishing changes.

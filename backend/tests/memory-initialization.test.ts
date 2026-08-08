@@ -19,30 +19,23 @@ function fakeLongTermMemory(): LongTermMemory {
   };
 }
 
-function fakeConversationLayer(): ConversationLayer {
+function fakeConversationLayer(close = async () => undefined): ConversationLayer {
   return {
-    respond: async () =>
-      GeneratedTurn.fromReply(
-        "reply",
-        { targetMessageId: 1, targetSender: { kind: "user", id: 2 }, targetSenderDisplayName: "Тест", targetText: "text" },
-        async () => undefined,
-        ),
+    respond: async () => GeneratedTurn.fromSilence(),
     recordDeliveredMessage: async () => undefined,
     getMessages: async () => [],
-    close: async () => undefined,
+    close,
   };
 }
 
-test("production initialization waits for Qdrant before constructing Mem0", async () => {
+test("initialization constructs memory and the conversation layer once", async () => {
   const events: string[] = [];
   process.env["MY_OPENAI_API_KEY"] = "test-key";
   try {
     assert.throws(() => getConversationLayer(), isConversationLayerNotInitializedError);
-    await initializeConversationLayer({
-      waitForReady: async () => {
-        events.push("ready");
-      },
-      createLongTermMemory: () => {
+    initializeConversationLayer({
+      createLongTermMemory: (apiKey) => {
+        assert.equal(apiKey, "test-key");
         events.push("memory");
         return fakeLongTermMemory();
       },
@@ -51,15 +44,32 @@ test("production initialization waits for Qdrant before constructing Mem0", asyn
         return fakeConversationLayer();
       },
     });
-    await initializeConversationLayer({
-      waitForReady: async () => {
+    initializeConversationLayer({
+      createLongTermMemory: () => {
         events.push("unexpected");
+        return fakeLongTermMemory();
       },
-      createLongTermMemory: fakeLongTermMemory,
-      createLayer: fakeConversationLayer,
+      createLayer: () => fakeConversationLayer(),
     });
-    assert.deepEqual(events, ["ready", "memory", "layer"]);
+    assert.deepEqual(events, ["memory", "layer"]);
     assert.equal(getConversationLayer(), getConversationLayer());
+  } finally {
+    delete process.env["MY_OPENAI_API_KEY"];
+    await closeConversationLayer();
+  }
+});
+
+test("closing resets the shared conversation layer", async () => {
+  let closeCount = 0;
+  process.env["MY_OPENAI_API_KEY"] = "test-key";
+  try {
+    initializeConversationLayer({
+      createLongTermMemory: fakeLongTermMemory,
+      createLayer: () => fakeConversationLayer(async () => { closeCount += 1; }),
+    });
+    await closeConversationLayer();
+    assert.equal(closeCount, 1);
+    assert.throws(() => getConversationLayer(), isConversationLayerNotInitializedError);
   } finally {
     delete process.env["MY_OPENAI_API_KEY"];
     await closeConversationLayer();

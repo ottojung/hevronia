@@ -24,7 +24,7 @@ function readVersion(): string {
 
 async function main(): Promise<void> {
   try {
-    await initializeConversationLayer();
+    initializeConversationLayer();
     await startBot();
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);

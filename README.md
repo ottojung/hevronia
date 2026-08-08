@@ -12,7 +12,11 @@ recalls a small relevant set for the Telegram user in future conversations.
 ```
 Telegram private/group chat
     ├── thread_id → LangGraph recent messages + rolling summary
-    └── user_id   → Mem0 semantic search (top 5, Qdrant service)
+    └── user_id   → Mem0 semantic search (top 5)
+                              │
+                              ▼
+              local persistent SQLite vectors
+              backend/.data/mem0/vectors-v1.db
                               ↓
               ephemeral dynamic system context
                               ↓
@@ -44,7 +48,6 @@ hevronia/
 
 - Node.js >= 22.13
 - npm
-- Qdrant 1.19.0 (the provided Compose service is the simplest local option)
 
 ## Installation
 
@@ -65,8 +68,6 @@ MY_OPENAI_API_KEY
 - `MY_OPENAI_API_KEY` is passed explicitly to the LangChain `ChatOpenAI`
   integration and to both Mem0's extraction LLM and OpenAI embedder.
   `OPENAI_API_KEY` is neither expected nor used.
-- `QDRANT_URL` selects the Qdrant HTTP endpoint and defaults to
-  `http://127.0.0.1:6333`.
 
 The bot must be able to observe ambient group conversation. In BotFather, use
 `/setprivacy` for `@hevronia_bot` and **disable Group Privacy Mode**. Telegram
@@ -87,12 +88,8 @@ In the normal working environment both variables are already provided through
 ## Running locally
 
 ```bash
-docker compose up -d qdrant
 npm run dev        # development (tsx watch, no build step)
 ```
-
-The bot may start immediately after Compose. It polls Qdrant's `/readyz`
-endpoint before constructing Mem0, for up to 60 seconds.
 
 or, for the compiled build:
 
@@ -104,7 +101,7 @@ npm start
 Both connect to Telegram via long polling (no webhooks). On startup the bot:
 
 1. validates that `MY_OPENAI_API_KEY` is present;
-2. waits for Qdrant readiness, then initializes Mem0 and conversation memory;
+2. initializes Mem0 and conversation memory;
 3. authenticates with Telegram;
 4. verifies the identity matches `Хевронія` / `@hevronia_bot`;
 5. starts long polling for message updates;
@@ -129,11 +126,11 @@ LangGraph owns thread-scoped conversational continuity under
 `backend/.data/checkpoints.sqlite`. Mem0 owns durable semantic knowledge under
 `telegram-user:<sender id>`. It extracts concise facts only from the user's
 message after the generated reply is delivered, and records audit history at
-`backend/.data/mem0/history.db`. A real Qdrant service stores the versioned
-vector collection. The provided Compose service persists Qdrant data at
-`backend/.data/qdrant/`; `QDRANT_URL` may instead select another deployment.
-Compose also mounts `backend/.data/` into the bot container, so LangGraph
-checkpoints and Mem0 history survive bot image upgrades and container recreation.
+`backend/.data/mem0/history.db`. Mem0 semantic vectors persist at
+`backend/.data/mem0/vectors-v1.db`. Its `"memory"` vector-store provider is
+SQLite-backed when `dbPath` is configured. Semantic retrieval uses a local linear
+scan; this is intentional because the expected corpus is small to moderate and
+operational simplicity matters more than an external ANN service.
 
 Each incoming message is persisted and compacted before the social decision.
 Silence is a first-class outcome. Generated outgoing text is persisted only after
@@ -177,7 +174,7 @@ in groups she observes ambient conversation and may naturally choose silence.
 
 Unit tests cover pure logic and both memory layers using LangChain fake models,
 a fake long-term-memory boundary, and temporary SQLite databases. They never
-call OpenAI, Qdrant, or Telegram.
+call OpenAI or Telegram.
 
 ## Linting
 
@@ -189,11 +186,20 @@ to add a new rule (`npm run rules:new <rule-name>`).
 ## Docker
 
 ```bash
-docker build .
+docker build -t hevronia .
 ```
 
-The image entrypoint is the `hevronia` executable; `docker run <image> --version`
+The image entrypoint is the `hevronia` executable; `docker run hevronia --version`
 prints the version. Running the bot requires the two environment variables above.
+Persist both SQLite memory layers across disposable containers with a direct bind mount:
+
+```bash
+docker run \
+  --mount type=bind,src="$PWD/backend/.data",dst=/workspace/backend/.data \
+  -e TELEGRAM_BOT_TOKEN \
+  -e MY_OPENAI_API_KEY \
+  hevronia
+```
 
 ## Documentation
 
