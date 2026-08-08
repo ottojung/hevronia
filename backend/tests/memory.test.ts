@@ -1,174 +1,153 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { test } from "node:test";
 
-import { fakeModel } from "@langchain/core/testing";
 import { AIMessage } from "@langchain/core/messages";
+import { fakeModel } from "@langchain/core/testing";
 
 import { createConversationLayer } from "../src/layer.js";
+import type { SocialDecisionContext, SocialDecisionMaker } from "../src/social-decision.js";
 import { SUMMARY_PREFIX } from "../src/summary.js";
+import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../src/telegram-event.js";
 import {
+  conversationThreadIdFromTelegramGroupChat,
   conversationThreadIdFromTelegramPrivateChat,
-  longTermMemoryUserIdFromTelegramSender,
 } from "../src/identifiers.js";
 
-const userId = longTermMemoryUserIdFromTelegramSender(1);
+const threadId = conversationThreadIdFromTelegramPrivateChat(1);
 
-function thread(chatId: number) {
-  return conversationThreadIdFromTelegramPrivateChat(chatId);
+function event(text: string, messageId: number, senderId = 1, name = "Іра",
+  messageThreadId: number | null = null): ObservedTelegramMessage {
+  return { kind: "participant", messageId, sender: { kind: "user", id: senderId }, senderDisplayName: name,
+    chatKind: "group", text, messageThreadId, replyTo: null, directlyAddressed: false };
 }
 
-function tempDbPath(): { dir: string; path: string } {
+function tempPath(): { dir: string; db: string } {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-memory-"));
-  return { dir, path: path.join(dir, "checkpoints.sqlite") };
+  return { dir, db: path.join(dir, "checkpoint.sqlite") };
 }
 
-test("thread continuity: a second turn sees the first turn", async () => {
-  const { dir, path } = tempDbPath();
+test("many consecutive silent observations compact bounded multi-participant state", async () => {
+  const { dir, db } = tempPath();
+  const contexts: SocialDecisionContext[] = [];
+  const planner: SocialDecisionMaker = { decide: async (context) => {
+    contexts.push(context);
+    return { action: "silence" };
+  } };
+  const summary = fakeModel();
+  for (let index = 0; index < 20; index += 1) {
+    summary.respond(new AIMessage(
+      "telegram-user:11 Іра любить чай; telegram-user:22 Іра не любить чай",
+    ));
+  }
+  const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
+    decisionMaker: planner, triggerTokens: 20, keepTokens: 12,
+    trimTokensToSummarize: 100, tokenCounter: (messages) => messages.length * 10 });
   try {
-    const model = fakeModel();
-    const summary = fakeModel();
-    const layer = createConversationLayer({ dbPath: path, model, summaryModel: summary });
-
-    model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    assert.equal((await layer.respond({ threadId: thread(1), userId, messageText: "перше повідомлення" })).replyText, "saw 2 messages");
-
-    model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    assert.equal((await layer.respond({ threadId: thread(1), userId, messageText: "друге повідомлення" })).replyText, "saw 4 messages");
-
-    const messages = await layer.getMessages(thread(1));
-    assert.equal(messages.length, 4);
-    assert.equal(messages[0]?.content, "перше повідомлення");
-    assert.equal(messages[2]?.content, "друге повідомлення");
+    for (let index = 0; index < 10; index += 1) {
+      const senderId = index % 2 === 0 ? 11 : 22;
+      const turn = await layer.respond({ threadId,
+        message: event(`повідомлення ${index}`, index + 1, senderId), hevroniaSender: { kind: "user", id: 999 } });
+      assert.equal(turn.outcome.action, "silence");
+    }
+    const stored = await layer.getMessages(threadId);
+    const summaryMessage = stored.find((message) =>
+      message.additional_kwargs["lc_source"] === "summarization");
+    assert.ok(summaryMessage);
+    assert.ok(String(summaryMessage.content).startsWith(SUMMARY_PREFIX));
+    assert.match(String(summaryMessage.content), /telegram-user:11 Іра любить чай/);
+    assert.match(String(summaryMessage.content), /telegram-user:22 Іра не любить чай/);
+    assert.ok(stored.length < 10);
+    assert.ok(contexts.every(({ boundedHistory }) => boundedHistory.length < 10));
+  } finally {
     await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("canonical observed state survives layer recreation", async () => {
+  const { dir, db } = tempPath();
+  const silence: SocialDecisionMaker = { decide: async () => ({ action: "silence" }) };
+  try {
+    const first = createConversationLayer({ dbPath: db, model: fakeModel(),
+      summaryModel: fakeModel(), decisionMaker: silence });
+    await first.respond({ threadId, message: event("перше", 1), hevroniaSender: { kind: "user", id: 999 } });
+    await first.close();
+    const second = createConversationLayer({ dbPath: db, model: fakeModel(),
+      summaryModel: fakeModel(), decisionMaker: silence });
+    const stored = await second.getMessages(threadId);
+    assert.equal(stored.length, 1);
+    assert.match(String(stored[0]?.content), /"sender":\{"kind":"user","id":1\}/);
+    assert.match(String(stored[0]?.content), /"text":"перше"/);
+    await second.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("thread isolation: different chats do not share context", async () => {
-  const { dir, path } = tempDbPath();
+test("forum topics in one group have isolated histories and reply candidates", async () => {
+  const { dir, db } = tempPath();
+  const seen = new Map<string, string[]>();
+  const planner: SocialDecisionMaker = { decide: async (context) => {
+    const topic = String(context.currentMessage.messageThreadId);
+    seen.set(topic, context.replyCandidates.map(({ text }) => text));
+    return { action: "silence" };
+  } };
+  const layer = createConversationLayer({ dbPath: db, model: fakeModel(),
+    summaryModel: fakeModel(), decisionMaker: planner });
+  const topicA = conversationThreadIdFromTelegramGroupChat(-100, 11);
+  const topicB = conversationThreadIdFromTelegramGroupChat(-100, 22);
   try {
-    const model = fakeModel();
-    const summary = fakeModel();
-    const layer = createConversationLayer({ dbPath: path, model, summaryModel: summary });
-
-    model.respond(new AIMessage("reply 111"));
-    await layer.respond({ threadId: thread(111), userId, messageText: "hello from 111" });
-
-    model.respond(new AIMessage("reply 222"));
-    await layer.respond({ threadId: thread(222), userId, messageText: "hello from 222" });
-
-    model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    const reply = await layer.respond({ threadId: thread(111), userId, messageText: "again from 111" });
-    assert.equal(reply.replyText, "saw 4 messages");
-
-    const messages = await layer.getMessages(thread(111));
-    const text = messages.map((m) => m.content).join("\n");
-    assert.ok(!text.includes("hello from 222"));
+    await layer.respond({ threadId: topicA, message: event("тільки A", 1, 1, "Іра", 11),
+      hevroniaSender: { kind: "user", id: 999 } });
+    await layer.respond({ threadId: topicB, message: event("тільки B", 2, 2, "Макс", 22),
+      hevroniaSender: { kind: "user", id: 999 } });
+    assert.deepEqual(seen.get("11"), ["тільки A"]);
+    assert.deepEqual(seen.get("22"), ["тільки B"]);
+    assert.equal((await layer.getMessages(topicA)).length, 1);
+    assert.equal((await layer.getMessages(topicB)).length, 1);
+  } finally {
     await layer.close();
-  } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });
 
-test("persistence: state survives layer recreation", async () => {
-  const { dir, path } = tempDbPath();
-  try {
-    const firstModel = fakeModel();
-    firstModel.respond(new AIMessage("запам'ятано: манго"));
-    const firstLayer = createConversationLayer({ dbPath: path, model: firstModel, summaryModel: fakeModel() });
-    await firstLayer.respond({ threadId: thread(3), userId, messageText: "Мій улюблений фрукт — манго." });
-    await firstLayer.close();
-
-    const secondModel = fakeModel();
-    secondModel.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    const secondLayer = createConversationLayer({ dbPath: path, model: secondModel, summaryModel: fakeModel() });
-    const reply = await secondLayer.respond({ threadId: thread(3), userId, messageText: "Який мій улюблений фрукт?" });
-    assert.equal(reply.replyText, "saw 4 messages");
-
-    const messages = await secondLayer.getMessages(thread(3));
-    assert.equal(messages.length, 4);
-    assert.equal(messages[0]?.content, "Мій улюблений фрукт — манго.");
-    await secondLayer.close();
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-});
-
-test("compaction: older messages are summarized, recent messages stay verbatim", async () => {
-  const { dir, path } = tempDbPath();
-  try {
-    const model = fakeModel();
-    const summary = fakeModel();
-    const layer = createConversationLayer({
-      dbPath: path,
-      model,
-      summaryModel: summary,
-      triggerTokens: 20,
-      keepTokens: 30,
-      trimTokensToSummarize: 50,
+test("compaction preserves user and chat sender kinds with duplicate names", async () => {
+  const { dir, db } = tempPath();
+  const summary = fakeModel();
+  for (let index = 0; index < 10; index += 1) {
+    summary.respond((messages) => {
+      const input = messages.map(({ content }) => String(content)).join("\n");
+      assert.match(input, /telegram-user:11/);
+      assert.match(input, /telegram-chat:-22/);
+      return new AIMessage(
+        "telegram-user:11 Новини любить чай; telegram-chat:-22 Новини не любить чай",
+      );
     });
-
-    for (let i = 0; i < 8; i += 1) {
-      model.respond(new AIMessage(`коротка відповідь ${i}`));
-    }
-    for (let i = 0; i < 20; i += 1) {
-      summary.respond(new AIMessage("continuity note: user said their favourite fruit is mango"));
-    }
-
-    for (let i = 0; i < 8; i += 1) {
-      await layer.respond({ threadId: thread(4), userId, messageText: `улюблений фрукт манго повідомлення номер ${i}` });
-    }
-
-    const messages = await layer.getMessages(thread(4));
-    assert.ok(messages.length < 16, `expected compaction, but state has ${messages.length} messages`);
-
-    const summaryMessage = messages.find(
-      (m) => m.additional_kwargs?.["lc_source"] === "summarization",
-    );
-    assert.ok(summaryMessage, "expected a summary message after compaction");
-    const summaryText = String(summaryMessage.content);
-    assert.ok(summaryText.startsWith(SUMMARY_PREFIX));
-    assert.ok(summaryText.includes("continuity note"));
-
-    const lastMessage = messages.at(-1);
-    if (!(lastMessage instanceof AIMessage)) {
-      assert.fail("expected the last message to be an AI message");
-    }
-    assert.equal(lastMessage.content, "коротка відповідь 7");
-
-    const allText = messages.map((m) => m.content).join("|");
-    assert.ok(allText.includes("номер 7"), "newest user message should remain verbatim");
-    await layer.close();
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
   }
-});
-
-test("failure does not write a fake assistant reply into memory", async () => {
-  const { dir, path } = tempDbPath();
+  const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
+    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 100,
+    tokenCounter: (messages) => messages.length * 10 });
   try {
-    const model = fakeModel();
-    const summary = fakeModel();
-    const layer = createConversationLayer({ dbPath: path, model, summaryModel: summary });
-
-    model.respond(new Error("openai boom"));
-    await assert.rejects(() => layer.respond({ threadId: thread(5), userId, messageText: "привіт" }));
-
-    model.respond(new AIMessage("відповідь після збою"));
-    const reply = await layer.respond({ threadId: thread(5), userId, messageText: "знову привіт" });
-    assert.equal(reply.replyText, "відповідь після збою");
-
-    const messages = await layer.getMessages(thread(5));
-    const assistantTexts = messages
-      .filter((m) => m instanceof AIMessage)
-      .map((m) => m.content);
-    assert.deepEqual(assistantTexts, ["відповідь після збою"]);
-    await layer.close();
+    for (let index = 0; index < 6; index += 1) {
+      const sender: TelegramSenderIdentity = index % 2 === 0
+        ? { kind: "user", id: 11 } : { kind: "chat", id: -22 };
+      const observed: ObservedTelegramMessage = { ...event(`факт ${index}`, index + 1, 11, "Новини"),
+        sender };
+      await layer.respond({ threadId, message: observed,
+        hevroniaSender: { kind: "user", id: 999 } });
+    }
+    const compacted = (await layer.getMessages(threadId)).find((message) =>
+      message.additional_kwargs["lc_source"] === "summarization");
+    assert.ok(compacted);
+    assert.match(String(compacted.content), /telegram-user:11 Новини любить чай/);
+    assert.match(String(compacted.content), /telegram-chat:-22 Новини не любить чай/);
+    assert.doesNotMatch(String(compacted.content), /telegram-user:-22/);
   } finally {
+    await layer.close();
     rmSync(dir, { recursive: true, force: true });
   }
 });

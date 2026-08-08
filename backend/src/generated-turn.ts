@@ -1,36 +1,48 @@
-import type { PendingMemoryWrites } from "./long-term-memory/pending.js";
+import type { ReplyRelationship } from "./telegram-event.js";
+
+export type GeneratedTurnOutcome =
+  | { action: "silence" }
+  | {
+      action: "reply";
+      replyText: string;
+      replyTo: ReplyRelationship;
+      persistDelivery(deliveredMessageId: number): void;
+    };
 
 /**
  * The properties that this class carries are:
- * - `replyText` is a successfully generated assistant response.
- * - Calling `postSend()` schedules its delivered user evidence for long-term
- *   memory at most once, even if the method is called repeatedly.
+ * - Silence cannot contain reply text or delivery behavior.
+ * - A reply exposes one consistency operation that persists only a
+ *   Telegram-confirmed outgoing event.
  *
  * The proof of those properties is guaranteed by:
  * - This class can only be introduced through these functions:
- *   - `GeneratedTurn.fromGeneratedResponse(...)`: receives text only after the
- *     LangChain invocation and reply extraction succeed, and memoizes the
- *     single tracked post-send promise before returning it to any caller.
+ *   - `GeneratedTurn.fromSilence()`: constructs only the silence variant.
+ *   - `GeneratedTurn.fromReply(...)`: requires post-delivery persistence and
+ *     memoizes it after Telegram supplies the delivered message identifier.
  */
 export class GeneratedTurn {
-  #postSendPromise: Promise<void> | undefined;
+  private constructor(readonly outcome: GeneratedTurnOutcome) {}
 
-  private constructor(
-    readonly replyText: string,
-    private readonly writeMemory: () => Promise<void>,
-    private readonly pendingWrites: PendingMemoryWrites,
-  ) {}
-
-  static fromGeneratedResponse(
-    replyText: string,
-    writeMemory: () => Promise<void>,
-    pendingWrites: PendingMemoryWrites,
-  ): GeneratedTurn {
-    return new GeneratedTurn(replyText, writeMemory, pendingWrites);
+  static fromSilence(): GeneratedTurn {
+    return new GeneratedTurn({ action: "silence" });
   }
 
-  postSend(): Promise<void> {
-    this.#postSendPromise ??= this.pendingWrites.track(this.writeMemory());
-    return this.#postSendPromise;
+  static fromReply(
+    replyText: string,
+    replyTo: ReplyRelationship,
+    persistDelivery: (deliveredMessageId: number) => void,
+  ): GeneratedTurn {
+    let persisted = false;
+    return new GeneratedTurn({
+      action: "reply",
+      replyText,
+      replyTo,
+      persistDelivery: (deliveredMessageId) => {
+        if (persisted) return;
+        persisted = true;
+        persistDelivery(deliveredMessageId);
+      },
+    });
   }
 }

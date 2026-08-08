@@ -4,6 +4,9 @@ import {
   type RecalledMemory,
 } from "./index.js";
 import type { ConversationThreadId, LongTermMemoryUserId } from "../identifiers.js";
+import { longTermMemoryUserIdFromTelegramSender } from "../identifiers.js";
+import type { TelegramSenderIdentity } from "../telegram-event.js";
+import type { PendingMemoryWrites } from "./pending.js";
 
 export async function recallForTurn(
   memory: LongTermMemory | undefined,
@@ -21,6 +24,23 @@ export async function recallForTurn(
     console.warn(`Long-term-memory search failed: ${operationalErrorDetail(error)}`);
     return [];
   }
+}
+
+export function memoryUserIdForSender(
+  sender: TelegramSenderIdentity,
+): LongTermMemoryUserId | undefined {
+  return sender.kind === "user" ? longTermMemoryUserIdFromTelegramSender(sender.id) : undefined;
+}
+
+export function scheduleRememberedMessage(
+  pending: PendingMemoryWrites,
+  memory: LongTermMemory | undefined,
+  userId: LongTermMemoryUserId | undefined,
+  threadId: ConversationThreadId,
+  text: string,
+): void {
+  if (userId === undefined) return;
+  void pending.track(rememberDeliveredUserMessage(memory, userId, threadId, text));
 }
 
 export async function rememberDeliveredUserMessage(

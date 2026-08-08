@@ -11,13 +11,13 @@ lives in `docs/`, and internal tooling lives in `tools/` and `scripts/`.
 ## Bot flow
 
 ```
-Telegram private chat
+Telegram private/group chat
         ├── thread_id → LangGraph recent messages + rolling summary
         └── user_id   → Mem0 search → five relevant semantic memories
                                     ↓
-                       dynamic system prompt (ephemeral)
+                 bounded canonical event history + summary
                                     ↓
-                         OpenAI → Хевронія response
+                    social decision → silence or realization
                                     ↓
                            Telegram delivery
                                     ↓
@@ -29,14 +29,21 @@ Telegram private chat
 - `backend/src/telegram.ts` — Telegram transport only (grammY, long polling).
   Maps the chat and sender to stable thread and user identifiers.
 - `backend/src/respond.ts` — the conversational entry point.
-- `backend/src/layer.ts` — the LangChain agent, `summarizationMiddleware`,
-  ephemeral memory-prompt middleware, and the SQLite checkpointer.
+- `backend/src/layer.ts` — canonical event ingestion, bounded conversation
+  context, social planning, ephemeral realization, and delivery completion.
 - `backend/src/long-term-memory/` — the Mem0 boundary, Qdrant service
   configuration, pending-write lifecycle, and conservative extraction policy.
 - `backend/src/personality.ts` — Хевронія's system prompt.
 
 Conversation state is owned by LangGraph and persisted in the ignored
 `backend/.data/checkpoints.sqlite`. It survives process restarts.
+Incoming participant events always enter this state and use the same compaction
+path, including silent turns. Outgoing Хевронія events enter it only after
+Telegram confirms delivery. Stable Telegram sender IDs distinguish participants
+even when display names collide; sender kind distinguishes users from chats acting
+as senders. Forum topic IDs are part of the LangGraph thread key. Confirmed outgoing
+events use a separate retry queue, and the next topic-local turn waits for its queue
+before planning. Chat senders do not enter person-scoped Mem0.
 
 Mem0 owns durable knowledge about a person, scoped by
 `telegram-user:<sender id>`. Its SQLite history lives beneath the ignored

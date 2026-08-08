@@ -1,15 +1,19 @@
 /**
  * The properties that this class carries are:
- * - The value is a canonical LangGraph persisted thread key in the
- *   `telegram-private:` namespace.
+ * - The value is a canonical LangGraph persisted thread key in either the
+ *   `telegram-private:` or `telegram-group:` namespace.
  * - The value originated from a positive, safe-integer Telegram private-chat
- *   identifier.
+ *   identifier, or a negative safe-integer Telegram group-chat identifier,
+ *   optionally scoped to a positive message-thread/topic identifier.
  *
  * The proof of those properties is guaranteed by:
  * - This class can only be introduced through these functions:
  *   - `conversationThreadIdFromTelegramPrivateChat(...)`: validates that the
  *     Telegram chat identifier is a positive safe integer and prefixes its
  *     decimal representation with `telegram-private:`.
+ *   - `conversationThreadIdFromTelegramGroupChat(...)`: validates that the
+ *     Telegram chat identifier is a negative safe integer and prefixes its
+ *     decimal representation with `telegram-group:`.
  */
 class ConversationThreadIdValue {
   constructor(private readonly persistenceKey: string) {}
@@ -47,8 +51,8 @@ class LongTermMemoryUserIdValue {
 export type LongTermMemoryUserId = LongTermMemoryUserIdValue;
 
 export class InvalidTelegramIdentifierError extends Error {
-  constructor(kind: string) {
-    super(`Telegram ${kind} identifier must be a positive safe integer`);
+  constructor(kind: string, requirement = "a positive safe integer") {
+    super(`Telegram ${kind} identifier must be ${requirement}`);
     this.name = "InvalidTelegramIdentifierError";
   }
 }
@@ -74,9 +78,30 @@ export function isInvalidIntegrationTestIdentifierError(
 
 export function conversationThreadIdFromTelegramPrivateChat(
   chatId: number,
+  messageThreadId?: number,
 ): ConversationThreadId {
   validateTelegramIdentifier(chatId, "private chat");
-  return new ConversationThreadIdValue(`telegram-private:${chatId}`);
+  return new ConversationThreadIdValue(withTopic(`telegram-private:${chatId}`, messageThreadId));
+}
+
+export function conversationThreadIdFromTelegramGroupChat(
+  chatId: number,
+  messageThreadId?: number,
+): ConversationThreadId {
+  if (!Number.isSafeInteger(chatId) || chatId >= 0) {
+    throw new InvalidTelegramIdentifierError("group chat", "a negative safe integer");
+  }
+  return new ConversationThreadIdValue(withTopic(`telegram-group:${chatId}`, messageThreadId));
+}
+
+export function conversationThreadIdFromTelegramChat(
+  chatKind: "private" | "group" | "supergroup",
+  chatId: number,
+  messageThreadId?: number,
+): ConversationThreadId {
+  return chatKind === "private"
+    ? conversationThreadIdFromTelegramPrivateChat(chatId, messageThreadId)
+    : conversationThreadIdFromTelegramGroupChat(chatId, messageThreadId);
 }
 
 export function longTermMemoryUserIdFromTelegramSender(senderId: number): LongTermMemoryUserId {
@@ -97,4 +122,10 @@ function validateTelegramIdentifier(identifier: number, kind: string): void {
   if (!Number.isSafeInteger(identifier) || identifier <= 0) {
     throw new InvalidTelegramIdentifierError(kind);
   }
+}
+
+function withTopic(base: string, messageThreadId: number | undefined): string {
+  if (messageThreadId === undefined) return base;
+  validateTelegramIdentifier(messageThreadId, "message thread");
+  return `${base}:topic:${messageThreadId}`;
 }

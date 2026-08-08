@@ -4,7 +4,6 @@ import { test } from "node:test";
 import type { ConversationLayer } from "../src/conversation-types.js";
 import { GeneratedTurn } from "../src/generated-turn.js";
 import type { LongTermMemory } from "../src/long-term-memory/index.js";
-import { PendingMemoryWrites } from "../src/long-term-memory/pending.js";
 import {
   closeConversationLayer,
   getConversationLayer,
@@ -23,11 +22,12 @@ function fakeLongTermMemory(): LongTermMemory {
 function fakeConversationLayer(): ConversationLayer {
   return {
     respond: async () =>
-      GeneratedTurn.fromGeneratedResponse(
+      GeneratedTurn.fromReply(
         "reply",
+        { targetMessageId: 1, targetSender: { kind: "user", id: 2 }, targetSenderDisplayName: "Тест", targetText: "text" },
         async () => undefined,
-        new PendingMemoryWrites(),
-      ),
+        ),
+    recordDeliveredMessage: async () => undefined,
     getMessages: async () => [],
     close: async () => undefined,
   };
