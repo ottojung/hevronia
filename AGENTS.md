@@ -581,6 +581,7 @@ Git remembers the dead. Source comments serve the living.
 If you have access to `git`, then:
 - commit frequently,
 - commit small, conceptual changes,
+- commit **as you go**, not after you're done with the actual tasks,
 - and write helpful multiline commit messages.
 
 It is always safe to commit, do it even if you weren't explicitly told to.
