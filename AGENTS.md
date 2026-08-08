@@ -21,7 +21,7 @@ npm install
 - TypeScript with strict mode, ESM (`"type": "module"`), Node.js, npm workspaces.
 - The bot source lives in `backend/src/`; unit tests live in `backend/tests/`.
 - Telegram transport lives in `backend/src/telegram.ts`; the conversational entry
-  point is `backend/src/respond.ts` (`respond(threadId, messageText)`); the
+  point is `backend/src/respond.ts` (`respond({ threadId, userId, messageText })`); the
   LangChain agent, summarization middleware, and SQLite checkpointer live in
   `backend/src/memory.ts`; the character system prompt lives in
   `backend/src/personality.ts`.
@@ -32,6 +32,9 @@ npm install
   `MY_OPENAI_API_KEY`) and are never logged or committed.
 - Conversation state is owned by LangGraph and persisted in the ignored
   `backend/.data/checkpoints.sqlite`; it is never reimplemented by hand.
+- Durable user-scoped semantic memory is owned by Mem0 in
+  `backend/src/long-term-memory/` and stored under the ignored
+  `backend/.data/mem0/`; it remains separate from LangGraph thread state.
 - ESLint enforces custom rules from `tools/eslint-plugin-hevronia/` (see
   `docs/linting.md`). Run `npm run static-analysis` and `npm run rules:test`
   before finishing changes.

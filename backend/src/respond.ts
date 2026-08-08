@@ -1,4 +1,5 @@
 import { getConversationLayer } from "./memory.js";
+import type { RespondInput } from "./memory.js";
 
 export {
   closeConversationLayer,
@@ -9,6 +10,6 @@ export {
   openAiKeyFromEnv,
 } from "./memory.js";
 
-export async function respond(threadId: string, messageText: string): Promise<string> {
-  return getConversationLayer().respond(threadId, messageText);
+export async function respond(input: RespondInput): Promise<string> {
+  return getConversationLayer().respond(input);
 }

@@ -12,31 +12,38 @@ lives in `docs/`, and internal tooling lives in `tools/` and `scripts/`.
 
 ```
 Telegram private chat
-        ↓
-stable thread_id (telegram-private:<chat id>)
-        ↓
-LangChain agent (backend/src/memory.ts, createAgent)
-        ↓
-LangGraph SQLite checkpointer  →  backend/.data/checkpoints.sqlite
-        ↓
-summarizationMiddleware
-        ├── older history → compact rolling summary
-        └── recent history → verbatim
-        ↓
-OpenAI → Хевронія response
+        ├── thread_id → LangGraph recent messages + rolling summary
+        └── user_id   → Mem0 search → five relevant semantic memories
+                                    ↓
+                       dynamic system prompt (ephemeral)
+                                    ↓
+                         OpenAI → Хевронія response
+                                    ↓
+                         Mem0 extraction and Qdrant
 ```
 
 ## Module layout
 
 - `backend/src/telegram.ts` — Telegram transport only (grammY, long polling).
-  Maps a chat to a thread id and calls `respond(threadId, messageText)`.
+  Maps the chat and sender to stable thread and user identifiers.
 - `backend/src/respond.ts` — the conversational entry point.
-- `backend/src/memory.ts` — the LangChain agent, `summarizationMiddleware`, and
-  the SQLite checkpointer (`SqliteSaver`).
+- `backend/src/layer.ts` — the LangChain agent, `summarizationMiddleware`,
+  ephemeral memory-prompt middleware, and the SQLite checkpointer.
+- `backend/src/long-term-memory/` — the Mem0 boundary, persistent local Qdrant
+  configuration, and conservative extraction policy.
 - `backend/src/personality.ts` — Хевронія's system prompt.
 
 Conversation state is owned by LangGraph and persisted in the ignored
 `backend/.data/checkpoints.sqlite`. It survives process restarts.
+
+Mem0 owns durable knowledge about a person, scoped by
+`telegram-user:<sender id>`. Its Qdrant vectors and SQLite history live beneath
+the ignored `backend/.data/mem0/`. Recalled facts exist only in the dynamic
+system prompt for one invocation, so they cannot enter checkpoints or rolling
+summaries. Search or ingestion failures degrade to normal thread-only behavior.
+There is no automatic expiration or garbage collection: conservative admission
+and top-five retrieval control the initial data set until operational evidence
+supports a more precise lifecycle policy.
 
 ## Tooling
 
