@@ -21,17 +21,21 @@ npm install
 - TypeScript with strict mode, ESM (`"type": "module"`), Node.js, npm workspaces.
 - The bot source lives in `backend/src/`; unit tests live in `backend/tests/`.
 - Telegram transport lives in `backend/src/telegram.ts`; the conversational entry
-  point is `backend/src/respond.ts` (`respond(threadId, messageText)`); the
+  point is `backend/src/respond.ts` (`respond({ threadId, userId, messageText })`); the
   LangChain agent, summarization middleware, and SQLite checkpointer live in
   `backend/src/memory.ts`; the character system prompt lives in
   `backend/src/personality.ts`.
-- `telegram.ts` only maps a chat to a thread id and calls
-  `await respond(threadId, messageText)`; it must not contain OpenAI/LangChain
-  details.
+- `telegram.ts` only maps Telegram identities, requests a generated turn,
+  delivers its reply, and invokes its post-send completion; it must not contain
+  OpenAI, Mem0, or LangChain details.
 - Secrets are read only from the process environment (`TELEGRAM_BOT_TOKEN`,
   `MY_OPENAI_API_KEY`) and are never logged or committed.
 - Conversation state is owned by LangGraph and persisted in the ignored
   `backend/.data/checkpoints.sqlite`; it is never reimplemented by hand.
+- Durable user-scoped semantic memory is owned by Mem0 in
+  `backend/src/long-term-memory/`; its history is under the ignored
+  `backend/.data/mem0/`, while Qdrant persists vectors through its configured
+  HTTP service. It remains separate from LangGraph thread state.
 - ESLint enforces custom rules from `tools/eslint-plugin-hevronia/` (see
   `docs/linting.md`). Run `npm run static-analysis` and `npm run rules:test`
   before finishing changes.

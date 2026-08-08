@@ -9,14 +9,18 @@
     "dev": "tsx watch src/index.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test-only": "node --import tsx --test tests/*.test.ts"
+    "test-only": "node --import tsx --test tests/*.test.ts",
+    "test:memory-integration": "node --import tsx scripts/memory-integration.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.2.5",
     "@langchain/langgraph": "^1.4.9",
     "@langchain/langgraph-checkpoint-sqlite": "^1.0.3",
     "@langchain/openai": "^1.5.6",
+    "@qdrant/js-client-rest": "1.19.0",
     "grammy": "^1.45.1",
-    "langchain": "^1.5.5"
+    "langchain": "^1.5.5",
+    "mem0ai": "^3.1.5",
+    "zod": "^3.25.76"
   }
 }

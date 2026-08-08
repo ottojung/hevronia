@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { startBot } from "./telegram.js";
-import { closeConversationLayer, getConversationLayer, openAiKeyFromEnv } from "./respond.js";
+import { closeConversationLayer, initializeConversationLayer } from "./memory.js";
 
 function readVersion(): string {
   try {
@@ -24,13 +24,14 @@ function readVersion(): string {
 
 async function main(): Promise<void> {
   try {
-    openAiKeyFromEnv();
-    getConversationLayer();
+    await initializeConversationLayer();
     await startBot();
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     console.error(`Fatal error: ${detail}`);
     process.exitCode = 1;
+  } finally {
+    await closeConversationLayer().catch(() => undefined);
   }
 }
 
@@ -40,11 +41,5 @@ if (argument === "--version" || argument === "-v") {
 } else if (argument === "--help" || argument === "-h") {
   console.log("Usage: hevronia [--version] [--help]");
 } else {
-  const signals: string[] = ["SIGINT", "SIGTERM"];
-  for (const signal of signals) {
-    process.once(signal, () => {
-      void closeConversationLayer().catch(() => undefined);
-    });
-  }
   void main();
 }

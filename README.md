@@ -4,26 +4,21 @@ A Telegram bot for Хевронія, a fictional Ukrainian woman. The bot connec
 Telegram over **long polling** via **grammY**, and generates each reply with an
 **OpenAI chat model** through **LangChain** (`@langchain/openai`).
 
-Every private Telegram chat has its own **durable conversational thread**.
-Recent messages are retained verbatim; older history is automatically compacted
-into a rolling summary by LangChain summarization. This is **thread-level
-conversational memory** — it is not semantic long-term memory, and there are no
-user profiles, embeddings, or retrieval.
+Every private Telegram chat has a durable LangGraph conversational thread.
+Recent messages remain verbatim and older history becomes a rolling summary.
+Separately, Mem0 extracts durable facts from user messages after successful delivery and semantically
+recalls a small relevant set for the Telegram user in future conversations.
 
 ```
 Telegram private chat
-    ↓
-stable thread_id (telegram-private:<chat id>)
-    ↓
-LangChain agent (backend/src/memory.ts, createAgent)
-    ↓
-LangGraph SQLite checkpointer  →  backend/.data/checkpoints.sqlite
-    ↓
-summarizationMiddleware
-    ├── older history → compact rolling summary
-    └── recent history → verbatim
-    ↓
-OpenAI → Хевронія response
+    ├── thread_id → LangGraph recent messages + rolling summary
+    └── user_id   → Mem0 semantic search (top 5, Qdrant service)
+                              ↓
+              ephemeral dynamic system context
+                              ↓
+                    OpenAI → response
+                              ↓
+                  Mem0 fact extraction
 ```
 
 ## Repository structure
@@ -47,8 +42,9 @@ hevronia/
 
 ## Prerequisites
 
-- Node.js >= 20 (tested on Node 22)
+- Node.js >= 22.13
 - npm
+- Qdrant 1.19.0 (the provided Compose service is the simplest local option)
 
 ## Installation
 
@@ -67,7 +63,10 @@ MY_OPENAI_API_KEY
 
 - `TELEGRAM_BOT_TOKEN` is used for Telegram (grammY).
 - `MY_OPENAI_API_KEY` is passed explicitly to the LangChain `ChatOpenAI`
-  integration. `OPENAI_API_KEY` is neither expected nor used.
+  integration and to both Mem0's extraction LLM and OpenAI embedder.
+  `OPENAI_API_KEY` is neither expected nor used.
+- `QDRANT_URL` selects the Qdrant HTTP endpoint and defaults to
+  `http://127.0.0.1:6333`.
 
 The bot fails fast at startup if either variable is absent. Secrets are never
 printed, logged, or stored, and should never be committed.
@@ -82,8 +81,12 @@ In the normal working environment both variables are already provided through
 ## Running locally
 
 ```bash
+docker compose up -d qdrant
 npm run dev        # development (tsx watch, no build step)
 ```
+
+The bot may start immediately after Compose. It polls Qdrant's `/readyz`
+endpoint before constructing Mem0, for up to 60 seconds.
 
 or, for the compiled build:
 
@@ -94,28 +97,45 @@ npm start
 
 Both connect to Telegram via long polling (no webhooks). On startup the bot:
 
-1. authenticates with Telegram;
-2. verifies the identity matches `Хевронія` / `@hevronia_bot`;
-3. validates that `MY_OPENAI_API_KEY` is present;
-4. opens the conversation-memory database;
+1. validates that `MY_OPENAI_API_KEY` is present;
+2. waits for Qdrant readiness, then initializes Mem0 and conversation memory;
+3. authenticates with Telegram;
+4. verifies the identity matches `Хевронія` / `@hevronia_bot`;
 5. starts long polling for message updates;
 6. replies to each private text message.
 
-It shuts down gracefully on `SIGINT`/`SIGTERM`. While generating a reply the
-bot sends a Telegram `typing` chat action.
+It shuts down gracefully on `SIGINT`/`SIGTERM`, including a bounded wait for
+pending long-term-memory writes. While generating a reply the bot sends a
+Telegram `typing` chat action.
 
 ## Memory
 
-- Each private chat maps to a LangGraph thread: `telegram-private:<chat id>`.
-  Different chats have fully isolated histories.
-- Conversation state is stored in a local SQLite database at
-  `backend/.data/checkpoints.sqlite` (git-ignored).
-- The database is resolved relative to the module, so the bot works from any
-  working directory.
-- Memory survives process restarts.
-- Once a thread's history grows past the compaction threshold, older messages
-  are summarized and only the newest tokens stay verbatim. The thresholds live
-  in `backend/src/memory.ts` (`COMPACTION`).
+The model receives three distinct context layers:
+
+1. recent thread messages verbatim;
+2. a rolling summary of older thread history;
+3. up to five semantically relevant long-term facts, recalled fresh for the
+   current invocation and never added to the LangGraph checkpoint or summary.
+
+LangGraph owns thread-scoped conversational continuity under
+`telegram-private:<chat id>` and persists it in the ignored
+`backend/.data/checkpoints.sqlite`. Mem0 owns durable semantic knowledge under
+`telegram-user:<sender id>`. It extracts concise facts only from the user's
+message after the generated reply is delivered, and records audit history at
+`backend/.data/mem0/history.db`. A real Qdrant service stores the versioned
+vector collection. The provided Compose service persists Qdrant data at
+`backend/.data/qdrant/`; `QDRANT_URL` may instead select another deployment.
+Compose also mounts `backend/.data/` into the bot container, so LangGraph
+checkpoints and Mem0 history survive bot image upgrades and container recreation.
+
+Each turn retrieves memories, generates a reply, sends it through Telegram,
+and only then starts Mem0 extraction. Undelivered replies are not memorized.
+Memory-write failures are logged without delaying or invalidating a delivered
+reply, and pending writes receive a bounded drain during shutdown.
+
+Admission is deliberately conservative, retrieval is bounded, and there is no
+arbitrary size cap. Expiration and garbage collection are deferred until real
+memory data can support a responsible policy rather than guessed lifetimes.
 
 ## Manual testing
 
@@ -132,6 +152,7 @@ same chat.
 | `npm run build`         | compile the backend to `backend/dist/`    |
 | `npm start`             | run the compiled build                    |
 | `npm test`              | run backend unit tests (no network)       |
+| `npm run test:memory-integration` | live Mem0 persistence check       |
 | `npm run lint`          | ESLint across the repository              |
 | `npm run lint:fix`      | ESLint with `--fix`                       |
 | `npm run static-analysis` | `tsc --noEmit` + ESLint (no warnings)  |
@@ -140,9 +161,9 @@ same chat.
 | `npm run docs:dev`      | run the Docusaurus dev server             |
 | `npm run docs:build`    | build the Docusaurus site                 |
 
-Unit tests cover pure logic (API-key validation, response-text extraction) and
-conversation-memory behavior using LangChain fake models and a temporary SQLite
-database. They never call OpenAI or Telegram.
+Unit tests cover pure logic and both memory layers using LangChain fake models,
+a fake long-term-memory boundary, and temporary SQLite databases. They never
+call OpenAI, Qdrant, or Telegram.
 
 ## Linting
 
@@ -167,6 +188,6 @@ it is deployed to GitHub Pages by the `docs` workflow.
 
 ## Status
 
-Thread-level conversational memory with automatic compaction is implemented.
-Still out of scope: semantic long-term memory, user profiles, embeddings,
-retrieval, tools, streaming, and webhooks.
+Thread conversational memory, automatic compaction, and user-scoped semantic
+long-term memory are implemented. Tools, streaming, and webhooks remain out of
+scope.
