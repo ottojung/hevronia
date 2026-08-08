@@ -83,13 +83,16 @@ export async function startBot(): Promise<void> {
     const messageId = ctx.message.message_id;
     console.log(`Handling private text message update=${updateId} message=${messageId}`);
     try {
-      const replyText = respond(ctx.message.text);
+      await ctx.replyWithChatAction("typing");
+      const replyText = await respond(ctx.message.text);
       await ctx.reply(replyText);
       console.log(`Handled message=${messageId}`);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       console.error(`Failed to handle message=${messageId}: ${detail}`);
-      throw error;
+      await ctx
+        .reply("Щось я зараз зависла. Спробуй ще раз за хвилину.")
+        .catch(() => undefined);
     }
   });
 

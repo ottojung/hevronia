@@ -1,86 +1,34 @@
 # Project Overview
-This is a JavaScript project with JSDoc typing for a highly reliable event logging system. It consists of a Node.js backend and a React frontend in a monorepo structure.
+This is a TypeScript, ESM Telegram bot for Хевронія (@hevronia_bot). It uses
+grammY for Telegram long polling and LangChain (@langchain/openai) for message
+response generation.
 
 # Initial Setup (Required for Fresh Repository)
 
 When working on a fresh clone, this command is useful:
 
 ```bash
-npm install   # install dependencies in root and all workspaces
+npm install
 ```
 
 # Core Programming Conventions
 
-## Capabilities Pattern
-**CRITICAL**: All side effects must be invoked through the "capabilities" pattern, NOT raw system APIs.
+## Conventions
 
-- File operations: Use `capabilities.creator`, `capabilities.deleter`, `capabilities.checker`
-- System commands: Use `capabilities.git` (for git operations) or `capabilities.command`
-- Environment access: Use `capabilities.environment`
-- Logging: Use `capabilities.logger`
+- TypeScript with strict mode, ESM (`"type": "module"`), Node.js.
+- Telegram transport lives in `src/telegram.ts`; response generation lives in
+  `src/respond.ts`; the character system prompt lives in `src/personality.ts`.
+- `telegram.ts` only calls `await respond(messageText)` and sends the result;
+  it must not contain OpenAI/LangChain details.
+- Secrets are read only from the process environment (`TELEGRAM_BOT_TOKEN`,
+  `MY_OPENAI_API_KEY`) and are never logged or committed.
 
-Example from the codebase:
-```javascript
-/**
- * @typedef {object} Capabilities
- * @property {Command} git - A command instance for Git operations.
- * @property {FileCreator} creator - A file creator instance.
- * @property {FileDeleter} deleter - A file deleter instance.
- * @property {FileChecker} checker - A file checker instance.
- * @property {Environment} environment - An environment instance.
- * @property {Logger} logger - A logger instance.
- */
+## TypeScript Conventions
 
-// ✅ Correct: Use capabilities
-await capabilities.checker.fileExists(indexFile);
-
-// ❌ Wrong: Direct system API
-const fs = require('fs');
-fs.existsSync(indexFile);
-```
-
-## JSDoc Typing
-This project uses JSDoc for type annotations instead of TypeScript:
-
-- Always provide `@typedef` for complex types
-- Use `@param` and `@returns` for function documentation
-- Import types with `/** @typedef {import('./path').Type} Type */`
-- Use type guards with `@returns {object is Type}` pattern
-
-Example:
-```javascript
-/**
- * @typedef {import('../environment').Environment} Environment
- */
-
-/**
- * Get local repository path.
- * @param {Capabilities} capabilities
- * @returns {string}
- */
-function pathToLocalRepository(capabilities) {
-    // implementation
-}
-```
-
-### Encapsulation Convention
-Classes are never exported directly from modules to prevent external constructor calls and `instanceof` usage:
-
-- **Export factory functions**: Use `makeFoo` instead of exporting the class
-- **Export type guards**: Use `isFoo` instead of relying on `instanceof`
-- **Nominal typing**: Use `__brand: undefined` fields for type safety where beneficial (see [Nominal types and proof-carrying comments](#nominal-types-and-proof-carrying-comments))
-
-#### Encapsulation Levels
-This project achieves encapsulation in two ways:
-
-1. **Module-Level Encapsulation**:
-   - Only chosen functions are exported from the module.
-   - Everything else is kept private within the module.
-
-2. **Subfolder-Level Encapsulation**:
-   - Each subfolder has an `index.js` file that exports chosen functions.
-   - Between the files of the subfolder, imports/exports can be less restrictive.
-   - From the outside, only the `index.js` file can be imported, ensuring sensitive functionality remains encapsulated.
+- The project is written in TypeScript, not JSDoc-typed JavaScript.
+- `verbatimModuleSyntax` is enabled, so type-only imports use `import type`.
+- ESM import specifiers use `.js` extensions (NodeNext resolution).
+- Prefer small, focused modules with a clear boundary between transport and logic.
 
 ## Error Handling
 This project follows strict error handling conventions that prioritize inspectability, locality, and type safety:
@@ -501,21 +449,19 @@ function isPathLike(object) {
 
 ## How to run tests
 
-- **Static checks**: `npm run static-analysis`
-- **Specific tests**: `npx jest --testNamePattern="test name"`
-- **Full test suite**: `npx jest --silent`
+- **Unit tests**: `npm test` (Node's built-in test runner with `tsx`)
+- **Type checking**: `npm run typecheck`
 - **Build verification**: `npm run build`
 
-Run static checks often, make sure they're passing continuously.
-Tests are slow. Prefer focused tests when working on a particular feature.
-Don't need to run `npx jest` if not changing any javascript code.
-Do not limit or filter the output of `npx jest`.
+Run type checking and tests often, make sure they're passing continuously.
+Unit tests must not call OpenAI or Telegram; test pure logic (API-key
+validation, prompt construction, response-text extraction) instead.
 
 ## Test Conventions
 
-- Test files are located in `backend/tests/` and `frontend/tests/`
+- Test files are located in `test/`
 - Use descriptive test names
-- Mock external dependencies using the patterns established in `backend/tests/stubs.js`
+- Do not require real secrets or network access in unit tests
 
 # Complete Workflow for Independent Agents
 
@@ -523,9 +469,9 @@ Must follow this workflow when making changes to the source code:
 
 1. **Setup**: `npm install` (install all dependencies)
 2. **Understand**: Read relevant code and tests to understand the context
-3. **Implement**: Make changes following the capabilities pattern and JSDoc conventions
-4. **Test**: Run `npx jest path/to/specific/test.js` for focused testing
-5. **Validate**: Run full test suite with `npm test`. Don't need to run `npm test` if not changing any javascript code.
+3. **Implement**: Make changes following the project's TypeScript/ESM conventions
+4. **Test**: Run `npm test`
+5. **Validate**: Run `npm run typecheck`
 6. **Build**: Run `npm run build` if need to ensure the project builds successfully
 
 ## Backwards compatibility
@@ -628,11 +574,11 @@ Github posts must use humor and metaphors.
 
 ## Static analysis
 
-The project has very precise and valuable rules for the codebase, and enforces them via `npm run static-analysis`.
+The project's type checking is enforced via `npm run typecheck`.
 Important:
 - linter configs must not be changed unless explicitly asked to by the user.
-- type checker configs must not be changed unless explicitly asked to by the user.
-- static analysis rules must not be ignored or disabled.
+- tsconfig must not be changed unless explicitly asked to by the user.
+- type checking rules must not be ignored or disabled.
 
 ## Notifications
 
@@ -640,8 +586,8 @@ If `command -v my-notify` exits with status `0`, then call `my-notify "Volodysla
 
 ## Additional Guidelines
 
-- Follow existing naming conventions (snake_case for files, camelCase for functions)
-- Maintain the dependency injection pattern through capabilities
-- Add comprehensive JSDoc documentation for new functions
+- Follow existing naming conventions (camelCase functions, `.ts` files, `.js` import specifiers)
+- Keep the Telegram transport and the response generation separated
+- Keep the character system prompt in `src/personality.ts`
 - Write tests for new functionality
 - Use the established error handling patterns

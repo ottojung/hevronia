@@ -1,31 +1,27 @@
 # Хевронія (@hevronia_bot)
 
-A minimal Telegram bot skeleton. Хевронія currently connects to Telegram over
-**long polling** and replies to every private text message with a trivial,
-deterministic Ukrainian response:
+A Telegram bot for Хевронія, a fictional Ukrainian woman. The bot connects to
+Telegram over **long polling** via **grammY**, and generates each reply with an
+**OpenAI chat model** through **LangChain** (`@langchain/openai`).
 
-```
-Ти сказала: <message>
-```
-
-The conversational engine is deliberately a placeholder. The point of this
-milestone is a clean, replaceable message-handling boundary:
+The conversation engine is currently **stateless**: every private text message
+is handled independently and the reply is generated from a single
+Хевронія system prompt plus the message. There is no memory or conversation
+history yet.
 
 ```
 Telegram update
     ↓
-Telegram transport  (src/telegram.ts)
+Telegram transport  (src/telegram.ts, grammY, long polling)
     ↓
-message handler     (src/respond.ts)   ← the part to replace later
+respond(text)       (src/respond.ts, LangChain ChatOpenAI)
     ↓
-response text
+Хевронія system prompt  (src/personality.ts)
+    ↓
+OpenAI → text reply
     ↓
 Telegram transport
 ```
-
-Later the trivial handler can be swapped for a real character/conversation
-engine (for example `const response = await conversation.respond(message)`)
-without touching the Telegram integration.
 
 ## Prerequisites
 
@@ -40,17 +36,22 @@ npm install
 
 ## Configuration
 
-The bot reads its token **only** from the environment variable:
+The bot reads two secrets **only** from the environment:
 
 ```text
 TELEGRAM_BOT_TOKEN
+MY_OPENAI_API_KEY
 ```
 
-The bot fails fast at startup if it is absent. It is never printed, logged, or
-stored.
+- `TELEGRAM_BOT_TOKEN` is used for Telegram (grammY).
+- `MY_OPENAI_API_KEY` is passed explicitly to the LangChain `ChatOpenAI`
+  integration. `OPENAI_API_KEY` is neither expected nor used.
 
-In the normal working environment this variable is already provided through
-`$MIYKA_PROJ_PATH/env`. If it is not loaded into your shell yet:
+The bot fails fast at startup if either variable is absent. Secrets are never
+printed, logged, or stored, and should never be committed.
+
+In the normal working environment both variables are already provided through
+`$MIYKA_PROJ_PATH/env`. If they are not loaded into your shell yet:
 
 ```bash
 . "$MIYKA_PROJ_PATH/env"
@@ -73,15 +74,17 @@ Both connect to Telegram via long polling (no webhooks). On startup the bot:
 
 1. authenticates with Telegram;
 2. verifies the identity matches `Хевронія` / `@hevronia_bot`;
-3. starts long polling for message updates;
-4. replies to each private text message.
+3. validates that `MY_OPENAI_API_KEY` is present;
+4. starts long polling for message updates;
+5. replies to each private text message.
 
-It shuts down gracefully on `SIGINT`/`SIGTERM`.
+It shuts down gracefully on `SIGINT`/`SIGTERM`. While generating a reply the
+bot sends a Telegram `typing` chat action.
 
 ## Manual testing
 
 Open Telegram, find **@hevronia_bot**, and send any text message in a private
-chat. The bot should reply with `Ти сказала: <message>`.
+chat. Хевронія will answer in character.
 
 ## Developer commands
 
@@ -93,8 +96,8 @@ chat. The bot should reply with `Ти сказала: <message>`.
 | `npm start`             | run the compiled build          |
 | `npm test`              | run unit tests (no network)     |
 
-Tests cover the pure response function only and never require
-`TELEGRAM_BOT_TOKEN` or real Telegram access.
+Unit tests cover pure logic only (API-key validation, prompt construction,
+response-text extraction) and never call OpenAI or Telegram.
 
 ## Project layout
 
@@ -102,13 +105,14 @@ Tests cover the pure response function only and never require
 src/
 ├── index.ts       entry point
 ├── telegram.ts    Telegram transport (grammY, long polling)
-└── respond.ts     pure, replaceable response function
+├── respond.ts     LangChain ChatOpenAI response generation
+└── personality.ts Хевронія's system prompt
 test/
 └── respond.test.ts
 ```
 
 ## Status
 
-The current response function is only a placeholder for the future
-Хевронія character/conversation engine. No LLM, history, persistence, or
-webhooks yet.
+Conversation history is **not yet implemented** — each message is currently
+interpreted independently. No memory, persistence, embeddings, retrieval,
+agents, tools, streaming, or webhooks yet.
