@@ -7,6 +7,7 @@ import { Memory, type MemoryConfig, type MemoryItem } from "mem0ai/oss";
 import { openAiKeyFromEnv } from "../model.js";
 import { LONG_TERM_MEMORY_POLICY, MEMORY_POLICY_VERSION } from "./policy.js";
 import { qdrantUrlFromEnv } from "./qdrant.js";
+import type { ConversationThreadId, LongTermMemoryUserId } from "../identifiers.js";
 
 export const LONG_TERM_MEMORY_TOP_K = 5;
 export const MEMORY_MODEL = "gpt-4o-mini-2024-07-18";
@@ -22,14 +23,13 @@ export interface RecalledMemory {
 }
 
 export interface LongTermMemory {
-  search(userId: string, query: string, topK: number): Promise<RecalledMemory[]>;
-  rememberTurn(
-    userId: string,
-    threadId: string,
+  search(userId: LongTermMemoryUserId, query: string, topK: number): Promise<RecalledMemory[]>;
+  rememberUserMessage(
+    userId: LongTermMemoryUserId,
+    threadId: ConversationThreadId,
     userMessage: string,
-    assistantMessage: string,
   ): Promise<void>;
-  deleteAll(userId: string): Promise<void>;
+  deleteAll(userId: LongTermMemoryUserId): Promise<void>;
 }
 
 export function createMem0Config(apiKey: string, qdrantUrl: string): MemoryConfig {
@@ -72,28 +72,25 @@ export function createMem0LongTermMemory(
     async search(userId, query, topK) {
       const result = await memory.search(query, {
         topK,
-        filters: { user_id: userId },
+        filters: { user_id: userId.toPersistenceKey() },
       });
       return result.results.map((item: MemoryItem) => ({ text: item.memory }));
     },
-    async rememberTurn(userId, threadId, userMessage, assistantMessage) {
+    async rememberUserMessage(userId, threadId, userMessage) {
       await memory.add(
-        [
-          { role: "user", content: userMessage },
-          { role: "assistant", content: assistantMessage },
-        ],
+        [{ role: "user", content: userMessage }],
         {
-          userId,
+          userId: userId.toPersistenceKey(),
           metadata: {
             source: "telegram",
-            threadId,
+            threadId: threadId.toPersistenceKey(),
             memoryPolicyVersion: MEMORY_POLICY_VERSION,
           },
         },
       );
     },
     async deleteAll(userId) {
-      await memory.deleteAll({ userId });
+      await memory.deleteAll({ userId: userId.toPersistenceKey() });
     },
   };
 }

@@ -17,7 +17,7 @@ import type {
   ConversationLayerOptions,
   RespondInput,
 } from "./conversation-types.js";
-import { recallForTurn, rememberSuccessfulTurn } from "./long-term-memory/operations.js";
+import { recallForTurn, rememberDeliveredUserMessage } from "./long-term-memory/operations.js";
 import { PendingMemoryWrites } from "./long-term-memory/pending.js";
 import { GeneratedTurn } from "./generated-turn.js";
 import {
@@ -80,17 +80,17 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
       const recalledMemories = await recallForTurn(longTermMemory, userId, messageText);
       const result = await agent.invoke(
         { messages: [new HumanMessage(messageText)] },
-        { configurable: { thread_id: threadId }, context: { recalledMemories } },
+        { configurable: { thread_id: threadId.toPersistenceKey() }, context: { recalledMemories } },
       );
       const replyText = extractReplyText(result.messages);
       return GeneratedTurn.fromGeneratedResponse(
         replyText,
-        () => rememberSuccessfulTurn(longTermMemory, userId, threadId, messageText, replyText),
+        () => rememberDeliveredUserMessage(longTermMemory, userId, threadId, messageText),
         pendingMemoryWrites,
       );
     },
-    async getMessages(threadId: string): Promise<BaseMessage[]> {
-      const tuple = await checkpointer.getTuple({ configurable: { thread_id: threadId } });
+    async getMessages(threadId): Promise<BaseMessage[]> {
+      const tuple = await checkpointer.getTuple({ configurable: { thread_id: threadId.toPersistenceKey() } });
       const stored = tuple?.checkpoint.channel_values["messages"];
       if (!Array.isArray(stored)) {
         return [];

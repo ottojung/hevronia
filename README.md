@@ -6,7 +6,7 @@ Telegram over **long polling** via **grammY**, and generates each reply with an
 
 Every private Telegram chat has a durable LangGraph conversational thread.
 Recent messages remain verbatim and older history becomes a rolling summary.
-Separately, Mem0 extracts durable facts from successful turns and semantically
+Separately, Mem0 extracts durable facts from user messages after successful delivery and semantically
 recalls a small relevant set for the Telegram user in future conversations.
 
 ```
@@ -120,8 +120,8 @@ The model receives three distinct context layers:
 LangGraph owns thread-scoped conversational continuity under
 `telegram-private:<chat id>` and persists it in the ignored
 `backend/.data/checkpoints.sqlite`. Mem0 owns durable semantic knowledge under
-`telegram-user:<sender id>`. It extracts concise facts only from completed
-user/assistant turns and records audit history at
+`telegram-user:<sender id>`. It extracts concise facts only from the user's
+message after the generated reply is delivered, and records audit history at
 `backend/.data/mem0/history.db`. A real Qdrant service stores the versioned
 vector collection. The provided Compose service persists Qdrant data at
 `backend/.data/qdrant/`; `QDRANT_URL` may instead select another deployment.

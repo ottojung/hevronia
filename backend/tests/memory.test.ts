@@ -7,7 +7,18 @@ import path from "node:path";
 import { fakeModel } from "@langchain/core/testing";
 import { AIMessage } from "@langchain/core/messages";
 
-import { createConversationLayer, SUMMARY_PREFIX } from "../src/memory.js";
+import { createConversationLayer } from "../src/layer.js";
+import { SUMMARY_PREFIX } from "../src/summary.js";
+import {
+  conversationThreadIdFromTelegramPrivateChat,
+  longTermMemoryUserIdFromTelegramSender,
+} from "../src/identifiers.js";
+
+const userId = longTermMemoryUserIdFromTelegramSender(1);
+
+function thread(chatId: number) {
+  return conversationThreadIdFromTelegramPrivateChat(chatId);
+}
 
 function tempDbPath(): { dir: string; path: string } {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-memory-"));
@@ -22,12 +33,12 @@ test("thread continuity: a second turn sees the first turn", async () => {
     const layer = createConversationLayer({ dbPath: path, model, summaryModel: summary });
 
     model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    assert.equal((await layer.respond({ threadId: "thread-a", userId: "test-user", messageText: "перше повідомлення" })).replyText, "saw 2 messages");
+    assert.equal((await layer.respond({ threadId: thread(1), userId, messageText: "перше повідомлення" })).replyText, "saw 2 messages");
 
     model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    assert.equal((await layer.respond({ threadId: "thread-a", userId: "test-user", messageText: "друге повідомлення" })).replyText, "saw 4 messages");
+    assert.equal((await layer.respond({ threadId: thread(1), userId, messageText: "друге повідомлення" })).replyText, "saw 4 messages");
 
-    const messages = await layer.getMessages("thread-a");
+    const messages = await layer.getMessages(thread(1));
     assert.equal(messages.length, 4);
     assert.equal(messages[0]?.content, "перше повідомлення");
     assert.equal(messages[2]?.content, "друге повідомлення");
@@ -45,16 +56,16 @@ test("thread isolation: different chats do not share context", async () => {
     const layer = createConversationLayer({ dbPath: path, model, summaryModel: summary });
 
     model.respond(new AIMessage("reply 111"));
-    await layer.respond({ threadId: "telegram-private:111", userId: "test-user", messageText: "hello from 111" });
+    await layer.respond({ threadId: thread(111), userId, messageText: "hello from 111" });
 
     model.respond(new AIMessage("reply 222"));
-    await layer.respond({ threadId: "telegram-private:222", userId: "test-user", messageText: "hello from 222" });
+    await layer.respond({ threadId: thread(222), userId, messageText: "hello from 222" });
 
     model.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
-    const reply = await layer.respond({ threadId: "telegram-private:111", userId: "test-user", messageText: "again from 111" });
+    const reply = await layer.respond({ threadId: thread(111), userId, messageText: "again from 111" });
     assert.equal(reply.replyText, "saw 4 messages");
 
-    const messages = await layer.getMessages("telegram-private:111");
+    const messages = await layer.getMessages(thread(111));
     const text = messages.map((m) => m.content).join("\n");
     assert.ok(!text.includes("hello from 222"));
     await layer.close();
@@ -69,16 +80,16 @@ test("persistence: state survives layer recreation", async () => {
     const firstModel = fakeModel();
     firstModel.respond(new AIMessage("запам'ятано: манго"));
     const firstLayer = createConversationLayer({ dbPath: path, model: firstModel, summaryModel: fakeModel() });
-    await firstLayer.respond({ threadId: "thread-p", userId: "test-user", messageText: "Мій улюблений фрукт — манго." });
+    await firstLayer.respond({ threadId: thread(3), userId, messageText: "Мій улюблений фрукт — манго." });
     await firstLayer.close();
 
     const secondModel = fakeModel();
     secondModel.respond((messages) => new AIMessage(`saw ${messages.length} messages`));
     const secondLayer = createConversationLayer({ dbPath: path, model: secondModel, summaryModel: fakeModel() });
-    const reply = await secondLayer.respond({ threadId: "thread-p", userId: "test-user", messageText: "Який мій улюблений фрукт?" });
+    const reply = await secondLayer.respond({ threadId: thread(3), userId, messageText: "Який мій улюблений фрукт?" });
     assert.equal(reply.replyText, "saw 4 messages");
 
-    const messages = await secondLayer.getMessages("thread-p");
+    const messages = await secondLayer.getMessages(thread(3));
     assert.equal(messages.length, 4);
     assert.equal(messages[0]?.content, "Мій улюблений фрукт — манго.");
     await secondLayer.close();
@@ -109,10 +120,10 @@ test("compaction: older messages are summarized, recent messages stay verbatim",
     }
 
     for (let i = 0; i < 8; i += 1) {
-      await layer.respond({ threadId: "thread-c", userId: "test-user", messageText: `улюблений фрукт манго повідомлення номер ${i}` });
+      await layer.respond({ threadId: thread(4), userId, messageText: `улюблений фрукт манго повідомлення номер ${i}` });
     }
 
-    const messages = await layer.getMessages("thread-c");
+    const messages = await layer.getMessages(thread(4));
     assert.ok(messages.length < 16, `expected compaction, but state has ${messages.length} messages`);
 
     const summaryMessage = messages.find(
@@ -145,13 +156,13 @@ test("failure does not write a fake assistant reply into memory", async () => {
     const layer = createConversationLayer({ dbPath: path, model, summaryModel: summary });
 
     model.respond(new Error("openai boom"));
-    await assert.rejects(() => layer.respond({ threadId: "thread-f", userId: "test-user", messageText: "привіт" }));
+    await assert.rejects(() => layer.respond({ threadId: thread(5), userId, messageText: "привіт" }));
 
     model.respond(new AIMessage("відповідь після збою"));
-    const reply = await layer.respond({ threadId: "thread-f", userId: "test-user", messageText: "знову привіт" });
+    const reply = await layer.respond({ threadId: thread(5), userId, messageText: "знову привіт" });
     assert.equal(reply.replyText, "відповідь після збою");
 
-    const messages = await layer.getMessages("thread-f");
+    const messages = await layer.getMessages(thread(5));
     const assistantTexts = messages
       .filter((m) => m instanceof AIMessage)
       .map((m) => m.content);

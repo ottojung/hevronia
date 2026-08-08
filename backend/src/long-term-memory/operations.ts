@@ -3,10 +3,11 @@ import {
   type LongTermMemory,
   type RecalledMemory,
 } from "./index.js";
+import type { ConversationThreadId, LongTermMemoryUserId } from "../identifiers.js";
 
 export async function recallForTurn(
   memory: LongTermMemory | undefined,
-  userId: string,
+  userId: LongTermMemoryUserId,
   query: string,
 ): Promise<RecalledMemory[]> {
   if (memory === undefined) {
@@ -22,18 +23,17 @@ export async function recallForTurn(
   }
 }
 
-export async function rememberSuccessfulTurn(
+export async function rememberDeliveredUserMessage(
   memory: LongTermMemory | undefined,
-  userId: string,
-  threadId: string,
+  userId: LongTermMemoryUserId,
+  threadId: ConversationThreadId,
   userMessage: string,
-  assistantMessage: string,
 ): Promise<void> {
   if (memory === undefined) {
     return;
   }
   try {
-    await memory.rememberTurn(userId, threadId, userMessage, assistantMessage);
+    await memory.rememberUserMessage(userId, threadId, userMessage);
   } catch (error) {
     console.warn(`Long-term-memory ingestion failed: ${operationalErrorDetail(error)}`);
   }

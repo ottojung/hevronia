@@ -2,6 +2,10 @@ import { Bot } from "grammy";
 
 import { respond } from "./respond.js";
 import { isTransientError, sleep } from "./retry.js";
+import {
+  conversationThreadIdFromTelegramPrivateChat,
+  longTermMemoryUserIdFromTelegramSender,
+} from "./identifiers.js";
 
 const EXPECTED_NAME = "Хевронія";
 const EXPECTED_USERNAME = "hevronia_bot";
@@ -58,8 +62,8 @@ export async function startBot(): Promise<void> {
     console.log(`Handling private text message update=${updateId} message=${messageId}`);
     try {
       await ctx.replyWithChatAction("typing");
-      const threadId = `telegram-private:${ctx.chat.id}`;
-      const userId = `telegram-user:${ctx.from.id}`;
+      const threadId = conversationThreadIdFromTelegramPrivateChat(ctx.chat.id);
+      const userId = longTermMemoryUserIdFromTelegramSender(ctx.from.id);
       const turn = await respond({ threadId, userId, messageText: ctx.message.text });
       await ctx.reply(turn.replyText);
       console.log(`Handled message=${messageId}`);

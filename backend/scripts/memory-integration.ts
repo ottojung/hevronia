@@ -3,19 +3,23 @@ import { randomUUID } from "node:crypto";
 
 import { createMem0LongTermMemory } from "../src/long-term-memory/index.js";
 import { qdrantUrlFromEnv, waitForQdrantReady } from "../src/long-term-memory/qdrant.js";
+import {
+  conversationThreadIdFromTelegramPrivateChat,
+  longTermMemoryUserIdFromIntegrationTest,
+} from "../src/identifiers.js";
 
-const userId = `integration-test:${randomUUID()}`;
+const userId = longTermMemoryUserIdFromIntegrationTest(randomUUID());
+const threadId = conversationThreadIdFromTelegramPrivateChat(1);
 const query = "улюблений фрукт";
 
 const qdrantUrl = qdrantUrlFromEnv();
 await waitForQdrantReady(qdrantUrl);
 const firstMemory = createMem0LongTermMemory({ qdrantUrl });
 try {
-  await firstMemory.rememberTurn(
+  await firstMemory.rememberUserMessage(
     userId,
-    "integration-test:initial",
+    threadId,
     "Мій улюблений тестовий фрукт — манго.",
-    "Добре, запам'ятаю.",
   );
   console.log("Mem0 add succeeded");
 

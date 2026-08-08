@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { startBot } from "./telegram.js";
-import { closeConversationLayer, initializeConversationLayer } from "./respond.js";
+import { closeConversationLayer, initializeConversationLayer } from "./memory.js";
 
 function readVersion(): string {
   try {

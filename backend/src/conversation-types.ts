@@ -5,10 +5,11 @@ import type { TokenCounter } from "langchain";
 import type { LongTermMemory } from "./long-term-memory/index.js";
 import type { GeneratedTurn } from "./generated-turn.js";
 import type { PendingMemoryWrites } from "./long-term-memory/pending.js";
+import type { ConversationThreadId, LongTermMemoryUserId } from "./identifiers.js";
 
 export interface RespondInput {
-  threadId: string;
-  userId: string;
+  threadId: ConversationThreadId;
+  userId: LongTermMemoryUserId;
   messageText: string;
 }
 
@@ -27,6 +28,6 @@ export interface ConversationLayerOptions {
 
 export interface ConversationLayer {
   respond(input: RespondInput): Promise<GeneratedTurn>;
-  getMessages(threadId: string): Promise<BaseMessage[]>;
+  getMessages(threadId: ConversationThreadId): Promise<BaseMessage[]>;
   close(): Promise<void>;
 }

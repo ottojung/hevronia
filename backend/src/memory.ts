@@ -8,12 +8,6 @@ import {
 import { qdrantUrlFromEnv, waitForQdrantReady } from "./long-term-memory/qdrant.js";
 import { openAiKeyFromEnv } from "./model.js";
 
-export { createConversationLayer } from "./layer.js";
-export type { ConversationLayer, ConversationLayerOptions, RespondInput } from "./conversation-types.js";
-export { MODEL, openAiKeyFromEnv } from "./model.js";
-export { COMPACTION, SUMMARY_PREFIX, SUMMARY_PROMPT } from "./summary.js";
-export { extractReplyText, extractText } from "./text.js";
-
 export class ConversationLayerNotInitializedError extends Error {
   constructor() {
     super("Conversation layer has not been initialized");

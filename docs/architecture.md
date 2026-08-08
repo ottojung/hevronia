@@ -47,7 +47,8 @@ constructed; Compose ordering alone is not treated as readiness. Compose mounts
 the same `backend/.data/` directory into the bot container so checkpoints and
 Mem0 history survive container replacement. Recalled facts exist only in the dynamic system
 prompt for one invocation, so they cannot enter checkpoints or rolling
-summaries. Only successfully delivered turns are offered to Mem0. Search or
+summaries. After successful delivery, only the user's message is offered to
+Mem0; generated assistant text is never long-term-memory evidence. Search or
 ingestion failures degrade to normal thread-only behavior, and shutdown drains
 pending writes with a bounded wait.
 There is no automatic expiration or garbage collection: conservative admission

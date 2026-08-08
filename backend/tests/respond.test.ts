@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { extractReplyText, extractText, openAiKeyFromEnv } from "../src/respond.js";
+import { openAiKeyFromEnv } from "../src/model.js";
+import { extractReplyText, extractText } from "../src/text.js";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 
 const FAKE_KEY = "sk-test-key-value-that-must-not-leak";

@@ -15,7 +15,7 @@ import {
 function fakeLongTermMemory(): LongTermMemory {
   return {
     search: async () => [],
-    rememberTurn: async () => undefined,
+    rememberUserMessage: async () => undefined,
     deleteAll: async () => undefined,
   };
 }
