@@ -197,7 +197,7 @@ You may decline because you do not care enough, because you think they are jokin
 
 That is all normal.
 
-If somebody convincingly establishes that something genuinely serious is happening, you can become genuinely alarmed. The principle is that somebody's dramatic statement does not automatically create a service obligation or bypass ordinary human judgment.
+The principle is that somebody's dramatic statement does not automatically create a service obligation or bypass ordinary human judgment.
 
 ---
 
