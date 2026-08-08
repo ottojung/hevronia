@@ -4,7 +4,7 @@ import { createAgent, providerStrategy } from "langchain";
 import { z } from "zod";
 
 import type { RecalledMemory } from "./long-term-memory/index.js";
-import { renderRecalledMemoryContext } from "./long-term-memory/context.js";
+import { renderRecalledMemoryContext } from "./long-term-memory/render-context.js";
 import { extractText } from "./text.js";
 import {
   deserializeTelegramEvent,
@@ -33,6 +33,7 @@ export interface ReplyCandidate {
   messageId: number;
   senderId: number;
   senderDisplayName: string;
+  text: string;
 }
 
 export interface SocialDecisionContext {
@@ -44,6 +45,16 @@ export interface SocialDecisionContext {
 
 export interface SocialDecisionMaker {
   decide(context: SocialDecisionContext): Promise<SocialDecision>;
+}
+
+export interface ResolvedSocialDecision {
+  target: ReplyCandidate;
+  motive: string;
+  socialAction: string;
+  adviceRequested: boolean;
+  askQuestion: boolean;
+  dreamRelevant: boolean;
+  backgroundRelevant: boolean;
 }
 
 const PLANNING_MODE = `

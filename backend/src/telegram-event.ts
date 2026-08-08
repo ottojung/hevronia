@@ -1,11 +1,11 @@
 import { z } from "zod";
 
 const chatKindSchema = z.enum(["private", "group", "supergroup"]);
-const replyRelationshipSchema = z.object({
-  messageId: z.number().int(),
-  senderId: z.number().int(),
-  senderDisplayName: z.string().min(1),
-  isHevronia: z.boolean(),
+export const replyRelationshipSchema = z.object({
+  targetMessageId: z.number().int(),
+  targetSenderId: z.number().int(),
+  targetSenderDisplayName: z.string().min(1),
+  targetText: z.string().nullable(),
 }).strict();
 
 export const observedTelegramMessageSchema = z.object({
@@ -26,7 +26,7 @@ export const deliveredHevroniaMessageSchema = z.object({
   senderDisplayName: z.literal("Хевронія"),
   chatKind: chatKindSchema,
   text: z.string().min(1),
-  replyToMessageId: z.number().int(),
+  replyTo: replyRelationshipSchema.nullable(),
 }).strict();
 
 export const canonicalTelegramEventSchema = z.discriminatedUnion("kind", [
@@ -37,6 +37,7 @@ export const canonicalTelegramEventSchema = z.discriminatedUnion("kind", [
 export type ObservedTelegramMessage = z.infer<typeof observedTelegramMessageSchema>;
 export type DeliveredHevroniaMessage = z.infer<typeof deliveredHevroniaMessageSchema>;
 export type CanonicalTelegramEvent = z.infer<typeof canonicalTelegramEventSchema>;
+export type ReplyRelationship = z.infer<typeof replyRelationshipSchema>;
 
 export function serializeTelegramEvent(event: CanonicalTelegramEvent): string {
   return JSON.stringify(event);
@@ -48,8 +49,8 @@ export function deserializeTelegramEvent(serialized: string): CanonicalTelegramE
 
 export function renderTelegramEvent(event: CanonicalTelegramEvent): string {
   const identity = `${event.senderDisplayName} [telegram-user:${event.senderId}]`;
-  const reply = event.kind === "participant" && event.replyTo !== null
-    ? ` (reply to ${event.replyTo.senderDisplayName} [telegram-user:${event.replyTo.senderId}], message ${event.replyTo.messageId})`
+  const reply = event.replyTo !== null
+    ? ` (reply to ${event.replyTo.targetSenderDisplayName} [telegram-user:${event.replyTo.targetSenderId}], message ${event.replyTo.targetMessageId}: ${event.replyTo.targetText ?? "text unavailable"})`
     : "";
   const direct = event.kind === "participant" && event.directlyAddressed
     ? " [directly addressing Хевронія]"

@@ -16,11 +16,9 @@ import { deliverGeneratedTurn } from "../src/telegram-delivery.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 import {
   conversationThreadIdFromTelegramPrivateChat,
-  longTermMemoryUserIdFromTelegramSender,
 } from "../src/identifiers.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(77);
-const userId = longTermMemoryUserIdFromTelegramSender(88);
 
 function message(overrides: Partial<ObservedTelegramMessage> = {}): ObservedTelegramMessage {
   return { kind: "participant", messageId: 10, senderId: 88,
@@ -34,14 +32,14 @@ test("private, group-reply, and ambient direct interaction semantics remain dist
     mentionsHevronia: false, replyTo: null });
   const groupReply = createObservedTelegramMessage({ messageId: 2, senderId: 11,
     senderDisplayName: "Іра", chatKind: "group", text: "та ні",
-    mentionsHevronia: false, replyTo: { messageId: 1, senderId: 999,
-      senderDisplayName: "Хевронія", isHevronia: true } });
+    mentionsHevronia: false, replyTo: { targetMessageId: 1, targetSenderId: 999,
+      targetSenderDisplayName: "Хевронія", targetText: "старе повідомлення", targetsHevronia: true } });
   const ambient = createObservedTelegramMessage({ messageId: 3, senderId: 11,
     senderDisplayName: "Іра", chatKind: "group", text: "та ні",
     mentionsHevronia: false, replyTo: null });
   assert.equal(privateMessage.directlyAddressed, true);
   assert.equal(groupReply.directlyAddressed, true);
-  assert.equal(groupReply.replyTo?.isHevronia, true);
+  assert.equal(groupReply.replyTo?.targetSenderId, 999);
   assert.equal(ambient.directlyAddressed, false);
 });
 
@@ -58,7 +56,7 @@ test("real planner receives canonical personality, background, and recalled memo
   const planner = createSocialDecisionMaker(model, SYSTEM_PROMPT);
   await planner.decide({ boundedHistory: [], currentMessage: message(),
     replyCandidates: [{ key: "candidate-0", messageId: 10, senderId: 88,
-      senderDisplayName: "Іра" }], recalledMemories: [{ text: "Іра боїться павуків" }] });
+      senderDisplayName: "Іра", text: "та ні" }], recalledMemories: [{ text: "Іра боїться павуків" }] });
 });
 
 test("a non-candidate planner target cannot reach Telegram delivery", async () => {
@@ -70,12 +68,12 @@ test("a non-candidate planner target cannot reach Telegram delivery", async () =
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner });
   try {
-    const turn = await layer.respond({ threadId, userId, message: message(),
+    const turn = await layer.respond({ threadId, message: message(),
       hevroniaSenderId: 999 });
     let delivered = false;
     const sent = await deliverGeneratedTurn(turn, { showTyping: async () => undefined,
       reply: async () => { delivered = true; return 100; } });
-    assert.equal(sent, false);
+    assert.deepEqual(sent, { status: "silence" });
     assert.equal(delivered, false);
   } finally {
     await layer.close();
@@ -93,9 +91,9 @@ test("duplicate display names retain distinct stable identities", async () => {
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner });
   try {
-    await layer.respond({ threadId, userId, message: message({ senderId: 11 }),
+    await layer.respond({ threadId, message: message({ senderId: 11 }),
       hevroniaSenderId: 999 });
-    await layer.respond({ threadId, userId, message: message({ messageId: 11, senderId: 22 }),
+    await layer.respond({ threadId, message: message({ messageId: 11, senderId: 22 }),
       hevroniaSenderId: 999 });
     assert.deepEqual(seen.at(-1), [11, 22]);
   } finally {
@@ -115,7 +113,7 @@ test("reply metadata is ephemeral and undelivered text never enters history", as
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model, summaryModel: fakeModel(), decisionMaker: planner });
   try {
-    const turn = await layer.respond({ threadId, userId, message: message(),
+    const turn = await layer.respond({ threadId, message: message(),
       hevroniaSenderId: 999 });
     await assert.rejects(() => deliverGeneratedTurn(turn, {
       showTyping: async () => undefined,
@@ -145,11 +143,11 @@ test("silence and delivered reply persist the same canonical incoming representa
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"), model,
     summaryModel: fakeModel(), decisionMaker: planner });
   try {
-    const silent = await layer.respond({ threadId, userId, message: message({ messageId: 1 }),
+    const silent = await layer.respond({ threadId, message: message({ messageId: 1 }),
       hevroniaSenderId: 999 });
     await deliverGeneratedTurn(silent, { showTyping: async () => undefined,
       reply: async () => 100 });
-    const reply = await layer.respond({ threadId, userId, message: message({ messageId: 2 }),
+    const reply = await layer.respond({ threadId, message: message({ messageId: 2 }),
       hevroniaSenderId: 999 });
     const sentTexts: string[] = [];
     await deliverGeneratedTurn(reply, { showTyping: async () => undefined,
@@ -179,7 +177,7 @@ test("recalled memory reaches the planner before silence decision", async () => 
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner,
     longTermMemory: memory });
   try {
-    await layer.respond({ threadId, userId, message: message(), hevroniaSenderId: 999 });
+    await layer.respond({ threadId, message: message(), hevroniaSenderId: 999 });
     assert.equal(recalled, "важлива обіцянка");
   } finally {
     await layer.close();

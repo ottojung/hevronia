@@ -1,33 +1,17 @@
 import { Bot } from "grammy";
 
-import { respond } from "./respond.js";
-import { isTransientError, sleep } from "./retry.js";
-import { conversationThreadIdFromTelegramGroupChat, conversationThreadIdFromTelegramPrivateChat, longTermMemoryUserIdFromTelegramSender } from "./identifiers.js";
-import { deliverGeneratedTurn } from "./telegram-delivery.js";
+import { recordDeliveredMessage, respond } from "./respond.js";
+import { conversationThreadIdFromTelegramGroupChat, conversationThreadIdFromTelegramPrivateChat } from "./identifiers.js";
+import { deliverFallbackMessage, deliverGeneratedTurn } from "./telegram-delivery.js";
 import { logBotIdentity, tokenFromEnv } from "./telegram-config.js";
 import { createObservedTelegramMessage } from "./telegram-observation.js";
+import { installTelegramRetry } from "./telegram-retry.js";
 export { tokenFromEnv } from "./telegram-config.js";
 
 export async function startBot(): Promise<void> {
   const bot = new Bot(tokenFromEnv());
 
-  bot.api.config.use(async (prev, method, payload, signal) => {
-    const maxAttempts = 5;
-    for (let attempt = 1; ; attempt++) {
-      try {
-        return await prev(method, payload, signal);
-      } catch (error) {
-        if (attempt >= maxAttempts || signal?.aborted || !isTransientError(error)) {
-          throw error;
-        }
-        const delayMs = 500 * attempt;
-        console.warn(
-          `Telegram API call "${method}" failed (attempt ${attempt}), retrying in ${delayMs}ms`,
-        );
-        await sleep(delayMs);
-      }
-    }
-  });
+  installTelegramRetry(bot);
 
   const me = await bot.api.getMe();
   logBotIdentity(me);
@@ -40,21 +24,21 @@ export async function startBot(): Promise<void> {
       const threadId = ctx.chat.type === "private"
         ? conversationThreadIdFromTelegramPrivateChat(ctx.chat.id)
         : conversationThreadIdFromTelegramGroupChat(ctx.chat.id);
-      const userId = longTermMemoryUserIdFromTelegramSender(ctx.from.id);
       const reply = ctx.message.reply_to_message;
-      const displayName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" ");
+      const displayName = displayNameFrom(ctx.from.first_name, ctx.from.last_name);
       const message = createObservedTelegramMessage({
         messageId, senderId: ctx.from.id, senderDisplayName: displayName,
         chatKind: ctx.chat.type, text: ctx.message.text,
         replyTo: reply === undefined ? null : {
-          messageId: reply.message_id, senderId: reply.from?.id ?? ctx.chat.id,
-          senderDisplayName: reply.from?.first_name ?? ctx.chat.title ?? "chat",
-          isHevronia: reply.from?.id === me.id,
+          targetMessageId: reply.message_id, targetSenderId: reply.from?.id ?? ctx.chat.id,
+          targetSenderDisplayName: reply.from?.first_name ?? ctx.chat.title ?? "chat",
+          targetText: "text" in reply ? reply.text ?? null : "caption" in reply ? reply.caption ?? null : null,
+          targetsHevronia: reply.from?.id === me.id,
         },
         mentionsHevronia: ctx.message.text.includes(`@${me.username}`),
       });
-      const turn = await respond({ threadId, userId, message, hevroniaSenderId: me.id });
-      const sent = await deliverGeneratedTurn(turn, {
+      const turn = await respond({ threadId, message, hevroniaSenderId: me.id });
+      const result = await deliverGeneratedTurn(turn, {
         showTyping: async () => {
           await ctx.replyWithChatAction("typing");
         },
@@ -65,17 +49,30 @@ export async function startBot(): Promise<void> {
           return delivered.message_id;
         },
       });
-      if (!sent) {
+      if (result.status === "silence") {
         console.log(`Observed message=${messageId}; chose silence`);
         return;
       }
-      console.log(`Handled message=${messageId}`);
+      console.log(`Handled message=${messageId}; persistence=${result.persistence}`);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       console.error(`Failed to handle message=${messageId}: ${detail}`);
-      await ctx
-        .reply("Щось я зараз зависла. Спробуй ще раз за хвилину.")
-        .catch(() => undefined);
+      const fallbackText = "Щось я зараз зависла. Спробуй ще раз за хвилину.";
+      const fallbackThreadId = ctx.chat.type === "private"
+        ? conversationThreadIdFromTelegramPrivateChat(ctx.chat.id)
+        : conversationThreadIdFromTelegramGroupChat(ctx.chat.id);
+      await deliverFallbackMessage({ text: fallbackText, senderId: me.id,
+        chatKind: ctx.chat.type, replyTo: { targetMessageId: messageId,
+          targetSenderId: ctx.from.id,
+          targetSenderDisplayName: displayNameFrom(ctx.from.first_name, ctx.from.last_name),
+          targetText: ctx.message.text } }, {
+        showTyping: async () => undefined,
+        reply: async (text, targetMessageId) => (await ctx.reply(text, {
+          reply_parameters: { message_id: targetMessageId },
+        })).message_id,
+      }, (fallback) => recordDeliveredMessage(fallbackThreadId, fallback)).catch(
+        (fallbackError) => console.error(`Failed to deliver fallback: ${String(fallbackError)}`),
+      );
     }
   });
 
@@ -105,4 +102,8 @@ export async function startBot(): Promise<void> {
     },
   });
   console.log("Long polling stopped.");
+}
+
+function displayNameFrom(firstName: string, lastName?: string): string {
+  return [firstName, lastName].filter(Boolean).join(" ");
 }

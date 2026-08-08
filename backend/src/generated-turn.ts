@@ -1,60 +1,46 @@
-import type { PendingMemoryWrites } from "./long-term-memory/pending.js";
+import type { ReplyRelationship } from "./telegram-event.js";
 
 export type GeneratedTurnOutcome =
-  | {
-      action: "silence";
-      completeObservation(): Promise<void>;
-    }
+  | { action: "silence" }
   | {
       action: "reply";
       replyText: string;
-      replyToMessageId: number;
-      completeDelivery(deliveredMessageId: number): Promise<void>;
+      replyTo: ReplyRelationship;
+      persistDelivery(deliveredMessageId: number): Promise<void>;
     };
 
 /**
  * The properties that this class carries are:
  * - Silence cannot contain reply text or delivery behavior.
- * - A reply is persisted only through `completeDelivery(...)`, after Telegram
- *   supplies the delivered outgoing message identifier.
+ * - A reply exposes one consistency operation that persists only a
+ *   Telegram-confirmed outgoing event.
  *
  * The proof of those properties is guaranteed by:
  * - This class can only be introduced through these functions:
- *   - `GeneratedTurn.fromSilence(...)`: constructs only `completeObservation`.
- *   - `GeneratedTurn.fromReply(...)`: constructs only `completeDelivery` and
- *     memoizes its post-delivery persistence operation.
+ *   - `GeneratedTurn.fromSilence()`: constructs only the silence variant.
+ *   - `GeneratedTurn.fromReply(...)`: requires post-delivery persistence and
+ *     memoizes it after Telegram supplies the delivered message identifier.
  */
 export class GeneratedTurn {
   private constructor(readonly outcome: GeneratedTurnOutcome) {}
 
-  static fromSilence(
-    afterObservation: () => Promise<void>,
-    pendingWrites: PendingMemoryWrites,
-  ): GeneratedTurn {
-    let completion: Promise<void> | undefined;
-    return new GeneratedTurn({
-      action: "silence",
-      completeObservation: () => {
-        completion ??= pendingWrites.track(afterObservation());
-        return completion;
-      },
-    });
+  static fromSilence(): GeneratedTurn {
+    return new GeneratedTurn({ action: "silence" });
   }
 
   static fromReply(
     replyText: string,
-    replyToMessageId: number,
-    afterDelivery: (deliveredMessageId: number) => Promise<void>,
-    pendingWrites: PendingMemoryWrites,
+    replyTo: ReplyRelationship,
+    persistDelivery: (deliveredMessageId: number) => Promise<void>,
   ): GeneratedTurn {
-    let completion: Promise<void> | undefined;
+    let persistence: Promise<void> | undefined;
     return new GeneratedTurn({
       action: "reply",
       replyText,
-      replyToMessageId,
-      completeDelivery: (deliveredMessageId) => {
-        completion ??= pendingWrites.track(afterDelivery(deliveredMessageId));
-        return completion;
+      replyTo,
+      persistDelivery: (deliveredMessageId) => {
+        persistence ??= persistDelivery(deliveredMessageId);
+        return persistence;
       },
     });
   }

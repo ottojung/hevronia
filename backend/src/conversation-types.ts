@@ -5,12 +5,11 @@ import type { TokenCounter } from "langchain";
 import type { LongTermMemory } from "./long-term-memory/index.js";
 import type { GeneratedTurn } from "./generated-turn.js";
 import type { PendingMemoryWrites } from "./long-term-memory/pending.js";
-import type { ConversationThreadId, LongTermMemoryUserId } from "./identifiers.js";
-import type { ObservedTelegramMessage } from "./telegram-event.js";
+import type { ConversationThreadId } from "./identifiers.js";
+import type { DeliveredHevroniaMessage, ObservedTelegramMessage } from "./telegram-event.js";
 
 export interface RespondInput {
   threadId: ConversationThreadId;
-  userId: LongTermMemoryUserId;
   message: ObservedTelegramMessage;
   hevroniaSenderId: number;
 }
@@ -31,6 +30,10 @@ export interface ConversationLayerOptions {
 
 export interface ConversationLayer {
   respond(input: RespondInput): Promise<GeneratedTurn>;
+  recordDeliveredMessage(
+    threadId: ConversationThreadId,
+    message: DeliveredHevroniaMessage,
+  ): Promise<void>;
   getMessages(threadId: ConversationThreadId): Promise<BaseMessage[]>;
   close(): Promise<void>;
 }

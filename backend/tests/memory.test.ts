@@ -13,10 +13,8 @@ import { SUMMARY_PREFIX } from "../src/summary.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 import {
   conversationThreadIdFromTelegramPrivateChat,
-  longTermMemoryUserIdFromTelegramSender,
 } from "../src/identifiers.js";
 
-const userId = longTermMemoryUserIdFromTelegramSender(1);
 const threadId = conversationThreadIdFromTelegramPrivateChat(1);
 
 function event(text: string, messageId: number, senderId = 1, name = "Іра"): ObservedTelegramMessage {
@@ -48,7 +46,7 @@ test("many consecutive silent observations compact bounded multi-participant sta
   try {
     for (let index = 0; index < 10; index += 1) {
       const senderId = index % 2 === 0 ? 11 : 22;
-      const turn = await layer.respond({ threadId, userId,
+      const turn = await layer.respond({ threadId,
         message: event(`повідомлення ${index}`, index + 1, senderId), hevroniaSenderId: 999 });
       assert.equal(turn.outcome.action, "silence");
     }
@@ -73,7 +71,7 @@ test("canonical observed state survives layer recreation", async () => {
   try {
     const first = createConversationLayer({ dbPath: db, model: fakeModel(),
       summaryModel: fakeModel(), decisionMaker: silence });
-    await first.respond({ threadId, userId, message: event("перше", 1), hevroniaSenderId: 999 });
+    await first.respond({ threadId, message: event("перше", 1), hevroniaSenderId: 999 });
     await first.close();
     const second = createConversationLayer({ dbPath: db, model: fakeModel(),
       summaryModel: fakeModel(), decisionMaker: silence });

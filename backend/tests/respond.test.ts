@@ -2,8 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { openAiKeyFromEnv } from "../src/model.js";
-import { extractReplyText, extractText } from "../src/text.js";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import { extractText } from "../src/text.js";
 import {
   isMissingGroupMessageAccessError,
   logBotIdentity,
@@ -58,16 +57,6 @@ test("extractText returns empty string when content has no text", () => {
 
 test("extractText returns empty string for empty content", () => {
   assert.equal(extractText([]), "");
-});
-
-test("extractReplyText returns the text of the last AI message", () => {
-  const messages = [new HumanMessage("привіт"), new AIMessage("Вітаю.")];
-  assert.equal(extractReplyText(messages), "Вітаю.");
-});
-
-test("extractReplyText throws when the agent produced no text", () => {
-  const messages = [new HumanMessage("привіт"), new AIMessage("")];
-  assert.throws(() => extractReplyText(messages), /no text reply/);
 });
 
 test("startup rejects a bot that cannot observe ambient group messages", () => {

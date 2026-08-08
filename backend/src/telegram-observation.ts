@@ -1,10 +1,11 @@
 import type { ObservedTelegramMessage } from "./telegram-event.js";
 
 export interface TelegramReplyInput {
-  messageId: number;
-  senderId: number;
-  senderDisplayName: string;
-  isHevronia: boolean;
+  targetMessageId: number;
+  targetSenderId: number;
+  targetSenderDisplayName: string;
+  targetText: string | null;
+  targetsHevronia: boolean;
 }
 
 export interface TelegramObservationInput {
@@ -28,12 +29,12 @@ export function createObservedTelegramMessage(
     chatKind: input.chatKind,
     text: input.text,
     replyTo: input.replyTo === null ? null : {
-      messageId: input.replyTo.messageId,
-      senderId: input.replyTo.senderId,
-      senderDisplayName: input.replyTo.senderDisplayName,
-      isHevronia: input.replyTo.isHevronia,
+      targetMessageId: input.replyTo.targetMessageId,
+      targetSenderId: input.replyTo.targetSenderId,
+      targetSenderDisplayName: input.replyTo.targetSenderDisplayName,
+      targetText: input.replyTo.targetText,
     },
     directlyAddressed: input.chatKind === "private" || input.mentionsHevronia ||
-      input.replyTo?.isHevronia === true,
+      input.replyTo?.targetsHevronia === true,
   };
 }
