@@ -56,7 +56,7 @@ test("real planner receives canonical personality, background, and recalled memo
   model.respond((messages) => {
     const input = messages.map((item) => typeof item.content === "string" ? item.content : JSON.stringify(item.content)).join("\n");
     assert.match(input, /You are Хевронія/);
-    assert.match(input, /Warcraft is a hidden layer/);
+    assert.match(input, /Warcraft is their game/);
     assert.match(input, /telegram-user:88/);
     assert.match(input, /боїться павуків/);
     return new AIMessage(JSON.stringify({ decision: { action: "silence" } }));
