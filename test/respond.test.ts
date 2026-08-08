@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
-
-import { SYSTEM_PROMPT } from "../src/personality.ts";
-import { buildMessages, extractText, openAiKeyFromEnv } from "../src/respond.ts";
+import { extractReplyText, extractText, openAiKeyFromEnv } from "../src/respond.ts";
+import { AIMessage, HumanMessage } from "@langchain/core/messages";
 
 const FAKE_KEY = "sk-test-key-value-that-must-not-leak";
 
@@ -34,14 +32,6 @@ test("openAiKeyFromEnv error does not reveal any key value", () => {
   }
 });
 
-test("buildMessages builds a system and a human message", () => {
-  const [system, human] = buildMessages("привіт");
-  assert.ok(system instanceof SystemMessage);
-  assert.equal(system.content, SYSTEM_PROMPT);
-  assert.ok(human instanceof HumanMessage);
-  assert.equal(human.content, "привіт");
-});
-
 test("extractText returns string content unchanged", () => {
   assert.equal(extractText("Привіт, світе"), "Привіт, світе");
 });
@@ -63,4 +53,14 @@ test("extractText returns empty string when content has no text", () => {
 
 test("extractText returns empty string for empty content", () => {
   assert.equal(extractText([]), "");
+});
+
+test("extractReplyText returns the text of the last AI message", () => {
+  const messages = [new HumanMessage("привіт"), new AIMessage("Вітаю.")];
+  assert.equal(extractReplyText(messages), "Вітаю.");
+});
+
+test("extractReplyText throws when the agent produced no text", () => {
+  const messages = [new HumanMessage("привіт"), new AIMessage("")];
+  assert.throws(() => extractReplyText(messages), /no text reply/);
 });

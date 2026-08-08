@@ -4,23 +4,26 @@ A Telegram bot for Хевронія, a fictional Ukrainian woman. The bot connec
 Telegram over **long polling** via **grammY**, and generates each reply with an
 **OpenAI chat model** through **LangChain** (`@langchain/openai`).
 
-The conversation engine is currently **stateless**: every private text message
-is handled independently and the reply is generated from a single
-Хевронія system prompt plus the message. There is no memory or conversation
-history yet.
+Every private Telegram chat has its own **durable conversational thread**.
+Recent messages are retained verbatim; older history is automatically compacted
+into a rolling summary by LangChain summarization. This is **thread-level
+conversational memory** — it is not semantic long-term memory, and there are no
+user profiles, embeddings, or retrieval.
 
 ```
-Telegram update
+Telegram private chat
     ↓
-Telegram transport  (src/telegram.ts, grammY, long polling)
+stable thread_id (telegram-private:<chat id>)
     ↓
-respond(text)       (src/respond.ts, LangChain ChatOpenAI)
+LangChain agent (src/memory.ts, createAgent)
     ↓
-Хевронія system prompt  (src/personality.ts)
+LangGraph SQLite checkpointer  →  .data/checkpoints.sqlite
     ↓
-OpenAI → text reply
+summarizationMiddleware
+    ├── older history → compact rolling summary
+    └── recent history → verbatim
     ↓
-Telegram transport
+OpenAI → Хевронія response
 ```
 
 ## Prerequisites
@@ -75,16 +78,31 @@ Both connect to Telegram via long polling (no webhooks). On startup the bot:
 1. authenticates with Telegram;
 2. verifies the identity matches `Хевронія` / `@hevronia_bot`;
 3. validates that `MY_OPENAI_API_KEY` is present;
-4. starts long polling for message updates;
-5. replies to each private text message.
+4. opens the conversation-memory database;
+5. starts long polling for message updates;
+6. replies to each private text message.
 
 It shuts down gracefully on `SIGINT`/`SIGTERM`. While generating a reply the
 bot sends a Telegram `typing` chat action.
 
+## Memory
+
+- Each private chat maps to a LangGraph thread: `telegram-private:<chat id>`.
+  Different chats have fully isolated histories.
+- Conversation state is stored in a local SQLite database at
+  `.data/checkpoints.sqlite` (inside the repository, git-ignored).
+- The database is resolved relative to the module, so the bot works from any
+  working directory.
+- Memory survives process restarts.
+- Once a thread's history grows past the compaction threshold, older messages
+  are summarized and only the newest tokens stay verbatim. The thresholds live
+  in `src/memory.ts` (`COMPACTION`).
+
 ## Manual testing
 
 Open Telegram, find **@hevronia_bot**, and send any text message in a private
-chat. Хевронія will answer in character.
+chat. Хевронія will answer in character and will remember earlier turns of the
+same chat.
 
 ## Developer commands
 
@@ -96,8 +114,9 @@ chat. Хевронія will answer in character.
 | `npm start`             | run the compiled build          |
 | `npm test`              | run unit tests (no network)     |
 
-Unit tests cover pure logic only (API-key validation, prompt construction,
-response-text extraction) and never call OpenAI or Telegram.
+Unit tests cover pure logic (API-key validation, response-text extraction) and
+conversation-memory behavior using LangChain fake models and a temporary SQLite
+database. They never call OpenAI or Telegram.
 
 ## Project layout
 
@@ -105,14 +124,16 @@ response-text extraction) and never call OpenAI or Telegram.
 src/
 ├── index.ts       entry point
 ├── telegram.ts    Telegram transport (grammY, long polling)
-├── respond.ts     LangChain ChatOpenAI response generation
+├── respond.ts     conversational entry point (respond(threadId, text))
+├── memory.ts      LangChain agent, summarization, SQLite checkpointer
 └── personality.ts Хевронія's system prompt
 test/
-└── respond.test.ts
+├── respond.test.ts
+└── memory.test.ts
 ```
 
 ## Status
 
-Conversation history is **not yet implemented** — each message is currently
-interpreted independently. No memory, persistence, embeddings, retrieval,
-agents, tools, streaming, or webhooks yet.
+Thread-level conversational memory with automatic compaction is implemented.
+Still out of scope: semantic long-term memory, user profiles, embeddings,
+retrieval, tools, streaming, and webhooks.

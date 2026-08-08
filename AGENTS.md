@@ -16,12 +16,17 @@ npm install
 ## Conventions
 
 - TypeScript with strict mode, ESM (`"type": "module"`), Node.js.
-- Telegram transport lives in `src/telegram.ts`; response generation lives in
-  `src/respond.ts`; the character system prompt lives in `src/personality.ts`.
-- `telegram.ts` only calls `await respond(messageText)` and sends the result;
-  it must not contain OpenAI/LangChain details.
+- Telegram transport lives in `src/telegram.ts`; the conversational entry point
+  is `src/respond.ts` (`respond(threadId, messageText)`); the LangChain agent,
+  summarization middleware, and SQLite checkpointer live in `src/memory.ts`; the
+  character system prompt lives in `src/personality.ts`.
+- `telegram.ts` only maps a chat to a thread id and calls
+  `await respond(threadId, messageText)`; it must not contain OpenAI/LangChain
+  details.
 - Secrets are read only from the process environment (`TELEGRAM_BOT_TOKEN`,
   `MY_OPENAI_API_KEY`) and are never logged or committed.
+- Conversation state is owned by LangGraph and persisted in the ignored
+  `.data/checkpoints.sqlite`; it is never reimplemented by hand.
 
 ## TypeScript Conventions
 

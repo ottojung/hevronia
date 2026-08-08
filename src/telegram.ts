@@ -84,7 +84,8 @@ export async function startBot(): Promise<void> {
     console.log(`Handling private text message update=${updateId} message=${messageId}`);
     try {
       await ctx.replyWithChatAction("typing");
-      const replyText = await respond(ctx.message.text);
+      const threadId = `telegram-private:${ctx.chat.id}`;
+      const replyText = await respond(threadId, ctx.message.text);
       await ctx.reply(replyText);
       console.log(`Handled message=${messageId}`);
     } catch (error) {
