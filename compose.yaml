@@ -11,6 +11,8 @@ services:
     build: .
     depends_on:
       - qdrant
+    volumes:
+      - ./backend/.data:/workspace/backend/.data
     environment:
       QDRANT_URL: http://qdrant:6333
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}

@@ -125,6 +125,8 @@ user/assistant turns and records audit history at
 `backend/.data/mem0/history.db`. A real Qdrant service stores the versioned
 vector collection. The provided Compose service persists Qdrant data at
 `backend/.data/qdrant/`; `QDRANT_URL` may instead select another deployment.
+Compose also mounts `backend/.data/` into the bot container, so LangGraph
+checkpoints and Mem0 history survive bot image upgrades and container recreation.
 
 Each turn retrieves memories, generates a reply, sends it through Telegram,
 and only then starts Mem0 extraction. Undelivered replies are not memorized.
