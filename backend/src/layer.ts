@@ -48,7 +48,6 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
     new ChatOpenAI({
       apiKey: openAiKeyFromEnv(),
       model: MODEL,
-      temperature: 0.9,
     });
   const summaryModel =
     options.summaryModel ??
