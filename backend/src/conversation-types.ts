@@ -6,13 +6,13 @@ import type { LongTermMemory } from "./long-term-memory/index.js";
 import type { GeneratedTurn } from "./generated-turn.js";
 import type { PendingMemoryWrites } from "./long-term-memory/pending.js";
 import type { ConversationThreadId, LongTermMemoryUserId } from "./identifiers.js";
+import type { ObservedTelegramMessage } from "./telegram-event.js";
 
 export interface RespondInput {
   threadId: ConversationThreadId;
   userId: LongTermMemoryUserId;
-  messageId: number;
-  speakerName: string;
-  messageText: string;
+  message: ObservedTelegramMessage;
+  hevroniaSenderId: number;
 }
 
 export interface ConversationLayerOptions {

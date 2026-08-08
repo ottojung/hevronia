@@ -1,100 +1,104 @@
+import { HumanMessage, SystemMessage, isBaseMessage } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai";
 import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
-import { HumanMessage, isBaseMessage, type BaseMessage } from "@langchain/core/messages";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { SYSTEM_PROMPT } from "./personality.js";
-import { DEFAULT_DB_PATH } from "./summary.js";
-import { extractReplyText } from "./text.js";
-import type {
-  ConversationLayer,
-  ConversationLayerOptions,
-  RespondInput,
-} from "./conversation-types.js";
+import type { ConversationLayer, ConversationLayerOptions, RespondInput } from "./conversation-types.js";
+import { createConversationStore } from "./conversation-store.js";
+import { GeneratedTurn } from "./generated-turn.js";
 import { recallForTurn, rememberDeliveredUserMessage } from "./long-term-memory/operations.js";
 import { PendingMemoryWrites } from "./long-term-memory/pending.js";
-import { GeneratedTurn } from "./generated-turn.js";
-import {
-  createSocialDecisionMaker,
-  renderDecisionForRealization,
-  renderObservedTranscript,
-} from "./social-decision.js";
-import { renderTelegramTextEvent } from "./telegram-event.js";
-import { createConversationAgent } from "./conversation-agent.js";
+import { MODEL, openAiKeyFromEnv } from "./model.js";
+import { SYSTEM_PROMPT } from "./personality.js";
+import { createSocialDecisionMaker } from "./social-decision.js";
+import { COMPACTION, DEFAULT_DB_PATH } from "./summary.js";
+import { extractText } from "./text.js";
+import type { DeliveredHevroniaMessage } from "./telegram-event.js";
+import { realizationContext, replyCandidates } from "./turn-context.js";
+
+export class InvalidRealizationResponseError extends Error {
+  constructor() {
+    super("Realization model returned no Telegram message");
+    this.name = "InvalidRealizationResponseError";
+  }
+}
+
+export function isInvalidRealizationResponseError(error: unknown): error is InvalidRealizationResponseError {
+  return error instanceof InvalidRealizationResponseError;
+}
 
 export function createConversationLayer(options: ConversationLayerOptions = {}): ConversationLayer {
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
-  const systemPrompt = options.systemPrompt ?? SYSTEM_PROMPT;
-  const longTermMemory = options.longTermMemory;
-  const pendingMemoryWrites = options.pendingMemoryWrites ?? new PendingMemoryWrites();
-
+  const personality = options.systemPrompt ?? SYSTEM_PROMPT;
+  const pending = options.pendingMemoryWrites ?? new PendingMemoryWrites();
   mkdirSync(dirname(dbPath), { recursive: true });
   const checkpointer = SqliteSaver.fromConnString(dbPath);
-  const { agent, model, triggerTokens, keepTokens, trimTokensToSummarize } =
-    createConversationAgent(options, checkpointer, systemPrompt);
-  console.log(`Conversation memory initialized; checkpoint database opened: ${dbPath}`);
-  console.log(
-    `Compaction configuration loaded: trigger=${triggerTokens} tokens, keep=${keepTokens} tokens, trim=${trimTokensToSummarize} tokens`,
-  );
-
-  const decisionMaker = options.decisionMaker ?? createSocialDecisionMaker(model);
+  const model = options.model ?? new ChatOpenAI({ apiKey: openAiKeyFromEnv(), model: MODEL });
+  const summaryModel = options.summaryModel ?? new ChatOpenAI({
+    apiKey: openAiKeyFromEnv(), model: MODEL, temperature: 0,
+  });
+  const store = createConversationStore(checkpointer, {
+    summaryModel,
+    triggerTokens: options.triggerTokens ?? COMPACTION.triggerTokens,
+    keepTokens: options.keepTokens ?? COMPACTION.keepTokens,
+    trimTokensToSummarize: options.trimTokensToSummarize ?? COMPACTION.trimTokensToSummarize,
+    tokenCounter: options.tokenCounter,
+  });
+  const planner = options.decisionMaker ?? createSocialDecisionMaker(model, personality);
 
   return {
     async respond(input: RespondInput): Promise<GeneratedTurn> {
-      const { threadId, userId, messageText } = input;
-      const recalledMemories = await recallForTurn(longTermMemory, userId, messageText);
-      const tuple = await checkpointer.getTuple({ configurable: { thread_id: threadId.toPersistenceKey() } });
-      const stored = tuple?.checkpoint.channel_values["messages"];
-      const history = Array.isArray(stored) ? stored.filter(isBaseMessage) : [];
-      const observedEvent = renderTelegramTextEvent({
-        messageId: input.messageId,
-        speakerName: input.speakerName,
-        text: messageText,
-      });
-      const invocationConfig = {
-        configurable: { thread_id: threadId.toPersistenceKey() },
-        context: { recalledMemories },
-      };
-      const rememberSilence = async (): Promise<GeneratedTurn> => {
-        await agent.updateState(invocationConfig, { messages: [new HumanMessage(observedEvent)] });
-        return GeneratedTurn.fromSilence(
-          () => rememberDeliveredUserMessage(longTermMemory, userId, threadId, messageText),
-          pendingMemoryWrites,
-        );
-      };
-      let decision;
+      await store.append(input.threadId, input.message);
+      const history = await store.getMessages(input.threadId);
+      const recalled = await recallForTurn(options.longTermMemory, input.userId, input.message.text);
+      const candidates = replyCandidates(history);
+      let decision: Awaited<ReturnType<typeof planner.decide>>;
       try {
-        decision = await decisionMaker.decide(renderObservedTranscript(history, observedEvent));
+        decision = await planner.decide({
+          boundedHistory: history,
+          currentMessage: input.message,
+          replyCandidates: candidates,
+          recalledMemories: recalled,
+        });
       } catch (error) {
-        const detail = error instanceof Error ? error.message : String(error);
-        console.warn(`Social decision failed safely to silence: ${detail}`);
-        return rememberSilence();
+        console.warn(`Social decision failed safely to silence: ${String(error)}`);
+        decision = { action: "silence" };
       }
+      const rememberIncoming = () => rememberDeliveredUserMessage(
+        options.longTermMemory, input.userId, input.threadId, input.message.text,
+      );
       if (decision.action === "silence") {
-        return rememberSilence();
+        return GeneratedTurn.fromSilence(rememberIncoming, pending);
       }
-      const result = await agent.invoke(
-        { messages: [new HumanMessage(renderDecisionForRealization(observedEvent, decision))] },
-        invocationConfig,
-      );
-      const replyText = extractReplyText(result.messages);
-      return GeneratedTurn.fromGeneratedResponse(
-        replyText,
-        decision.replyToMessageId,
-        () => rememberDeliveredUserMessage(longTermMemory, userId, threadId, messageText),
-        pendingMemoryWrites,
-      );
-    },
-    async getMessages(threadId): Promise<BaseMessage[]> {
-      const tuple = await checkpointer.getTuple({ configurable: { thread_id: threadId.toPersistenceKey() } });
-      const stored = tuple?.checkpoint.channel_values["messages"];
-      if (!Array.isArray(stored)) {
-        return [];
+      const target = candidates.find(({ key }) => key === decision.targetCandidateKey);
+      if (target === undefined) {
+        return GeneratedTurn.fromSilence(rememberIncoming, pending);
       }
-      return stored.filter(isBaseMessage);
+      const response = await model.invoke([
+        new SystemMessage(personality),
+        new HumanMessage(realizationContext(history, recalled, decision)),
+      ]);
+      if (!isBaseMessage(response)) {
+        throw new InvalidRealizationResponseError();
+      }
+      const replyText = extractText(response.content).trim();
+      if (!replyText) {
+        throw new InvalidRealizationResponseError();
+      }
+      return GeneratedTurn.fromReply(replyText, target.messageId, async (messageId) => {
+        const delivered: DeliveredHevroniaMessage = {
+          kind: "hevronia", messageId, senderId: input.hevroniaSenderId,
+          senderDisplayName: "Хевронія", chatKind: input.message.chatKind,
+          text: replyText, replyToMessageId: target.messageId,
+        };
+        await store.append(input.threadId, delivered);
+        await rememberIncoming();
+      }, pending);
     },
+    getMessages: store.getMessages,
     async close(): Promise<void> {
-      await pendingMemoryWrites.drain();
+      await pending.drain();
       checkpointer.db.close();
     },
   };

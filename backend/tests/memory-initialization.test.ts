@@ -23,7 +23,7 @@ function fakeLongTermMemory(): LongTermMemory {
 function fakeConversationLayer(): ConversationLayer {
   return {
     respond: async () =>
-      GeneratedTurn.fromGeneratedResponse(
+      GeneratedTurn.fromReply(
         "reply",
         1,
         async () => undefined,

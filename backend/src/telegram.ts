@@ -2,13 +2,10 @@ import { Bot } from "grammy";
 
 import { respond } from "./respond.js";
 import { isTransientError, sleep } from "./retry.js";
-import {
-  conversationThreadIdFromTelegramGroupChat,
-  conversationThreadIdFromTelegramPrivateChat,
-  longTermMemoryUserIdFromTelegramSender,
-} from "./identifiers.js";
+import { conversationThreadIdFromTelegramGroupChat, conversationThreadIdFromTelegramPrivateChat, longTermMemoryUserIdFromTelegramSender } from "./identifiers.js";
 import { deliverGeneratedTurn } from "./telegram-delivery.js";
 import { logBotIdentity, tokenFromEnv } from "./telegram-config.js";
+import { createObservedTelegramMessage } from "./telegram-observation.js";
 export { tokenFromEnv } from "./telegram-config.js";
 
 export async function startBot(): Promise<void> {
@@ -38,34 +35,41 @@ export async function startBot(): Promise<void> {
   bot.on("message:text", async (ctx) => {
     const updateId = ctx.update.update_id;
     const messageId = ctx.message.message_id;
-    console.log(`Handling private text message update=${updateId} message=${messageId}`);
+    console.log(`Handling Telegram text message update=${updateId} message=${messageId}`);
     try {
       const threadId = ctx.chat.type === "private"
         ? conversationThreadIdFromTelegramPrivateChat(ctx.chat.id)
         : conversationThreadIdFromTelegramGroupChat(ctx.chat.id);
       const userId = longTermMemoryUserIdFromTelegramSender(ctx.from.id);
-      const turn = await respond({
-        threadId,
-        userId,
-        messageId,
-        speakerName: ctx.from.first_name,
-        messageText: ctx.message.text,
+      const reply = ctx.message.reply_to_message;
+      const displayName = [ctx.from.first_name, ctx.from.last_name].filter(Boolean).join(" ");
+      const message = createObservedTelegramMessage({
+        messageId, senderId: ctx.from.id, senderDisplayName: displayName,
+        chatKind: ctx.chat.type, text: ctx.message.text,
+        replyTo: reply === undefined ? null : {
+          messageId: reply.message_id, senderId: reply.from?.id ?? ctx.chat.id,
+          senderDisplayName: reply.from?.first_name ?? ctx.chat.title ?? "chat",
+          isHevronia: reply.from?.id === me.id,
+        },
+        mentionsHevronia: ctx.message.text.includes(`@${me.username}`),
       });
+      const turn = await respond({ threadId, userId, message, hevroniaSenderId: me.id });
       const sent = await deliverGeneratedTurn(turn, {
         showTyping: async () => {
           await ctx.replyWithChatAction("typing");
         },
         reply: async (text, replyToMessageId) => {
-          await ctx.reply(text, { reply_parameters: { message_id: replyToMessageId } });
+          const delivered = await ctx.reply(text, {
+            reply_parameters: { message_id: replyToMessageId },
+          });
+          return delivered.message_id;
         },
       });
       if (!sent) {
         console.log(`Observed message=${messageId}; chose silence`);
-        void turn.postSend();
         return;
       }
       console.log(`Handled message=${messageId}`);
-      void turn.postSend();
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       console.error(`Failed to handle message=${messageId}: ${detail}`);

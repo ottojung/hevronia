@@ -33,10 +33,16 @@ function replyText(turn: GeneratedTurn): string {
   return turn.outcome.replyText;
 }
 
+function observedMessage(text: string, messageId: number): import("../src/telegram-event.js").ObservedTelegramMessage {
+  return { kind: "participant", messageId, senderId: 1,
+    senderDisplayName: "Віталик", chatKind: "private", text,
+    replyTo: null, directlyAddressed: true };
+}
+
 const replyingDecisionMaker: SocialDecisionMaker = {
   decide: async () => ({
     action: "reply",
-    replyToMessageId: 1,
+    targetCandidateKey: "candidate-0",
     motive: "personal concern",
     socialAction: "brief personal reaction",
     adviceRequested: false,
@@ -151,7 +157,7 @@ test("retrieval uses top five and reaches the model through ephemeral system con
     await layer.respond({
       threadId: thread(1),
       userId: user(111),
-      messageId: 1, speakerName: "Віталик", messageText: "Який колір мені пасує?",
+      message: observedMessage("Який колір мені пасує?", 1), hevroniaSenderId: 999
     });
     assert.equal(memory.searchCalls[0]?.topK, LONG_TERM_MEMORY_TOP_K);
 
@@ -181,7 +187,7 @@ test("recalled memories are delimited as untrusted JSON data", async () => {
     const turn = await layer.respond({
       threadId: thread(1),
       userId: user(1),
-      messageId: 1, speakerName: "Віталик", messageText: "hello",
+      message: observedMessage("hello", 1), hevroniaSenderId: 999
     });
     assert.equal(replyText(turn), "safe reply");
     await layer.close();
@@ -208,16 +214,16 @@ test("users are isolated while one user can share memory across separate threads
       return new AIMessage("other user");
     });
 
-    await layer.respond({ threadId: thread(1), userId: user(111), messageId: 1, speakerName: "Віталик", messageText: "a" });
-    await layer.respond({ threadId: thread(2), userId: user(111), messageId: 1, speakerName: "Віталик", messageText: "b" });
-    await layer.respond({ threadId: thread(3), userId: user(222), messageId: 1, speakerName: "Віталик", messageText: "c" });
+    await layer.respond({ threadId: thread(1), userId: user(111), message: observedMessage("a" , 1), hevroniaSenderId: 999});
+    await layer.respond({ threadId: thread(2), userId: user(111), message: observedMessage("b" , 1), hevroniaSenderId: 999});
+    await layer.respond({ threadId: thread(3), userId: user(222), message: observedMessage("c" , 1), hevroniaSenderId: 999});
 
     assert.deepEqual(
       memory.searchCalls.map(({ userId }) => userId.toPersistenceKey()),
       ["telegram-user:111", "telegram-user:111", "telegram-user:222"],
     );
-    assert.equal((await layer.getMessages(thread(1))).length, 2);
-    assert.equal((await layer.getMessages(thread(2))).length, 2);
+    assert.equal((await layer.getMessages(thread(1))).length, 1);
+    assert.equal((await layer.getMessages(thread(2))).length, 1);
     await layer.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -229,9 +235,9 @@ test("successful delivery stores user evidence once without the assistant recomm
   const { dir, model, layer } = fixture(memory);
   try {
     model.respond(new AIMessage("Assistant recommendation: buy the purple one."));
-    const turn = await layer.respond({ threadId: thread(1), userId: user(1), messageId: 1, speakerName: "Віталик", messageText: "user text" });
+    const turn = await layer.respond({ threadId: thread(1), userId: user(1), message: observedMessage("user text" , 1), hevroniaSenderId: 999});
     assert.equal(memory.rememberCalls.length, 0);
-    await turn.postSend();
+    if (turn.outcome.action === "reply") { await turn.outcome.completeDelivery(500); }
     const call = memory.rememberCalls[0];
     assert.ok(call);
     assert.equal(call.userId.toPersistenceKey(), "telegram-user:1");
@@ -255,21 +261,24 @@ test("generation returns before post-send ingestion and undelivered turns are no
     const deliveredTurn = await layer.respond({
       threadId: thread(4),
       userId: user(1),
-      messageId: 1, speakerName: "Віталик", messageText: "hello",
+      message: observedMessage("hello", 1), hevroniaSenderId: 999
     });
     assert.equal(replyText(deliveredTurn), "delivered reply");
     assert.equal(memory.rememberCalls.length, 0);
 
     model.respond(new AIMessage("undelivered reply"));
-    await layer.respond({ threadId: thread(5), userId: user(1), messageId: 1, speakerName: "Віталик", messageText: "again" });
+    await layer.respond({ threadId: thread(5), userId: user(1), message: observedMessage("again" , 1), hevroniaSenderId: 999});
     assert.equal(memory.rememberCalls.length, 0);
 
     let writeCompleted = false;
-    void deliveredTurn.postSend().then(() => {
+    if (deliveredTurn.outcome.action === "silence") assert.fail("expected reply");
+    void deliveredTurn.outcome.completeDelivery(502).then(() => {
       writeCompleted = true;
     });
+    for (let attempt = 0; attempt < 20 && memory.rememberCalls.length === 0; attempt += 1) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    }
     assert.equal(memory.rememberCalls.length, 1);
-    await Promise.resolve();
     assert.equal(writeCompleted, false);
     pendingWrite.finish();
     await tracker.drain();
@@ -288,8 +297,9 @@ test("shutdown drains a tracked post-send write", async () => {
   const { dir, model, layer } = fixture(memory, undefined, tracker);
   try {
     model.respond(new AIMessage("reply"));
-    const turn = await layer.respond({ threadId: thread(6), userId: user(1), messageId: 1, speakerName: "Віталик", messageText: "hello" });
-    const postSend = turn.postSend();
+    const turn = await layer.respond({ threadId: thread(6), userId: user(1), message: observedMessage("hello" , 1), hevroniaSenderId: 999});
+    if (turn.outcome.action === "silence") assert.fail("expected reply");
+    const postSend = turn.outcome.completeDelivery(503);
     let closed = false;
     const close = layer.close().then(() => {
       closed = true;
@@ -310,7 +320,7 @@ test("failed generation is not offered for long-term storage", async () => {
   try {
     model.respond(new Error("generation failed"));
     await assert.rejects(() =>
-      layer.respond({ threadId: thread(1), userId: user(1), messageId: 1, speakerName: "Віталик", messageText: "hello" }),
+      layer.respond({ threadId: thread(1), userId: user(1), message: observedMessage("hello" , 1), hevroniaSenderId: 999}),
     );
     assert.equal(memory.rememberCalls.length, 0);
     await layer.close();
@@ -332,11 +342,12 @@ test("search and ingestion failures independently degrade gracefully", async () 
     const reply = await layer.respond({
       threadId: thread(1),
       userId: user(1),
-      messageId: 1, speakerName: "Віталик", messageText: "hello",
+      message: observedMessage("hello", 1), hevroniaSenderId: 999
     });
     assert.equal(replyText(reply), "valid reply");
     assert.equal(memory.rememberCalls.length, 0);
-    await reply.postSend();
+    if (reply.outcome.action === "silence") assert.fail("expected reply");
+    await reply.outcome.completeDelivery(504);
     assert.equal(memory.rememberCalls.length, 1);
     await layer.close();
   } finally {

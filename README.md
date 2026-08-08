@@ -4,13 +4,13 @@ A Telegram bot for Хевронія, a fictional Ukrainian woman. The bot connec
 Telegram over **long polling** via **grammY**, and generates each reply with an
 **OpenAI chat model** through **LangChain** (`@langchain/openai`).
 
-Every private Telegram chat has a durable LangGraph conversational thread.
+Every private or group Telegram chat has a durable LangGraph conversational thread.
 Recent messages remain verbatim and older history becomes a rolling summary.
 Separately, Mem0 extracts durable facts from user messages after successful delivery and semantically
 recalls a small relevant set for the Telegram user in future conversations.
 
 ```
-Telegram private chat
+Telegram private/group chat
     ├── thread_id → LangGraph recent messages + rolling summary
     └── user_id   → Mem0 semantic search (top 5, Qdrant service)
                               ↓
@@ -68,6 +68,12 @@ MY_OPENAI_API_KEY
 - `QDRANT_URL` selects the Qdrant HTTP endpoint and defaults to
   `http://127.0.0.1:6333`.
 
+The bot must be able to observe ambient group conversation. In BotFather, use
+`/setprivacy` for `@hevronia_bot` and **disable Group Privacy Mode**. Telegram
+may require removing and re-adding the bot to existing groups after this change.
+Startup fails with a clear diagnostic when `getMe()` does not report
+`can_read_all_group_messages`, rather than silently running without ambient messages.
+
 The bot fails fast at startup if either variable is absent. Secrets are never
 printed, logged, or stored, and should never be committed.
 
@@ -102,7 +108,8 @@ Both connect to Telegram via long polling (no webhooks). On startup the bot:
 3. authenticates with Telegram;
 4. verifies the identity matches `Хевронія` / `@hevronia_bot`;
 5. starts long polling for message updates;
-6. replies to each private text message.
+6. observes each private/group text message, makes a structured social decision,
+   and either remains silent or sends a targeted reply.
 
 It shuts down gracefully on `SIGINT`/`SIGTERM`, including a bounded wait for
 pending long-term-memory writes. While generating a reply the bot sends a
@@ -118,7 +125,7 @@ The model receives three distinct context layers:
    current invocation and never added to the LangGraph checkpoint or summary.
 
 LangGraph owns thread-scoped conversational continuity under
-`telegram-private:<chat id>` and persists it in the ignored
+`telegram-private:<chat id>` or `telegram-group:<chat id>` and persists it in the ignored
 `backend/.data/checkpoints.sqlite`. Mem0 owns durable semantic knowledge under
 `telegram-user:<sender id>`. It extracts concise facts only from the user's
 message after the generated reply is delivered, and records audit history at
@@ -128,8 +135,9 @@ vector collection. The provided Compose service persists Qdrant data at
 Compose also mounts `backend/.data/` into the bot container, so LangGraph
 checkpoints and Mem0 history survive bot image upgrades and container recreation.
 
-Each turn retrieves memories, generates a reply, sends it through Telegram,
-and only then starts Mem0 extraction. Undelivered replies are not memorized.
+Each incoming message is persisted and compacted before the social decision.
+Silence is a first-class outcome. Generated outgoing text is persisted only after
+Telegram confirms delivery; undelivered replies never enter conversation history.
 Memory-write failures are logged without delaying or invalidating a delivered
 reply, and pending writes receive a bounded drain during shutdown.
 
@@ -139,9 +147,9 @@ memory data can support a responsible policy rather than guessed lifetimes.
 
 ## Manual testing
 
-Open Telegram, find **@hevronia_bot**, and send any text message in a private
-chat. Хевронія will answer in character and will remember earlier turns of the
-same chat.
+Open Telegram and either message **@hevronia_bot** privately or add her to a
+group after disabling Group Privacy Mode. Private messages are direct interaction;
+in groups she observes ambient conversation and may naturally choose silence.
 
 ## Developer commands
 

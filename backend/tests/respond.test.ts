@@ -4,6 +4,10 @@ import { test } from "node:test";
 import { openAiKeyFromEnv } from "../src/model.js";
 import { extractReplyText, extractText } from "../src/text.js";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
+import {
+  isMissingGroupMessageAccessError,
+  logBotIdentity,
+} from "../src/telegram-config.js";
 
 const FAKE_KEY = "sk-test-key-value-that-must-not-leak";
 
@@ -64,4 +68,10 @@ test("extractReplyText returns the text of the last AI message", () => {
 test("extractReplyText throws when the agent produced no text", () => {
   const messages = [new HumanMessage("привіт"), new AIMessage("")];
   assert.throws(() => extractReplyText(messages), /no text reply/);
+});
+
+test("startup rejects a bot that cannot observe ambient group messages", () => {
+  assert.throws(() => logBotIdentity({ id: 999, first_name: "Хевронія",
+    username: "hevronia_bot", can_read_all_group_messages: false }),
+  isMissingGroupMessageAccessError);
 });

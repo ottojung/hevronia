@@ -5,6 +5,20 @@ export interface TelegramBotIdentity {
   id: number;
   first_name: string;
   username?: string;
+  can_read_all_group_messages?: boolean;
+}
+
+export class MissingGroupMessageAccessError extends Error {
+  constructor() {
+    super("Telegram Group Privacy Mode is enabled. Disable it with BotFather and re-add the bot to groups before starting Хевронія.");
+    this.name = "MissingGroupMessageAccessError";
+  }
+}
+
+export function isMissingGroupMessageAccessError(
+  error: unknown,
+): error is MissingGroupMessageAccessError {
+  return error instanceof MissingGroupMessageAccessError;
 }
 
 export function tokenFromEnv(): string {
@@ -27,5 +41,8 @@ export function logBotIdentity(me: TelegramBotIdentity): void {
       `Unexpected bot identity — expected "${EXPECTED_NAME}" / @${EXPECTED_USERNAME}, ` +
         `got "${me.first_name}" / @${me.username}`,
     );
+  }
+  if (me.can_read_all_group_messages !== true) {
+    throw new MissingGroupMessageAccessError();
   }
 }

@@ -1,102 +1,98 @@
-import { AIMessage, HumanMessage, type BaseMessage } from "@langchain/core/messages";
+import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import { createAgent, providerStrategy } from "langchain";
 import { z } from "zod";
 
+import type { RecalledMemory } from "./long-term-memory/index.js";
+import { renderRecalledMemoryContext } from "./long-term-memory/context.js";
 import { extractText } from "./text.js";
+import {
+  deserializeTelegramEvent,
+  renderTelegramEvent,
+  type ObservedTelegramMessage,
+} from "./telegram-event.js";
 
 export const socialDecisionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("silence") }).strict(),
-  z
-    .object({
-      action: z.literal("reply"),
-      replyToMessageId: z.number().int().positive(),
-      motive: z.string().min(1),
-      socialAction: z.string().min(1),
-      adviceRequested: z.boolean(),
-      askQuestion: z.boolean(),
-      dreamRelevant: z.boolean(),
-      backgroundRelevant: z.boolean(),
-    })
-    .strict(),
+  z.object({
+    action: z.literal("reply"),
+    targetCandidateKey: z.string().min(1),
+    motive: z.string().min(1),
+    socialAction: z.string().min(1),
+    adviceRequested: z.boolean(),
+    askQuestion: z.boolean(),
+    dreamRelevant: z.boolean(),
+    backgroundRelevant: z.boolean(),
+  }).strict(),
 ]);
 
 export type SocialDecision = z.infer<typeof socialDecisionSchema>;
 
-export interface SocialDecisionMaker {
-  decide(transcript: string): Promise<SocialDecision>;
+export interface ReplyCandidate {
+  key: string;
+  messageId: number;
+  senderId: number;
+  senderDisplayName: string;
 }
 
-const DECISION_PROMPT = `
-You privately decide whether Хевронія speaks in an observed Telegram conversation.
-Return only the structured decision requested by the schema.
+export interface SocialDecisionContext {
+  boundedHistory: BaseMessage[];
+  currentMessage: ObservedTelegramMessage;
+  replyCandidates: ReplyCandidate[];
+  recalledMemories: RecalledMemory[];
+}
 
-Хевронія is a participant, not a response service. Silence is normal when she has no
-personal social motive. Direct address strongly favours replying but is not a command
-interface. A disclosure is social communication, not an implicit request for help.
+export interface SocialDecisionMaker {
+  decide(context: SocialDecisionContext): Promise<SocialDecision>;
+}
 
-For a reply, identify the exact message, a concise personal motive and social action,
-and explicitly decide whether advice was requested, whether a question is genuinely
-motivated, and whether the dream premise or remembered background is relevant.
-Questions are not engagement hooks. Advice is absent unless requested or exceptionally
-natural. Dream and background relevance are usually false.
-
-This is private planning. Never compose Хевронія's message here.
+const PLANNING_MODE = `
+You are privately planning Хевронія's social behavior, not writing dialogue.
+Use the supplied canonical personality as the complete source of truth about her.
+Choose silence normally when she has no personal social motive. Select reply targets
+only by one of the supplied candidate keys. Return only the requested structured data.
 `;
 
-export function createSocialDecisionMaker(model: BaseLanguageModel): SocialDecisionMaker {
+export function renderBoundedConversation(messages: BaseMessage[]): string {
+  return messages.map((message) => {
+    const content = extractText(message.content).trim();
+    if (message.additional_kwargs["lc_source"] === "summarization") {
+      return content;
+    }
+    return renderTelegramEvent(deserializeTelegramEvent(content));
+  }).join("\n");
+}
+
+export function renderDecisionContext(context: SocialDecisionContext): string {
+  return [
+    `Chat kind: ${context.currentMessage.chatKind}`,
+    `Current stable participant: telegram-user:${context.currentMessage.senderId}`,
+    `Current display name: ${context.currentMessage.senderDisplayName}`,
+    `Directly addressed: ${context.currentMessage.directlyAddressed}`,
+    `Reply relationship: ${JSON.stringify(context.currentMessage.replyTo)}`,
+    `Eligible reply candidates: ${JSON.stringify(context.replyCandidates)}`,
+    renderRecalledMemoryContext(context.recalledMemories),
+    "Bounded canonical conversation:",
+    renderBoundedConversation(context.boundedHistory),
+  ].join("\n");
+}
+
+export function createSocialDecisionMaker(
+  model: BaseLanguageModel,
+  personality: string,
+): SocialDecisionMaker {
   const agent = createAgent({
     model,
     tools: [],
-    systemPrompt: DECISION_PROMPT,
+    systemPrompt: `${personality}\n\n${PLANNING_MODE}`,
     responseFormat: providerStrategy(socialDecisionSchema),
   });
   return {
-    async decide(transcript): Promise<SocialDecision> {
-      const result = await agent.invoke({ messages: [new HumanMessage(transcript)] });
+    async decide(context): Promise<SocialDecision> {
+      const result = await agent.invoke({
+        messages: [new HumanMessage(renderDecisionContext(context))],
+      });
       return socialDecisionSchema.parse(result.structuredResponse);
     },
   };
-}
-
-export function renderObservedTranscript(messages: BaseMessage[], currentEvent: string): string {
-  const lines = messages.flatMap((message) => {
-    const content = extractText(message.content).trim();
-    if (!content) {
-      return [];
-    }
-    if (message instanceof AIMessage) {
-      return [`Хевронія: ${content}`];
-    }
-    const eventPrefix = "Observed Telegram event:\n";
-    if (content.startsWith(eventPrefix)) {
-      const event = content.slice(eventPrefix.length).split("\n", 1)[0];
-      return event === undefined ? [] : [event];
-    }
-    return [content];
-  });
-  lines.push(currentEvent);
-  return [
-    "You are observing this Telegram conversation as a group-chat transcript.",
-    "Each event preserves its speaker identity; nobody below is an AI assistant's generic user.",
-    "",
-    ...lines,
-    "",
-    "Decide what Хевронія does now.",
-  ].join("\n");
-}
-
-export function renderDecisionForRealization(
-  observedEvent: string,
-  decision: Exclude<SocialDecision, { action: "silence" }>,
-): string {
-  return [
-    "Observed Telegram event:",
-    observedEvent,
-    "",
-    "Private social decision (constraints for realization, not text to repeat):",
-    JSON.stringify(decision),
-    "",
-    "Write only the Telegram message Хевронія actually sends. Do not expose the decision or JSON.",
-  ].join("\n");
 }

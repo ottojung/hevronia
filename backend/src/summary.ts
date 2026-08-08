@@ -23,13 +23,14 @@ export const SUMMARY_PROMPT = `Create a compact continuity summary of the earlie
 
 Preserve information that may matter later:
 
-- concrete facts established by either participant;
-- names and relationships;
+- concrete facts established by any participant, always attributed to that
+  participant's stable telegram-user identifier;
+- display names and relationships, retaining stable identifiers when names collide;
 - preferences, dislikes, habits, and boundaries;
 - plans, promises, decisions, and intentions;
 - unresolved questions and unfinished topics;
 - important emotional context;
-- corrections the user made to earlier assumptions;
+- corrections a participant made to earlier assumptions, attributed by stable identifier;
 - meaningful opinions or positions;
 - recurring jokes, references, or conversational context that would otherwise become confusing;
 - important facts established about Хевронія within the conversation.
@@ -46,7 +47,12 @@ Compress aggressively:
 - distinguish hypothetical statements from actual facts;
 - retain exact wording only when the wording itself matters.
 
-The summary is internal memory, not a message written by either participant. Do not imitate either participant's voice.
+For every participant-specific preference, correction, plan, emotional context,
+relationship, unfinished thread, or opinion, retain the stable telegram-user
+identifier of the person it belongs to. Never merge participants because their
+display names match or because their statements conflict.
+
+The summary is internal memory, not a Telegram message. Do not imitate any participant's voice.
 
 Conversation to compact:
 

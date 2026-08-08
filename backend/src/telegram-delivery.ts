@@ -2,7 +2,7 @@ import type { GeneratedTurn } from "./generated-turn.js";
 
 export interface TelegramTurnDelivery {
   showTyping(): Promise<void>;
-  reply(text: string, replyToMessageId: number): Promise<void>;
+  reply(text: string, replyToMessageId: number): Promise<number>;
 }
 
 export async function deliverGeneratedTurn(
@@ -10,9 +10,14 @@ export async function deliverGeneratedTurn(
   delivery: TelegramTurnDelivery,
 ): Promise<boolean> {
   if (turn.outcome.action === "silence") {
+    await turn.outcome.completeObservation();
     return false;
   }
   await delivery.showTyping();
-  await delivery.reply(turn.outcome.replyText, turn.outcome.replyToMessageId);
+  const deliveredMessageId = await delivery.reply(
+    turn.outcome.replyText,
+    turn.outcome.replyToMessageId,
+  );
+  await turn.outcome.completeDelivery(deliveredMessageId);
   return true;
 }
