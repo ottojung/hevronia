@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
 
-import { createMem0LongTermMemory } from "../src/long-term-memory/index.js";
-import { qdrantUrlFromEnv, waitForQdrantReady } from "../src/long-term-memory/qdrant.js";
+import {
+  createMem0LongTermMemory,
+  VECTOR_DB_PATH,
+} from "../src/long-term-memory/index.js";
+import { openAiKeyFromEnv } from "../src/model.js";
 import {
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromIntegrationTest,
@@ -11,10 +15,9 @@ import {
 const userId = longTermMemoryUserIdFromIntegrationTest(randomUUID());
 const threadId = conversationThreadIdFromTelegramPrivateChat(1);
 const query = "улюблений фрукт";
+const apiKey = openAiKeyFromEnv();
 
-const qdrantUrl = qdrantUrlFromEnv();
-await waitForQdrantReady(qdrantUrl);
-const firstMemory = createMem0LongTermMemory({ qdrantUrl });
+const firstMemory = createMem0LongTermMemory(apiKey);
 try {
   await firstMemory.rememberUserMessage(
     userId,
@@ -25,11 +28,12 @@ try {
 
   const initialResults = await firstMemory.search(userId, query, 5);
   assert.ok(initialResults.length > 0, "Mem0 search should recall the test fact");
+  assert.ok(existsSync(VECTOR_DB_PATH), "Mem0 should create the SQLite vector database");
   console.log(`Mem0 search returned ${initialResults.length} result(s)`);
 
-  const recreatedMemory = createMem0LongTermMemory({ qdrantUrl });
+  const recreatedMemory = createMem0LongTermMemory(apiKey);
   const persistedResults = await recreatedMemory.search(userId, query, 5);
-  assert.ok(persistedResults.length > 0, "memory should survive service recreation");
+  assert.ok(persistedResults.length > 0, "memory should survive Memory instance recreation");
   console.log(`Mem0 recreation search returned ${persistedResults.length} result(s)`);
 
   await recreatedMemory.deleteAll(userId);

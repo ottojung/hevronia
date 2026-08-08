@@ -21,7 +21,7 @@ Telegram private/group chat
                                     ↓
                            Telegram delivery
                                     ↓
-                         Mem0 extraction and Qdrant
+                      Mem0 extraction and local SQLite
 ```
 
 ## Module layout
@@ -31,7 +31,7 @@ Telegram private/group chat
 - `backend/src/respond.ts` — the conversational entry point.
 - `backend/src/layer.ts` — canonical event ingestion, bounded conversation
   context, social planning, ephemeral realization, and delivery completion.
-- `backend/src/long-term-memory/` — the Mem0 boundary, Qdrant service
+- `backend/src/long-term-memory/` — the Mem0 boundary, local SQLite vector
   configuration, pending-write lifecycle, and conservative extraction policy.
 - `backend/src/personality.ts` — Хевронія's system prompt.
 
@@ -46,14 +46,14 @@ events use a separate retry queue, and the next topic-local turn waits for its q
 before planning. Chat senders do not enter person-scoped Mem0.
 
 Mem0 owns durable knowledge about a person, scoped by
-`telegram-user:<sender id>`. Its SQLite history lives beneath the ignored
-`backend/.data/mem0/`; the Qdrant service provided by Compose persists vectors
-under `backend/.data/qdrant/`. The bundled Qdrant server and JS client are both
-pinned to 1.19.0. Startup waits for Qdrant's `/readyz` response before Mem0 is
-constructed; Compose ordering alone is not treated as readiness. Compose mounts
-the same `backend/.data/` directory into the bot container so checkpoints and
-Mem0 history survive container replacement. Recalled facts exist only in the dynamic system
-prompt for one invocation, so they cannot enter checkpoints or rolling
+`telegram-user:<sender id>`. Its audit history persists at
+`backend/.data/mem0/history.db`, while semantic vectors persist at
+`backend/.data/mem0/vectors-v1.db`. Both paths are beneath the ignored
+`backend/.data/` directory. Mem0's `"memory"` provider is SQLite-backed when
+configured with this vector database path. Retrieval performs a local linear
+scan, an intentional tradeoff for a small to moderate corpus where operational
+simplicity matters more than an external ANN service. Recalled facts exist only in the
+dynamic system prompt for one invocation, so they cannot enter checkpoints or rolling
 summaries. After successful delivery, only the user's message is offered to
 Mem0; generated assistant text is never long-term-memory evidence. Search or
 ingestion failures degrade to normal thread-only behavior, and shutdown drains

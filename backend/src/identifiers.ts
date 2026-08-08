@@ -27,7 +27,7 @@ export type ConversationThreadId = ConversationThreadIdValue;
 
 /**
  * The properties that this class carries are:
- * - The value is a canonical Mem0/Qdrant persisted user key.
+ * - The value is a canonical Mem0 persisted user key.
  * - Telegram users use the `telegram-user:` namespace and originate from a
  *   positive, safe-integer Telegram sender identifier.
  * - Disposable integration users use the `integration-test:` namespace and
