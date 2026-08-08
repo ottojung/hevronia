@@ -194,6 +194,7 @@ prints the version. Running the bot requires the two environment variables above
 Persist both SQLite memory layers across disposable containers with a direct bind mount:
 
 ```bash
+mkdir -p -- "$PWD/backend/.data"
 docker run \
   --mount type=bind,src="$PWD/backend/.data",dst=/workspace/backend/.data \
   -e TELEGRAM_BOT_TOKEN \
