@@ -4,12 +4,12 @@ import { dirname } from "node:path";
 
 import { Memory, type MemoryConfig, type MemoryItem } from "mem0ai/oss";
 
-import { MODEL, openAiKeyFromEnv } from "../model.js";
+import { openAiKeyFromEnv } from "../model.js";
 import { LONG_TERM_MEMORY_POLICY, MEMORY_POLICY_VERSION } from "./policy.js";
 import { qdrantUrlFromEnv } from "./qdrant.js";
 
 export const LONG_TERM_MEMORY_TOP_K = 5;
-export const MEMORY_MODEL = MODEL;
+export const MEMORY_MODEL = "gpt-4o-mini-2024-07-18";
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSION = 1536;
 export const QDRANT_COLLECTION = "hevronia-long-term-memory-v1";

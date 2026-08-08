@@ -41,7 +41,9 @@ Conversation state is owned by LangGraph and persisted in the ignored
 Mem0 owns durable knowledge about a person, scoped by
 `telegram-user:<sender id>`. Its SQLite history lives beneath the ignored
 `backend/.data/mem0/`; the Qdrant service provided by Compose persists vectors
-under `backend/.data/qdrant/`. Recalled facts exist only in the dynamic system
+under `backend/.data/qdrant/`. The bundled Qdrant server and JS client are both
+pinned to 1.19.0. Startup waits for Qdrant's `/readyz` response before Mem0 is
+constructed; Compose ordering alone is not treated as readiness. Recalled facts exist only in the dynamic system
 prompt for one invocation, so they cannot enter checkpoints or rolling
 summaries. Only successfully delivered turns are offered to Mem0. Search or
 ingestion failures degrade to normal thread-only behavior, and shutdown drains

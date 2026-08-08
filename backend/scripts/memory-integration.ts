@@ -2,11 +2,14 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 
 import { createMem0LongTermMemory } from "../src/long-term-memory/index.js";
+import { qdrantUrlFromEnv, waitForQdrantReady } from "../src/long-term-memory/qdrant.js";
 
 const userId = `integration-test:${randomUUID()}`;
 const query = "улюблений фрукт";
 
-const firstMemory = createMem0LongTermMemory();
+const qdrantUrl = qdrantUrlFromEnv();
+await waitForQdrantReady(qdrantUrl);
+const firstMemory = createMem0LongTermMemory({ qdrantUrl });
 try {
   await firstMemory.rememberTurn(
     userId,
@@ -20,7 +23,7 @@ try {
   assert.ok(initialResults.length > 0, "Mem0 search should recall the test fact");
   console.log(`Mem0 search returned ${initialResults.length} result(s)`);
 
-  const recreatedMemory = createMem0LongTermMemory();
+  const recreatedMemory = createMem0LongTermMemory({ qdrantUrl });
   const persistedResults = await recreatedMemory.search(userId, query, 5);
   assert.ok(persistedResults.length > 0, "memory should survive service recreation");
   console.log(`Mem0 recreation search returned ${persistedResults.length} result(s)`);

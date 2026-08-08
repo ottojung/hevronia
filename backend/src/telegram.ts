@@ -63,7 +63,7 @@ export async function startBot(): Promise<void> {
       const turn = await respond({ threadId, userId, messageText: ctx.message.text });
       await ctx.reply(turn.replyText);
       console.log(`Handled message=${messageId}`);
-      await turn.postSend();
+      void turn.postSend();
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       console.error(`Failed to handle message=${messageId}: ${detail}`);

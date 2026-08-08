@@ -1,4 +1,4 @@
-export const MODEL = "gpt-4o-mini";
+export const MODEL = "gpt-5.6";
 
 export function openAiKeyFromEnv(): string {
   const apiKey = process.env["MY_OPENAI_API_KEY"];

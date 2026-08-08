@@ -39,31 +39,31 @@ function makeCommentLines(count) {
 
 tester.run("max-lines-per-file", rule, {
   valid: [
-    // Exactly at the limit: 100 code lines → should pass
-    { code: makeCodeLines(100) },
+    // Exactly at the limit: 300 code lines → should pass
+    { code: makeCodeLines(300) },
 
     // Under the limit
     { code: makeCodeLines(1) },
-    { code: makeCodeLines(99) },
+    { code: makeCodeLines(299) },
 
     // 400 lines of comments → should pass (comments are not counted)
     { code: makeCommentLines(400) },
 
-    // 80 code lines + 200 comment lines → 80 code lines, should pass
+    // 200 code lines + 200 comment lines → 200 code lines, should pass
     {
-      code: makeCodeLines(80) + "\n" + makeCommentLines(200),
+      code: makeCodeLines(200) + "\n" + makeCommentLines(200),
     },
 
-    // 100 code lines + 500 comment lines → 100 code lines, exactly at limit, should pass
+    // 300 code lines + 500 comment lines → 300 code lines, exactly at limit, should pass
     {
-      code: makeCodeLines(100) + "\n" + makeCommentLines(500),
+      code: makeCodeLines(300) + "\n" + makeCommentLines(500),
     },
   ],
 
   invalid: [
-    // 101 code lines → should fail
+    // 301 code lines → should fail
     {
-      code: makeCodeLines(101),
+      code: makeCodeLines(301),
       errors: [{ messageId: "tooManyLines" }],
     },
 
@@ -73,9 +73,9 @@ tester.run("max-lines-per-file", rule, {
       errors: [{ messageId: "tooManyLines" }],
     },
 
-    // 101 code lines + 1000 comment lines → still 101 code lines, should fail
+    // 301 code lines + 1000 comment lines → still 301 code lines, should fail
     {
-      code: makeCodeLines(101) + "\n" + makeCommentLines(1000),
+      code: makeCodeLines(301) + "\n" + makeCommentLines(1000),
       errors: [{ messageId: "tooManyLines" }],
     },
   ],

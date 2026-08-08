@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { startBot } from "./telegram.js";
-import { closeConversationLayer, getConversationLayer, openAiKeyFromEnv } from "./respond.js";
+import { closeConversationLayer, initializeConversationLayer } from "./respond.js";
 
 function readVersion(): string {
   try {
@@ -24,8 +24,7 @@ function readVersion(): string {
 
 async function main(): Promise<void> {
   try {
-    openAiKeyFromEnv();
-    getConversationLayer();
+    await initializeConversationLayer();
     await startBot();
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);

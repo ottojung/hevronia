@@ -191,7 +191,8 @@ test("generation returns before post-send ingestion and undelivered turns are no
   const memory = new FakeLongTermMemory();
   const pendingWrite = new DeferredWrite();
   memory.rememberPromise = pendingWrite.promise;
-  const { dir, model, layer } = fixture(memory);
+  const tracker = new PendingMemoryWrites();
+  const { dir, model, layer } = fixture(memory, undefined, tracker);
   try {
     model.respond(new AIMessage("delivered reply"));
     const deliveredTurn = await layer.respond({
@@ -206,10 +207,16 @@ test("generation returns before post-send ingestion and undelivered turns are no
     await layer.respond({ threadId: "failed-send", userId: "user-a", messageText: "again" });
     assert.equal(memory.rememberCalls.length, 0);
 
-    const postSend = deliveredTurn.postSend();
+    let writeCompleted = false;
+    void deliveredTurn.postSend().then(() => {
+      writeCompleted = true;
+    });
     assert.equal(memory.rememberCalls.length, 1);
+    await Promise.resolve();
+    assert.equal(writeCompleted, false);
     pendingWrite.finish();
-    await postSend;
+    await tracker.drain();
+    assert.equal(writeCompleted, true);
     await layer.close();
   } finally {
     rmSync(dir, { recursive: true, force: true });

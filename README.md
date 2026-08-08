@@ -44,7 +44,7 @@ hevronia/
 
 - Node.js >= 22.13
 - npm
-- Qdrant (the provided Compose service is the simplest local option)
+- Qdrant 1.19.0 (the provided Compose service is the simplest local option)
 
 ## Installation
 
@@ -85,6 +85,9 @@ docker compose up -d qdrant
 npm run dev        # development (tsx watch, no build step)
 ```
 
+The bot may start immediately after Compose. It polls Qdrant's `/readyz`
+endpoint before constructing Mem0, for up to 60 seconds.
+
 or, for the compiled build:
 
 ```bash
@@ -94,10 +97,10 @@ npm start
 
 Both connect to Telegram via long polling (no webhooks). On startup the bot:
 
-1. authenticates with Telegram;
-2. verifies the identity matches `Хевронія` / `@hevronia_bot`;
-3. validates that `MY_OPENAI_API_KEY` is present;
-4. connects Mem0 to Qdrant and opens the conversation-memory databases;
+1. validates that `MY_OPENAI_API_KEY` is present;
+2. waits for Qdrant readiness, then initializes Mem0 and conversation memory;
+3. authenticates with Telegram;
+4. verifies the identity matches `Хевронія` / `@hevronia_bot`;
 5. starts long polling for message updates;
 6. replies to each private text message.
 

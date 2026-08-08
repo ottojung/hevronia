@@ -7,6 +7,7 @@ export {
   extractReplyText,
   extractText,
   getConversationLayer,
+  initializeConversationLayer,
   MODEL,
   openAiKeyFromEnv,
 } from "./memory.js";
