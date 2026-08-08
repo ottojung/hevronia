@@ -6,3 +6,6 @@ dist/
 .data/
 *.sqlite
 *.sqlite3
+docs/.docusaurus/
+docs/build/
+coverage/

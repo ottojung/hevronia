@@ -1,0 +1,41 @@
+#! /bin/sh
+
+set -e
+
+cd -- "${0%/*}"/..
+
+if ! test "$#" = 2
+then
+    echo "Usage: $0 <source-directory> <prefix>" >&2
+    exit 1
+fi
+
+set -xe
+
+# Capture the version from the source repository and store it for the installed version
+if command -v git >/dev/null 2>&1
+then
+    VERSION=$(git describe 2>/dev/null || echo "unknown")
+else
+    echo "This program requires git to capture the version, but git is not installed." >&2
+    exit 1
+fi
+
+SOURCEDIR="$1"
+shift
+
+PREFIX="$1"
+shift
+
+BINDIR="$PREFIX"/bin
+
+mkdir -p -- "$BINDIR"
+
+if test "${HEVRONIA_ALLOW_RELEASE_BLOCKERS:-}" != "1"
+then
+    sh scripts/check-release-blockers
+fi
+
+echo "$VERSION" > "$SOURCEDIR"/VERSION
+
+ln -srfT -- "$SOURCEDIR"/scripts/run-main "$BINDIR"/hevronia

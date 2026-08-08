@@ -1,0 +1,9 @@
+#! /bin/sh
+
+set -e
+
+cd -- "${0%/*}"/..
+
+set -xe
+
+npm run dev -w backend

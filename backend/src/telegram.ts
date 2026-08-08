@@ -6,7 +6,7 @@ const EXPECTED_NAME = "Хевронія";
 const EXPECTED_USERNAME = "hevronia_bot";
 
 export function tokenFromEnv(): string {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = process.env["TELEGRAM_BOT_TOKEN"];
   if (!token) {
     throw new Error(
       "TELEGRAM_BOT_TOKEN is not set in the environment. " +

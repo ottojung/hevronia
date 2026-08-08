@@ -1,0 +1,10 @@
+#! /bin/sh
+
+set -e
+
+cd -- "${0%/*}"/..
+
+set -xe
+
+npm test
+npm run static-analysis

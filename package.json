@@ -1,30 +1,38 @@
 {
-  "name": "hevronia-bot",
+  "name": "hevronia",
   "version": "0.1.0",
-  "description": "Хевронія (@hevronia_bot) — a minimal Telegram bot skeleton with a replaceable response function",
   "private": true,
-  "type": "module",
-  "engines": {
-    "node": ">=20"
-  },
+  "description": "Хевронія (@hevronia_bot) — a Telegram bot with persistent conversational memory",
+  "workspaces": [
+    "backend",
+    "docs"
+  ],
   "scripts": {
-    "dev": "tsx src/index.ts",
+    "dev": "sh scripts/run-development-server",
+    "build": "npm run build -w backend",
+    "start": "npm run start -w backend",
     "typecheck": "tsc --noEmit",
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "test": "node --import tsx --test test/*.test.ts"
-  },
-  "dependencies": {
-    "@langchain/core": "^1.2.5",
-    "@langchain/langgraph": "^1.4.9",
-    "@langchain/langgraph-checkpoint-sqlite": "^1.0.3",
-    "@langchain/openai": "^1.5.6",
-    "grammy": "^1.34.0",
-    "langchain": "^1.5.5"
+    "static-analysis": "tsc --noEmit && eslint . --max-warnings 0",
+    "test": "npm run test -w backend",
+    "test-only": "npm run test-only -w backend",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix --max-warnings 0",
+    "docs:dev": "npm run dev -w docs",
+    "docs:build": "npm run build -w docs",
+    "rules:test": "npm --prefix tools/eslint-plugin-hevronia run test",
+    "rules:new": "node scripts/new-rule.mjs"
   },
   "devDependencies": {
-    "@types/node": "^22.10.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.1",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "@typescript-eslint/parser": "^8.62.1",
+    "eslint": "^10.6.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-hevronia": "file:tools/eslint-plugin-hevronia",
+    "eslint-plugin-import-x": "^4.14.22",
+    "globals": "^17.7.0",
+    "tsx": "^4.23.11",
+    "typescript": "^5.9.3"
   }
 }

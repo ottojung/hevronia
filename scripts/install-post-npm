@@ -1,0 +1,18 @@
+#! /bin/sh
+
+set -e
+
+if ! test "$#" = 1
+then
+    echo "Usage: $0 PREFIX" >&2
+    echo 'Builds the project and installs it at location `PREFIX`.' >&2
+    exit 1
+fi
+
+PREFIX="$1"
+shift
+
+test "$#" = 0
+
+npm run build
+sh scripts/link "$PREFIX"

@@ -1,7 +1,10 @@
 # Project Overview
-This is a TypeScript, ESM Telegram bot for Хевронія (@hevronia_bot). It uses
-grammY for Telegram long polling and LangChain (@langchain/openai) for message
-response generation.
+This is a TypeScript, ESM npm-workspace monorepo for the Telegram bot
+Хевронія (@hevronia_bot). The bot lives in `backend/` (grammY for Telegram long
+polling, LangChain/@langchain/openai for response generation, LangGraph SQLite
+for conversation memory). The repository also contains a Docusaurus `docs/`
+workspace, a custom internal ESLint plugin in `tools/eslint-plugin-hevronia/`,
+development/install scripts in `scripts/`, and CI in `.github/workflows/`.
 
 # Initial Setup (Required for Fresh Repository)
 
@@ -15,18 +18,23 @@ npm install
 
 ## Conventions
 
-- TypeScript with strict mode, ESM (`"type": "module"`), Node.js.
-- Telegram transport lives in `src/telegram.ts`; the conversational entry point
-  is `src/respond.ts` (`respond(threadId, messageText)`); the LangChain agent,
-  summarization middleware, and SQLite checkpointer live in `src/memory.ts`; the
-  character system prompt lives in `src/personality.ts`.
+- TypeScript with strict mode, ESM (`"type": "module"`), Node.js, npm workspaces.
+- The bot source lives in `backend/src/`; unit tests live in `backend/tests/`.
+- Telegram transport lives in `backend/src/telegram.ts`; the conversational entry
+  point is `backend/src/respond.ts` (`respond(threadId, messageText)`); the
+  LangChain agent, summarization middleware, and SQLite checkpointer live in
+  `backend/src/memory.ts`; the character system prompt lives in
+  `backend/src/personality.ts`.
 - `telegram.ts` only maps a chat to a thread id and calls
   `await respond(threadId, messageText)`; it must not contain OpenAI/LangChain
   details.
 - Secrets are read only from the process environment (`TELEGRAM_BOT_TOKEN`,
   `MY_OPENAI_API_KEY`) and are never logged or committed.
 - Conversation state is owned by LangGraph and persisted in the ignored
-  `.data/checkpoints.sqlite`; it is never reimplemented by hand.
+  `backend/.data/checkpoints.sqlite`; it is never reimplemented by hand.
+- ESLint enforces custom rules from `tools/eslint-plugin-hevronia/` (see
+  `docs/linting.md`). Run `npm run static-analysis` and `npm run rules:test`
+  before finishing changes.
 
 ## TypeScript Conventions
 
@@ -34,6 +42,10 @@ npm install
 - `verbatimModuleSyntax` is enabled, so type-only imports use `import type`.
 - ESM import specifiers use `.js` extensions (NodeNext resolution).
 - Prefer small, focused modules with a clear boundary between transport and logic.
+- The strict tsconfig (root `tsconfig.json`) enables `noUncheckedIndexedAccess`
+  and `noPropertyAccessFromIndexSignature`; array index access and index-signature
+  property access must be handled accordingly (no type casts, no non-null
+  assertions — these are lint errors).
 
 ## Error Handling
 This project follows strict error handling conventions that prioritize inspectability, locality, and type safety:
@@ -456,15 +468,17 @@ function isPathLike(object) {
 
 - **Unit tests**: `npm test` (Node's built-in test runner with `tsx`)
 - **Type checking**: `npm run typecheck`
+- **Linting**: `npm run lint` / `npm run static-analysis`
+- **Custom lint-rule tests**: `npm run rules:test`
 - **Build verification**: `npm run build`
 
-Run type checking and tests often, make sure they're passing continuously.
-Unit tests must not call OpenAI or Telegram; test pure logic (API-key
-validation, prompt construction, response-text extraction) instead.
+Run type checking, linting, and tests often, make sure they're passing
+continuously. Unit tests must not call OpenAI or Telegram; test pure logic
+(API-key validation, prompt construction, response-text extraction) instead.
 
 ## Test Conventions
 
-- Test files are located in `test/`
+- Test files are located in `backend/tests/`
 - Use descriptive test names
 - Do not require real secrets or network access in unit tests
 
@@ -579,20 +593,21 @@ Github posts must use humor and metaphors.
 
 ## Static analysis
 
-The project's type checking is enforced via `npm run typecheck`.
+The project's type checking and linting are enforced via
+`npm run static-analysis` (`tsc --noEmit` plus ESLint with `--max-warnings 0`).
 Important:
 - linter configs must not be changed unless explicitly asked to by the user.
 - tsconfig must not be changed unless explicitly asked to by the user.
-- type checking rules must not be ignored or disabled.
+- type checking and linting rules must not be ignored or disabled.
 
 ## Notifications
 
-If `command -v my-notify` exits with status `0`, then call `my-notify "Volodyslav is ready for review"` when you're done with all the work to notify the user of it.
+If `command -v my-notify` exits with status `0`, then call `my-notify "Hevronia is ready for review"` when you're done with all the work to notify the user of it.
 
 ## Additional Guidelines
 
 - Follow existing naming conventions (camelCase functions, `.ts` files, `.js` import specifiers)
 - Keep the Telegram transport and the response generation separated
-- Keep the character system prompt in `src/personality.ts`
+- Keep the character system prompt in `backend/src/personality.ts`
 - Write tests for new functionality
 - Use the established error handling patterns

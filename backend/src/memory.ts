@@ -4,6 +4,7 @@ import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
 import {
   AIMessage,
   HumanMessage,
+  isBaseMessage,
   type BaseMessage,
   type MessageContent,
 } from "@langchain/core/messages";
@@ -16,11 +17,15 @@ import { SYSTEM_PROMPT } from "./personality.js";
 
 export const MODEL = "gpt-4o-mini";
 
-export const COMPACTION = {
+export const COMPACTION: {
+  triggerTokens: number;
+  keepTokens: number;
+  trimTokensToSummarize: number;
+} = {
   triggerTokens: 12_000,
   keepTokens: 4_000,
   trimTokensToSummarize: 10_000,
-} as const;
+};
 
 const DEFAULT_DB_PATH = fileURLToPath(
   new URL("../.data/checkpoints.sqlite", import.meta.url),
@@ -63,7 +68,7 @@ Conversation to compact:
 {messages}`;
 
 export function openAiKeyFromEnv(): string {
-  const apiKey = process.env.MY_OPENAI_API_KEY;
+  const apiKey = process.env["MY_OPENAI_API_KEY"];
   if (!apiKey) {
     throw new Error(
       "MY_OPENAI_API_KEY is not set in the environment. " +
@@ -79,8 +84,8 @@ export function extractText(content: MessageContent): string {
   }
   let text = "";
   for (const block of content) {
-    if ("type" in block && block.type === "text") {
-      text += block.text;
+    if (block["type"] === "text" && typeof block["text"] === "string") {
+      text += block["text"];
     }
   }
   return text;
@@ -89,6 +94,9 @@ export function extractText(content: MessageContent): string {
 export function extractReplyText(messages: BaseMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const message = messages[i];
+    if (message === undefined) {
+      continue;
+    }
     if (message instanceof AIMessage) {
       const text = extractText(message.content).trim();
       if (text) {
@@ -174,8 +182,11 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
     },
     async getMessages(threadId: string): Promise<BaseMessage[]> {
       const tuple = await checkpointer.getTuple({ configurable: { thread_id: threadId } });
-      const messages = tuple?.checkpoint.channel_values.messages;
-      return (Array.isArray(messages) ? messages : []) as BaseMessage[];
+      const stored = tuple?.checkpoint.channel_values["messages"];
+      if (!Array.isArray(stored)) {
+        return [];
+      }
+      return stored.filter(isBaseMessage);
     },
     async close(): Promise<void> {
       checkpointer.db.close();

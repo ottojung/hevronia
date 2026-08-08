@@ -15,15 +15,34 @@ Telegram private chat
     ↓
 stable thread_id (telegram-private:<chat id>)
     ↓
-LangChain agent (src/memory.ts, createAgent)
+LangChain agent (backend/src/memory.ts, createAgent)
     ↓
-LangGraph SQLite checkpointer  →  .data/checkpoints.sqlite
+LangGraph SQLite checkpointer  →  backend/.data/checkpoints.sqlite
     ↓
 summarizationMiddleware
     ├── older history → compact rolling summary
     └── recent history → verbatim
     ↓
 OpenAI → Хевронія response
+```
+
+## Repository structure
+
+```text
+hevronia/
+├── backend/                # the Telegram bot (npm workspace)
+│   ├── src/                # bot source (TypeScript)
+│   └── tests/              # unit tests (Node built-in test runner)
+├── docs/                   # Docusaurus documentation (npm workspace)
+├── scripts/                # development / install / CI helper scripts
+├── tools/
+│   └── eslint-plugin-hevronia/  # custom internal ESLint plugin
+├── .github/workflows/      # CI / automation
+├── Dockerfile
+├── Makefile
+├── eslint.config.mjs
+├── package.json            # workspace root
+└── tsconfig.json
 ```
 
 ## Prerequisites
@@ -63,7 +82,7 @@ In the normal working environment both variables are already provided through
 ## Running locally
 
 ```bash
-npm run dev        # development (tsx, no build step)
+npm run dev        # development (tsx watch, no build step)
 ```
 
 or, for the compiled build:
@@ -90,13 +109,13 @@ bot sends a Telegram `typing` chat action.
 - Each private chat maps to a LangGraph thread: `telegram-private:<chat id>`.
   Different chats have fully isolated histories.
 - Conversation state is stored in a local SQLite database at
-  `.data/checkpoints.sqlite` (inside the repository, git-ignored).
+  `backend/.data/checkpoints.sqlite` (git-ignored).
 - The database is resolved relative to the module, so the bot works from any
   working directory.
 - Memory survives process restarts.
 - Once a thread's history grows past the compaction threshold, older messages
   are summarized and only the newest tokens stay verbatim. The thresholds live
-  in `src/memory.ts` (`COMPACTION`).
+  in `backend/src/memory.ts` (`COMPACTION`).
 
 ## Manual testing
 
@@ -106,31 +125,45 @@ same chat.
 
 ## Developer commands
 
-| Command                 | Purpose                         |
-| ----------------------- | ------------------------------- |
-| `npm run dev`           | run locally with tsx            |
-| `npm run typecheck`     | TypeScript type checking        |
-| `npm run build`         | compile to `dist/`              |
-| `npm start`             | run the compiled build          |
-| `npm test`              | run unit tests (no network)     |
+| Command                 | Purpose                                   |
+| ----------------------- | ----------------------------------------- |
+| `npm run dev`           | run locally with tsx                      |
+| `npm run typecheck`     | TypeScript type checking                  |
+| `npm run build`         | compile the backend to `backend/dist/`    |
+| `npm start`             | run the compiled build                    |
+| `npm test`              | run backend unit tests (no network)       |
+| `npm run lint`          | ESLint across the repository              |
+| `npm run lint:fix`      | ESLint with `--fix`                       |
+| `npm run static-analysis` | `tsc --noEmit` + ESLint (no warnings)  |
+| `npm run rules:test`    | test the custom ESLint rules              |
+| `npm run rules:new`     | scaffold a new custom ESLint rule         |
+| `npm run docs:dev`      | run the Docusaurus dev server             |
+| `npm run docs:build`    | build the Docusaurus site                 |
 
 Unit tests cover pure logic (API-key validation, response-text extraction) and
 conversation-memory behavior using LangChain fake models and a temporary SQLite
 database. They never call OpenAI or Telegram.
 
-## Project layout
+## Linting
 
-```text
-src/
-├── index.ts       entry point
-├── telegram.ts    Telegram transport (grammY, long polling)
-├── respond.ts     conversational entry point (respond(threadId, text))
-├── memory.ts      LangChain agent, summarization, SQLite checkpointer
-└── personality.ts Хевронія's system prompt
-test/
-├── respond.test.ts
-└── memory.test.ts
+The repository uses ESLint (flat config) with a **custom internal plugin** at
+`tools/eslint-plugin-hevronia/`. Rules are auto-discovered and enabled via the
+plugin's `recommended` config. See [`docs/linting.md`](docs/linting.md) for how
+to add a new rule (`npm run rules:new <rule-name>`).
+
+## Docker
+
+```bash
+docker build .
 ```
+
+The image entrypoint is the `hevronia` executable; `docker run <image> --version`
+prints the version. Running the bot requires the two environment variables above.
+
+## Documentation
+
+The `docs/` workspace is a Docusaurus site. Build it with `npm run docs:build`;
+it is deployed to GitHub Pages by the `docs` workflow.
 
 ## Status
 

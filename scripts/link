@@ -1,0 +1,44 @@
+#! /bin/sh
+
+set -e
+
+cd -- "${0%/*}"/..
+
+if ! test "$#" = 1
+then
+    echo "Usage: $0 <prefix>" >&2
+    exit 1
+fi
+
+set -xe
+
+PREFIX="$1"
+shift
+
+if ! command -v git >/dev/null 2>&1
+then
+    echo "This program requires git to capture the version, but git is not installed." >&2
+    exit 1
+fi
+
+BINDIR="$PREFIX"/bin
+DATADIR="$PREFIX"/share/hevronia
+SOURCEDIR="$DATADIR"/source
+
+mkdir -p -- "$BINDIR"
+mkdir -p -- "$DATADIR"
+
+if command -v rsync >/dev/null 2>&1
+then
+    COPY="rsync --recursive --partial --delete --links --times"
+else
+    COPY="cp -r -T"
+    rm -rf -- "$SOURCEDIR"
+fi
+
+$COPY -- ./ "$SOURCEDIR"
+
+sh scripts/link-targeted "$SOURCEDIR" "$PREFIX"
+
+# Remove .git to avoid broken references in submodule setups
+rm -rf -- "$SOURCEDIR"/.git

@@ -1,0 +1,8 @@
+#! /bin/sh
+
+set -e
+
+SELF="${0}"
+SELF=$(readlink -f -- "$SELF")
+
+node -- "$SELF"/../../backend/dist/index.js "$@"

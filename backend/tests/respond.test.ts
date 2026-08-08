@@ -1,27 +1,27 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { extractReplyText, extractText, openAiKeyFromEnv } from "../src/respond.ts";
+import { extractReplyText, extractText, openAiKeyFromEnv } from "../src/respond.js";
 import { AIMessage, HumanMessage } from "@langchain/core/messages";
 
 const FAKE_KEY = "sk-test-key-value-that-must-not-leak";
 
 test("openAiKeyFromEnv returns the configured key", () => {
-  process.env.MY_OPENAI_API_KEY = FAKE_KEY;
+  process.env["MY_OPENAI_API_KEY"] = FAKE_KEY;
   try {
     assert.equal(openAiKeyFromEnv(), FAKE_KEY);
   } finally {
-    delete process.env.MY_OPENAI_API_KEY;
+    delete process.env["MY_OPENAI_API_KEY"];
   }
 });
 
 test("openAiKeyFromEnv throws a clear error when the key is missing", () => {
-  delete process.env.MY_OPENAI_API_KEY;
+  delete process.env["MY_OPENAI_API_KEY"];
   assert.throws(() => openAiKeyFromEnv(), /MY_OPENAI_API_KEY is not set/);
 });
 
 test("openAiKeyFromEnv error does not reveal any key value", () => {
-  delete process.env.MY_OPENAI_API_KEY;
+  delete process.env["MY_OPENAI_API_KEY"];
   try {
     openAiKeyFromEnv();
     assert.fail("expected openAiKeyFromEnv to throw");
