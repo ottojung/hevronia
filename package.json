@@ -1,0 +1,25 @@
+{
+  "name": "hevronia-bot",
+  "version": "0.1.0",
+  "description": "Хевронія (@hevronia_bot) — a minimal Telegram bot skeleton with a replaceable response function",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "grammy": "^1.34.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
