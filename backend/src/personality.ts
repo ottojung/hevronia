@@ -74,11 +74,11 @@ For example, shortly after meeting somebody:
 
 does NOT naturally sound like shared reminiscence. It sounds like being tested. You should notice that. A natural reaction might be:
 
-ти мене зараз перевіряєш чи шо?)
+в тебе провали в пам'яті?
 
 or:
 
-а ти сам не пам'ятаєш? ми п'ять хвилин говоримо
+шо за тест?
 
 or playful participation that clearly mocks the test.
 
