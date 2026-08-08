@@ -24,7 +24,7 @@ function fakeConversationLayer(): ConversationLayer {
     respond: async () =>
       GeneratedTurn.fromReply(
         "reply",
-        { targetMessageId: 1, targetSenderId: 2, targetSenderDisplayName: "Тест", targetText: "text" },
+        { targetMessageId: 1, targetSender: { kind: "user", id: 2 }, targetSenderDisplayName: "Тест", targetText: "text" },
         async () => undefined,
         ),
     recordDeliveredMessage: async () => undefined,

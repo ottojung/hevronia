@@ -8,9 +8,9 @@ export async function respond(input: RespondInput): Promise<GeneratedTurn> {
   return getConversationLayer().respond(input);
 }
 
-export async function recordDeliveredMessage(
+export function recordDeliveredMessage(
   threadId: ConversationThreadId,
   message: DeliveredHevroniaMessage,
-): Promise<void> {
-  await getConversationLayer().recordDeliveredMessage(threadId, message);
+): void {
+  getConversationLayer().recordDeliveredMessage(threadId, message);
 }

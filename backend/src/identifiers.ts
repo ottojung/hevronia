@@ -3,7 +3,8 @@
  * - The value is a canonical LangGraph persisted thread key in either the
  *   `telegram-private:` or `telegram-group:` namespace.
  * - The value originated from a positive, safe-integer Telegram private-chat
- *   identifier, or a negative safe-integer Telegram group-chat identifier.
+ *   identifier, or a negative safe-integer Telegram group-chat identifier,
+ *   optionally scoped to a positive message-thread/topic identifier.
  *
  * The proof of those properties is guaranteed by:
  * - This class can only be introduced through these functions:
@@ -77,16 +78,30 @@ export function isInvalidIntegrationTestIdentifierError(
 
 export function conversationThreadIdFromTelegramPrivateChat(
   chatId: number,
+  messageThreadId?: number,
 ): ConversationThreadId {
   validateTelegramIdentifier(chatId, "private chat");
-  return new ConversationThreadIdValue(`telegram-private:${chatId}`);
+  return new ConversationThreadIdValue(withTopic(`telegram-private:${chatId}`, messageThreadId));
 }
 
-export function conversationThreadIdFromTelegramGroupChat(chatId: number): ConversationThreadId {
+export function conversationThreadIdFromTelegramGroupChat(
+  chatId: number,
+  messageThreadId?: number,
+): ConversationThreadId {
   if (!Number.isSafeInteger(chatId) || chatId >= 0) {
     throw new InvalidTelegramIdentifierError("group chat", "a negative safe integer");
   }
-  return new ConversationThreadIdValue(`telegram-group:${chatId}`);
+  return new ConversationThreadIdValue(withTopic(`telegram-group:${chatId}`, messageThreadId));
+}
+
+export function conversationThreadIdFromTelegramChat(
+  chatKind: "private" | "group" | "supergroup",
+  chatId: number,
+  messageThreadId?: number,
+): ConversationThreadId {
+  return chatKind === "private"
+    ? conversationThreadIdFromTelegramPrivateChat(chatId, messageThreadId)
+    : conversationThreadIdFromTelegramGroupChat(chatId, messageThreadId);
 }
 
 export function longTermMemoryUserIdFromTelegramSender(senderId: number): LongTermMemoryUserId {
@@ -107,4 +122,10 @@ function validateTelegramIdentifier(identifier: number, kind: string): void {
   if (!Number.isSafeInteger(identifier) || identifier <= 0) {
     throw new InvalidTelegramIdentifierError(kind);
   }
+}
+
+function withTopic(base: string, messageThreadId: number | undefined): string {
+  if (messageThreadId === undefined) return base;
+  validateTelegramIdentifier(messageThreadId, "message thread");
+  return `${base}:topic:${messageThreadId}`;
 }

@@ -40,7 +40,10 @@ Conversation state is owned by LangGraph and persisted in the ignored
 Incoming participant events always enter this state and use the same compaction
 path, including silent turns. Outgoing Хевронія events enter it only after
 Telegram confirms delivery. Stable Telegram sender IDs distinguish participants
-even when display names collide.
+even when display names collide; sender kind distinguishes users from chats acting
+as senders. Forum topic IDs are part of the LangGraph thread key. Confirmed outgoing
+events use a separate retry queue, and the next topic-local turn waits for its queue
+before planning. Chat senders do not enter person-scoped Mem0.
 
 Mem0 owns durable knowledge about a person, scoped by
 `telegram-user:<sender id>`. Its SQLite history lives beneath the ignored

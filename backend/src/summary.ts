@@ -24,7 +24,7 @@ export const SUMMARY_PROMPT = `Create a compact continuity summary of the earlie
 Preserve information that may matter later:
 
 - concrete facts established by any participant, always attributed to that
-  participant's stable telegram-user identifier;
+  participant's stable telegram-user or telegram-chat identifier;
 - display names and relationships, retaining stable identifiers when names collide;
 - preferences, dislikes, habits, and boundaries;
 - plans, promises, decisions, and intentions;

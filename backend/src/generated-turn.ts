@@ -6,7 +6,7 @@ export type GeneratedTurnOutcome =
       action: "reply";
       replyText: string;
       replyTo: ReplyRelationship;
-      persistDelivery(deliveredMessageId: number): Promise<void>;
+      persistDelivery(deliveredMessageId: number): void;
     };
 
 /**
@@ -31,16 +31,17 @@ export class GeneratedTurn {
   static fromReply(
     replyText: string,
     replyTo: ReplyRelationship,
-    persistDelivery: (deliveredMessageId: number) => Promise<void>,
+    persistDelivery: (deliveredMessageId: number) => void,
   ): GeneratedTurn {
-    let persistence: Promise<void> | undefined;
+    let persisted = false;
     return new GeneratedTurn({
       action: "reply",
       replyText,
       replyTo,
       persistDelivery: (deliveredMessageId) => {
-        persistence ??= persistDelivery(deliveredMessageId);
-        return persistence;
+        if (persisted) return;
+        persisted = true;
+        persistDelivery(deliveredMessageId);
       },
     });
   }

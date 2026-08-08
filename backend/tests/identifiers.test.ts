@@ -16,6 +16,14 @@ test("Telegram identifiers construct distinct canonical persistence namespaces",
   const userId = longTermMemoryUserIdFromTelegramSender(123);
   assert.equal(threadId.toPersistenceKey(), "telegram-private:123");
   assert.equal(groupThreadId.toPersistenceKey(), "telegram-group:-456");
+  assert.equal(
+    conversationThreadIdFromTelegramGroupChat(-456, 12).toPersistenceKey(),
+    "telegram-group:-456:topic:12",
+  );
+  assert.equal(
+    conversationThreadIdFromTelegramPrivateChat(123, 9).toPersistenceKey(),
+    "telegram-private:123:topic:9",
+  );
   assert.equal(userId.toPersistenceKey(), "telegram-user:123");
 });
 

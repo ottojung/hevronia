@@ -1,5 +1,5 @@
 import type { GeneratedTurn } from "./generated-turn.js";
-import type { DeliveredHevroniaMessage, ReplyRelationship } from "./telegram-event.js";
+import type { DeliveredHevroniaMessage, ReplyRelationship, TelegramSenderIdentity } from "./telegram-event.js";
 
 export interface TelegramTurnDelivery {
   showTyping(): Promise<void>;
@@ -8,12 +8,13 @@ export interface TelegramTurnDelivery {
 
 export type TelegramDeliveryResult =
   | { status: "silence" }
-  | { status: "delivered"; persistence: "stored" | "failed" };
+  | { status: "delivered"; persistence: "queued" };
 
 export interface FallbackDeliveryInput {
   text: string;
-  senderId: number;
+  sender: TelegramSenderIdentity;
   chatKind: "private" | "group" | "supergroup";
+  messageThreadId: number | null;
   replyTo: ReplyRelationship;
 }
 
@@ -30,28 +31,20 @@ export async function deliverGeneratedTurn(
     reply.replyText,
     reply.replyTo.targetMessageId,
   );
-  return persistConfirmed(() => reply.persistDelivery(deliveredMessageId));
+  reply.persistDelivery(deliveredMessageId);
+  return { status: "delivered", persistence: "queued" };
 }
 
 export async function deliverFallbackMessage(
   input: FallbackDeliveryInput,
   delivery: TelegramTurnDelivery,
-  persist: (message: DeliveredHevroniaMessage) => Promise<void>,
+  persist: (message: DeliveredHevroniaMessage) => void,
 ): Promise<TelegramDeliveryResult> {
   const deliveredMessageId = await delivery.reply(input.text, input.replyTo.targetMessageId);
-  return persistConfirmed(() => persist({
-    kind: "hevronia", messageId: deliveredMessageId, senderId: input.senderId,
+  persist({
+    kind: "hevronia", messageId: deliveredMessageId, sender: input.sender,
     senderDisplayName: "Хевронія", chatKind: input.chatKind, text: input.text,
-    replyTo: input.replyTo,
-  }));
-}
-
-async function persistConfirmed(task: () => Promise<void>): Promise<TelegramDeliveryResult> {
-  try {
-    await task();
-    return { status: "delivered", persistence: "stored" };
-  } catch (error) {
-    console.error(`Telegram delivery confirmed but conversation persistence failed: ${String(error)}`);
-    return { status: "delivered", persistence: "failed" };
-  }
+    messageThreadId: input.messageThreadId, replyTo: input.replyTo,
+  });
+  return { status: "delivered", persistence: "queued" };
 }

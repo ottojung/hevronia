@@ -18,10 +18,15 @@ export interface ConversationStoreOptions {
   tokenCounter?: TokenCounter;
 }
 
+export interface ConversationStore {
+  append(threadId: ConversationThreadId, event: CanonicalTelegramEvent): Promise<void>;
+  getMessages(threadId: ConversationThreadId): Promise<BaseMessage[]>;
+}
+
 export function createConversationStore(
   checkpointer: SqliteSaver,
   options: ConversationStoreOptions,
-) {
+): ConversationStore {
   const middleware = summarizationMiddleware({
     model: options.summaryModel,
     trigger: { tokens: options.triggerTokens },
@@ -47,7 +52,8 @@ export function createConversationStore(
   return {
     async append(threadId: ConversationThreadId, event: CanonicalTelegramEvent): Promise<void> {
       await graph.invoke(
-        { messages: [new HumanMessage(serializeTelegramEvent(event))] },
+        { messages: [new HumanMessage({ content: serializeTelegramEvent(event),
+          id: `${event.kind}:${event.messageId}` })] },
         config(threadId),
       );
     },

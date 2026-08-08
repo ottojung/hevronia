@@ -31,7 +31,7 @@ export type SocialDecision = z.infer<typeof socialDecisionSchema>;
 export interface ReplyCandidate {
   key: string;
   messageId: number;
-  senderId: number;
+  sender: import("./telegram-event.js").TelegramSenderIdentity;
   senderDisplayName: string;
   text: string;
 }
@@ -77,7 +77,7 @@ export function renderBoundedConversation(messages: BaseMessage[]): string {
 export function renderDecisionContext(context: SocialDecisionContext): string {
   return [
     `Chat kind: ${context.currentMessage.chatKind}`,
-    `Current stable participant: telegram-user:${context.currentMessage.senderId}`,
+    `Current stable participant: telegram-${context.currentMessage.sender.kind}:${context.currentMessage.sender.id}`,
     `Current display name: ${context.currentMessage.senderDisplayName}`,
     `Directly addressed: ${context.currentMessage.directlyAddressed}`,
     `Reply relationship: ${JSON.stringify(context.currentMessage.replyTo)}`,

@@ -6,12 +6,12 @@ import type { LongTermMemory } from "./long-term-memory/index.js";
 import type { GeneratedTurn } from "./generated-turn.js";
 import type { PendingMemoryWrites } from "./long-term-memory/pending.js";
 import type { ConversationThreadId } from "./identifiers.js";
-import type { DeliveredHevroniaMessage, ObservedTelegramMessage } from "./telegram-event.js";
+import type { DeliveredHevroniaMessage, ObservedTelegramMessage, TelegramSenderIdentity } from "./telegram-event.js";
 
 export interface RespondInput {
   threadId: ConversationThreadId;
   message: ObservedTelegramMessage;
-  hevroniaSenderId: number;
+  hevroniaSender: TelegramSenderIdentity;
 }
 
 export interface ConversationLayerOptions {
@@ -26,6 +26,8 @@ export interface ConversationLayerOptions {
   longTermMemory?: LongTermMemory;
   pendingMemoryWrites?: PendingMemoryWrites;
   decisionMaker?: import("./social-decision.js").SocialDecisionMaker;
+  conversationStore?: import("./conversation-store.js").ConversationStore;
+  pendingConversationWrites?: import("./pending-conversation-writes.js").PendingConversationWrites;
 }
 
 export interface ConversationLayer {
@@ -33,7 +35,7 @@ export interface ConversationLayer {
   recordDeliveredMessage(
     threadId: ConversationThreadId,
     message: DeliveredHevroniaMessage,
-  ): Promise<void>;
+  ): void;
   getMessages(threadId: ConversationThreadId): Promise<BaseMessage[]>;
   close(): Promise<void>;
 }

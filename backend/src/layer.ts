@@ -7,10 +7,10 @@ import { dirname } from "node:path";
 import type { ConversationLayer, ConversationLayerOptions, RespondInput } from "./conversation-types.js";
 import { createConversationStore } from "./conversation-store.js";
 import { GeneratedTurn } from "./generated-turn.js";
-import { recallForTurn, rememberDeliveredUserMessage } from "./long-term-memory/operations.js";
+import { memoryUserIdForSender, recallForTurn, scheduleRememberedMessage } from "./long-term-memory/operations.js";
 import { PendingMemoryWrites } from "./long-term-memory/pending.js";
+import { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { MODEL, openAiKeyFromEnv } from "./model.js";
-import { longTermMemoryUserIdFromTelegramSender } from "./identifiers.js";
 import { SYSTEM_PROMPT } from "./personality.js";
 import { createSocialDecisionMaker } from "./social-decision.js";
 import { COMPACTION, DEFAULT_DB_PATH } from "./summary.js";
@@ -35,7 +35,7 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
   const model = options.model ?? new ChatOpenAI({ apiKey: openAiKeyFromEnv(), model: MODEL });
   const summaryModel = options.summaryModel ?? new ChatOpenAI({ apiKey: openAiKeyFromEnv(),
     model: MODEL, temperature: 0 });
-  const store = createConversationStore(checkpointer, {
+  const store = options.conversationStore ?? createConversationStore(checkpointer, {
     summaryModel,
     triggerTokens: options.triggerTokens ?? COMPACTION.triggerTokens,
     keepTokens: options.keepTokens ?? COMPACTION.keepTokens,
@@ -43,30 +43,29 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
     tokenCounter: options.tokenCounter,
   });
   const planner = options.decisionMaker ?? createSocialDecisionMaker(model, personality);
+  const canonicalWrites = options.pendingConversationWrites ?? new PendingConversationWrites();
 
   return {
     async respond(input: RespondInput): Promise<GeneratedTurn> {
+      await canonicalWrites.waitForThread(input.threadId);
       await store.append(input.threadId, input.message);
       const history = await store.getMessages(input.threadId);
-      const userId = longTermMemoryUserIdFromTelegramSender(input.message.senderId);
-      const recalled = await recallForTurn(options.longTermMemory, userId, input.message.text);
+      const userId = memoryUserIdForSender(input.message.sender);
+      const recalled = userId === undefined ? []
+        : await recallForTurn(options.longTermMemory, userId, input.message.text);
       const candidates = replyCandidates(history);
       let decision: Awaited<ReturnType<typeof planner.decide>>;
       try {
         decision = await planner.decide({
-          boundedHistory: history,
-          currentMessage: input.message,
-          replyCandidates: candidates,
-          recalledMemories: recalled,
+          boundedHistory: history, currentMessage: input.message,
+          replyCandidates: candidates, recalledMemories: recalled,
         });
       } catch (error) {
         console.warn(`Social decision failed safely to silence: ${String(error)}`);
         decision = { action: "silence" };
       }
       const scheduleMemory = (): void => {
-        void pending.track(rememberDeliveredUserMessage(
-          options.longTermMemory, userId, input.threadId, input.message.text,
-        ));
+        scheduleRememberedMessage(pending, options.longTermMemory, userId, input.threadId, input.message.text);
       };
       if (decision.action === "silence") {
         scheduleMemory();
@@ -81,22 +80,24 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
         new SystemMessage(personality),
         new HumanMessage(realizationContext(history, recalled, resolved)),
       ]);
-      if (!isBaseMessage(response)) {
-        throw new InvalidRealizationResponseError();
-      }
+      if (!isBaseMessage(response)) throw new InvalidRealizationResponseError();
       const replyText = extractText(response.content).trim();
       if (!replyText) throw new InvalidRealizationResponseError();
-      return GeneratedTurn.fromReply(replyText, replyRelationship(resolved.target), async (messageId) => {
-        await store.append(input.threadId, deliveredEvent(
-          messageId, input.hevroniaSenderId, replyText, input.message, resolved.target,
-        ));
+      return GeneratedTurn.fromReply(replyText, replyRelationship(resolved.target), (messageId) => {
+        const delivered = deliveredEvent(
+          messageId, input.hevroniaSender, replyText, input.message, resolved.target,
+        );
+        canonicalWrites.enqueue(input.threadId, () => store.append(input.threadId, delivered));
         scheduleMemory();
       });
     },
-    recordDeliveredMessage: store.append,
-    getMessages: store.getMessages,
+    recordDeliveredMessage: (threadId, message) => {
+      canonicalWrites.enqueue(threadId, () => store.append(threadId, message));
+    },
+    getMessages: async (threadId) => { await canonicalWrites.waitForThread(threadId);
+      return store.getMessages(threadId); },
     async close(): Promise<void> {
-      await pending.drain();
+      await canonicalWrites.drain(); await pending.drain();
       checkpointer.db.close();
     },
   };

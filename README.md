@@ -138,6 +138,12 @@ checkpoints and Mem0 history survive bot image upgrades and container recreation
 Each incoming message is persisted and compacted before the social decision.
 Silence is a first-class outcome. Generated outgoing text is persisted only after
 Telegram confirms delivery; undelivered replies never enter conversation history.
+Forum topics append `:topic:<message thread id>` to the thread identity, so topics
+in the same chat have independent histories and summaries. Messages sent on behalf
+of a channel or group retain a `telegram-chat` sender identity and deliberately skip
+person-scoped Mem0; ordinary users retain `telegram-user` identity and memory.
+Confirmed outgoing events retry canonical persistence in the background, and the
+next turn in that thread waits for the retry so delivered speech cannot disappear.
 Memory-write failures are logged without delaying or invalidating a delivered
 reply, and pending writes receive a bounded drain during shutdown.
 

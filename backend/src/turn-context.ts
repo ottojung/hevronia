@@ -15,7 +15,7 @@ export function replyCandidates(messages: BaseMessage[]): ReplyCandidate[] {
       candidates.push({
         key: `candidate-${candidates.length}`,
         messageId: event.messageId,
-        senderId: event.senderId,
+        sender: event.sender,
         senderDisplayName: event.senderDisplayName,
         text: event.text,
       });
@@ -48,16 +48,17 @@ export function resolveDecision(
 
 export function deliveredEvent(
   messageId: number,
-  senderId: number,
+  sender: import("./telegram-event.js").TelegramSenderIdentity,
   text: string,
   source: ObservedTelegramMessage,
   target: ReplyCandidate,
 ): DeliveredHevroniaMessage {
-  return { kind: "hevronia", messageId, senderId, senderDisplayName: "Хевронія",
-    chatKind: source.chatKind, text, replyTo: replyRelationship(target) };
+  return { kind: "hevronia", messageId, sender, senderDisplayName: "Хевронія",
+    chatKind: source.chatKind, text, messageThreadId: source.messageThreadId,
+    replyTo: replyRelationship(target) };
 }
 
 export function replyRelationship(target: ReplyCandidate): ReplyRelationship {
-  return { targetMessageId: target.messageId, targetSenderId: target.senderId,
+  return { targetMessageId: target.messageId, targetSender: target.sender,
     targetSenderDisplayName: target.senderDisplayName, targetText: target.text };
 }
