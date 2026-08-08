@@ -1,6 +1,6 @@
 "use strict";
 
-const MAX_CODE_LINES = 300;
+const MAX_CODE_LINES = 100;
 
 module.exports = {
     meta: {
