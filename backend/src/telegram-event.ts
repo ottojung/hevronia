@@ -10,6 +10,9 @@ export const replyRelationshipSchema = z.object({
   targetSender: telegramSenderIdentitySchema,
   targetSenderDisplayName: z.string().min(1),
   targetText: z.string().nullable(),
+  // Canonical flag from the observation pipeline; optional so previously
+  // persisted relationships without it remain deserializable.
+  targetIsHevronia: z.boolean().optional(),
 }).strict();
 
 export const observedTelegramMessageSchema = z.object({
