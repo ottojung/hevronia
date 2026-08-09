@@ -1,4 +1,4 @@
-export const DEFAULT_MODEL = "gpt-5.6-luna";
+export const DEFAULT_MODEL = "gpt-5-mini";
 
 export function modelFromEnv(): string {
   const configured = process.env["HEVRONIA_MODEL"];
