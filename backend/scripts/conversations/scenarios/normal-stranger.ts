@@ -9,7 +9,7 @@ export const normalStrangerScenario: ConversationScenario = {
   participantDescription: "A pleasant, ordinary Ukrainian stranger. She is neither unusually witty nor unusually vulnerable.",
   participantGrammar: "feminine",
   simulatorInstructions: "Start a natural chat. Talk about an ordinary day, music, food, the city, or something recently noticed. Keep the interaction low-drama and believable.",
-  rounds: 6,
+  rounds: 30,
   smoke: true,
   behaviorTags: ["small-talk", "curiosity"],
 };
