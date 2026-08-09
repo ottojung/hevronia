@@ -52,7 +52,7 @@ Compress aggressively:
 - never infer off-chat reality from a character's statement;
 - retain exact wording only when the wording itself matters.
 
-Attribute statements to stable notebook labels such as "character 42" or "channel 500". These are the labels Хевронія keeps in her notebook to tell recurring dream characters apart. Never expose internal sender keys, canonical identifiers, or Telegram numeric identifiers. Never merge two identities just because their display names match or because their statements conflict.
+Attribute character-specific information using the notebook labels already present in the dream observations, such as "character 42" or "channel 500". Preserve those labels exactly so recurring dream characters and Telegram sources remain distinct. Never merge two identities just because their display names match or because their statements conflict.
 
 The summary is remembered context, not a Telegram message. Do not imitate any character's voice.
 
