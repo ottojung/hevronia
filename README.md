@@ -212,3 +212,19 @@ it is deployed to GitHub Pages by the `docs` workflow.
 Thread conversational memory, automatic compaction, and user-scoped semantic
 long-term memory are implemented. Tools, streaming, and webhooks remain out of
 scope.
+
+# Conversation simulations
+
+Developer-facing conversation simulations use the real Hevronia conversation
+layer while a separate model plays a dynamic Telegram participant. Every
+scenario gets a fresh temporary checkpoint database, conversation thread,
+identity, simulator context, and empty long-term memory. They are readable
+personality-regression transcripts, not automated scoring or unit tests.
+
+Run the smoke suite with `npm run conversations`, every scenario with
+`npm run conversations -- --all`, selected scenarios with
+`npm run conversations -- normal-stranger playful-banter`, or inspect the
+catalog with `npm run conversations -- --list`. Use `--rounds N` to override
+scenario lengths. `HEVRONIA_SIMULATOR_MODEL` selects the participant model and
+defaults to `gpt-5-mini`. Transcripts are saved under
+`backend/.data/conversation-runs/<run-id>/`.

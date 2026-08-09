@@ -25,7 +25,8 @@
     "docs:dev": "npm run dev -w docs",
     "docs:build": "npm run build -w docs",
     "rules:test": "npm --prefix tools/eslint-plugin-hevronia run test",
-    "rules:new": "node scripts/new-rule.mjs"
+    "rules:new": "node scripts/new-rule.mjs",
+    "conversations": "npm run conversations -w backend --"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

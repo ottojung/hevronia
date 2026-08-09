@@ -1,0 +1,60 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+
+import { createConversationLayer } from "../../src/layer.js";
+import { parseCli, HELP, renderScenarioList, isConversationCliError } from "./cli.js";
+import { EmptyLongTermMemory } from "./empty-long-term-memory.js";
+import { runScenario } from "./runner.js";
+import { createSimulator, DEFAULT_SIMULATOR_MODEL } from "./simulator.js";
+import { createRunId, saveRun, type RunRecord } from "./transcript.js";
+
+async function main(): Promise<void> {
+  let command;
+  try {
+    command = parseCli(process.argv.slice(2));
+  } catch (error) {
+    console.error(isConversationCliError(error) ? error.message : String(error));
+    process.exitCode = 1;
+    return;
+  }
+  if (command.action === "help") { console.log(HELP); return; }
+  if (command.action === "list") { console.log(renderScenarioList()); return; }
+
+  const simulatorModel = process.env["HEVRONIA_SIMULATOR_MODEL"] ?? DEFAULT_SIMULATOR_MODEL;
+  const simulator = createSimulator(simulatorModel);
+  const records: RunRecord[] = [];
+  for (const configuredScenario of command.scenarios) {
+    const scenario = command.rounds === undefined
+      ? configuredScenario : { ...configuredScenario, rounds: command.rounds };
+    console.log("=".repeat(60));
+    console.log(`${scenario.id} — ${scenario.title}`);
+    console.log("=".repeat(60));
+    console.log(`Purpose: ${scenario.purpose}\n`);
+    const temporaryDirectory = await mkdtemp(join(tmpdir(), "hevronia-conversation-"));
+    try {
+      const result = await runScenario(scenario, scenario.rounds, {
+        simulator,
+        createLayer: () => createConversationLayer({
+          dbPath: join(temporaryDirectory, "checkpoints.sqlite"),
+          longTermMemory: new EmptyLongTermMemory(),
+        }),
+        print: console.log,
+      });
+      records.push({ scenario, result });
+      console.log(`[completed ${result.roundsCompleted}/${scenario.rounds} rounds: ${result.stoppingReason}]\n`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      records.push({ scenario, error: message });
+      console.error(`[failed: ${message}]\n`);
+      process.exitCode = 1;
+    } finally {
+      await rm(temporaryDirectory, { recursive: true, force: true });
+    }
+  }
+  const runDirectory = join("backend", ".data", "conversation-runs", createRunId());
+  await saveRun(runDirectory, records, simulatorModel);
+  console.log(`Transcripts saved to ${runDirectory}`);
+}
+
+await main();
