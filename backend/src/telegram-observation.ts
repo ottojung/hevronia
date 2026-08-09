@@ -35,6 +35,7 @@ export function createObservedTelegramMessage(
       targetSender: input.replyTo.targetSender,
       targetSenderDisplayName: input.replyTo.targetSenderDisplayName,
       targetText: input.replyTo.targetText,
+      targetIsHevronia: input.replyTo.targetsHevronia,
     },
     directlyAddressed: input.chatKind === "private" || input.mentionsHevronia ||
       input.replyTo?.targetsHevronia === true,

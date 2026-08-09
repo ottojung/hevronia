@@ -99,5 +99,6 @@ export function deliveredEvent(
 
 export function replyRelationship(target: ReplyCandidate): ReplyRelationship {
   return { targetMessageId: target.messageId, targetSender: target.sender,
-    targetSenderDisplayName: target.senderDisplayName, targetText: target.text };
+    targetSenderDisplayName: target.senderDisplayName, targetText: target.text,
+    targetIsHevronia: false };
 }
