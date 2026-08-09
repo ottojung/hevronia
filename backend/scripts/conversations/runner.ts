@@ -9,7 +9,8 @@ const HEVRONIA_ID = 7_002;
 const CHAT_ID = 7_003;
 
 export function errorDetail(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replaceAll(/\s+/gu, " ").trim();
 }
 
 export async function runScenario(
