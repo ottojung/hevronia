@@ -53,6 +53,9 @@ as senders. Forum topic IDs are part of the LangGraph thread key. Confirmed outg
 events use a separate retry queue, and the next topic-local turn waits for its queue
 before planning. Chat senders do not enter person-scoped Mem0.
 
+Development persistence formats are not stable and may be discarded as the
+architecture evolves.
+
 ## Model-facing boundary
 
 The language models never see the conversation as users messaging an assistant.
