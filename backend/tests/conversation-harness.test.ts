@@ -69,11 +69,11 @@ test("scenario catalog is broad, unique, and fully specified", () => {
   "at least one scenario should carry seeded long-term memory");
 });
 
-test("CLI defaults to the full catalog and supports --all and --smoke", () => {
+test("CLI defaults to the smoke suite and supports --all and --smoke", () => {
   const defaultRun = parseCli([]);
   assert.equal(defaultRun.action, "run");
   if (defaultRun.action === "run") {
-    assert.equal(defaultRun.scenarios.length, scenarios.length);
+    assert.deepEqual(defaultRun.scenarios.map(({ id }) => id), smokeScenarioIds);
   }
   const all = parseCli(["--all"]);
   assert.equal(all.action, "run");

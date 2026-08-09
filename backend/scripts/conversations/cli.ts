@@ -49,9 +49,9 @@ export function parseCli(arguments_: readonly string[]): CliCommand {
   if ((all || smoke) && ids.length > 0) {
     throw new ConversationCliError("--all/--smoke cannot be combined with scenario IDs");
   }
-  const selectedIds: readonly string[] = all || (ids.length === 0 && !smoke)
+  const selectedIds: readonly string[] = all
     ? scenarios.map(({ id }) => id)
-    : smoke ? smokeScenarioIds
+    : smoke || ids.length === 0 ? smokeScenarioIds
     : ids;
   const selected = selectedIds.map((id) => {
     const scenario = scenarios.find((candidate) => candidate.id === id);
@@ -63,9 +63,9 @@ export function parseCli(arguments_: readonly string[]): CliCommand {
 
 export const HELP = `Usage: npm run conversations -- [options] [scenario IDs]
 
-Without arguments, runs every scenario in the catalog.
-  --all       Run every scenario in the catalog (same as the default)
-  --smoke     Run only the small smoke suite
+Without arguments, runs the small smoke suite.
+  --all       Run every scenario in the catalog
+  --smoke     Run the small smoke suite (same as the default)
   --list      List scenarios without API calls
   --rounds N  Override rounds for every selected scenario
   --help      Show this help`;

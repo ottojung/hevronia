@@ -237,11 +237,11 @@ scenario gets a fresh temporary checkpoint database, conversation thread,
 identity, simulator context, and empty long-term memory. They are readable
 personality-regression transcripts, not automated scoring or unit tests.
 
-Run every scenario in the catalog with `npm run conversations`, the small
-smoke suite with `npm run conversations -- --smoke`, selected scenarios with
+Run the small smoke suite with `npm run conversations`, every scenario in the
+catalog with `npm run conversations -- --all`, selected scenarios with
 `npm run conversations -- normal-stranger slow-friendship`, or inspect the
-catalog with `npm run conversations -- --list`. `--all` is an explicit synonym
-for the full catalog, and `--rounds N` overrides scenario lengths.
+catalog with `npm run conversations -- --list`. `--smoke` is an explicit
+synonym for the default, and `--rounds N` overrides scenario lengths.
 `HEVRONIA_SIMULATOR_MODEL` selects the participant model and defaults to
 `gpt-5-mini`. Transcripts are saved under
 `backend/.data/conversation-runs/<run-id>/`.
