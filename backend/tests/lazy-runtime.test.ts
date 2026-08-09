@@ -240,15 +240,15 @@ test("a newly learned correction precedes an older retrieved fact", async () => 
   const { memory, store, scheduler } = createMemory();
   store.searchImpl = (_key, query) =>
     query === MEMORY_WARM_QUERY
-      ? [fact("b1", "The user lives in Vancouver.")]
-      : [fact("t1", "The user lives in Vancouver.")];
-  store.rememberImpl = () => [fact("l1", "The user lives in Toronto.")];
+      ? [fact("b1", "Lives in Vancouver.")]
+      : [fact("t1", "Lives in Vancouver.")];
+  store.rememberImpl = () => [fact("l1", "Lives in Toronto.")];
   memory.warmUser(userId);
   memory.observeUserMessage(userId, threadId, "I moved to Toronto.");
   await scheduler.fireAll();
   const turn = memory.beginTurn();
   assert.deepEqual(turn.snapshot.memoriesFor(userId).map(({ text }) => text),
-    ["The user lives in Toronto.", "The user lives in Vancouver."]);
+    ["Lives in Toronto.", "Lives in Vancouver."]);
   turn.release();
   await memory.close();
 });
