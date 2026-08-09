@@ -36,26 +36,22 @@ export async function trimForSummary(
   trimTokensToSummarize: number,
   tokenCounter: TokenCounter,
 ): Promise<BaseMessage[]> {
-  try {
-    if (await tokenCounter(messages) <= trimTokensToSummarize) return messages;
-    let left = 0;
-    let right = messages.length;
-    let cutoff = messages.length;
-    const maxIterations = Math.floor(Math.log2(messages.length)) + 1;
-    for (let index = 0; index < maxIterations; index += 1) {
-      if (left >= right) break;
-      const mid = Math.floor((left + right) / 2);
-      if (await tokenCounter(messages.slice(mid)) <= trimTokensToSummarize) {
-        cutoff = mid;
-        right = mid;
-      } else {
-        left = mid + 1;
-      }
+  if (await tokenCounter(messages) <= trimTokensToSummarize) return messages;
+  let left = 0;
+  let right = messages.length;
+  let cutoff = messages.length;
+  const maxIterations = Math.floor(Math.log2(messages.length)) + 1;
+  for (let index = 0; index < maxIterations; index += 1) {
+    if (left >= right) break;
+    const mid = Math.floor((left + right) / 2);
+    if (await tokenCounter(messages.slice(mid)) <= trimTokensToSummarize) {
+      cutoff = mid;
+      right = mid;
+    } else {
+      left = mid + 1;
     }
-    if (cutoff === messages.length) cutoff = left;
-    if (cutoff >= messages.length) cutoff = messages.length - 1;
-    return messages.slice(Math.max(cutoff, 0));
-  } catch {
-    return messages.slice(-15);
   }
+  if (cutoff === messages.length) cutoff = left;
+  if (cutoff >= messages.length) cutoff = messages.length - 1;
+  return messages.slice(Math.max(cutoff, 0));
 }
