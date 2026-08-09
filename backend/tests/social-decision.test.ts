@@ -8,15 +8,16 @@ import { AIMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
 
 import { createConversationLayer } from "../src/layer.js";
-import type { LongTermMemory } from "../src/long-term-memory/index.js";
+import {
+  longTermMemoryUserIdFromTelegramSender,
+  conversationThreadIdFromTelegramPrivateChat,
+} from "../src/identifiers.js";
 import { SYSTEM_PROMPT } from "../src/personality.js";
 import { createSocialDecisionMaker, type SocialDecisionMaker } from "../src/social-decision.js";
 import { createObservedTelegramMessage, hasDirectMention } from "../src/telegram-observation.js";
 import { deliverGeneratedTurn } from "../src/telegram-delivery.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
-import {
-  conversationThreadIdFromTelegramPrivateChat,
-} from "../src/identifiers.js";
+import { staticMemory } from "./memory-fixtures.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(77);
 
@@ -195,8 +196,10 @@ test("a planner exception fails safely to silence instead of crashing", async ()
 
 test("recalled memory reaches the planner before silence decision", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-recall-"));
-  const memory: LongTermMemory = { search: async () => [{ text: "важлива обіцянка" }],
-    rememberUserMessage: async () => undefined, deleteAll: async () => undefined };
+  const memory = staticMemory(new Map([
+    [longTermMemoryUserIdFromTelegramSender(88).toPersistenceKey(),
+      [{ text: "важлива обіцянка" }]],
+  ]));
   let recalled = "";
   const planner: SocialDecisionMaker = { decide: async (context) => {
     recalled = context.participantMemories.flatMap(({ memories }) =>
@@ -205,7 +208,7 @@ test("recalled memory reaches the planner before silence decision", async () => 
   } };
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner,
-    longTermMemory: memory });
+    lazyMemory: memory });
   try {
     await layer.respond({ threadId, message: message(), hevroniaSender: { kind: "user", id: 999 } });
     assert.equal(recalled, "важлива обіцянка");

@@ -11,7 +11,7 @@ import { scenarios, smokeScenarioIds } from "../scripts/conversations/catalog.js
 import { runScenariosConcurrently } from "../scripts/conversations/orchestrator.js";
 import { runScenario } from "../scripts/conversations/runner.js";
 import { scenarioHeaderLines } from "../scripts/conversations/scenario-execution.js";
-import { SeededLongTermMemory } from "../scripts/conversations/seeded-long-term-memory.js";
+import { PreseededLazyMemory } from "../scripts/conversations/preseeded-lazy-memory.js";
 import { completedScenarioResult } from "../scripts/conversations/types.js";
 import type { ConversationLayer } from "../src/conversation-types.js";
 import { GeneratedTurn } from "../src/generated-turn.js";
@@ -134,6 +134,7 @@ test("runner alternates messages, persists increasing reply IDs, records silence
     },
     recordDeliveredMessage: () => undefined,
     getMessages: () => Promise.resolve([]),
+    warmParticipant: () => undefined,
     close: () => { closeCount += 1; return Promise.resolve(); },
   };
   const transcriptLengths: number[] = [];
@@ -162,6 +163,7 @@ test("runner respects round limit and gives each run an empty simulator transcri
   const makeLayer = (): ConversationLayer => ({
     respond: () => Promise.resolve(GeneratedTurn.fromSilence()),
     recordDeliveredMessage: () => undefined, getMessages: () => Promise.resolve([]),
+    warmParticipant: () => undefined,
     close: () => Promise.resolve(),
   });
   const dependencies = {
@@ -196,6 +198,7 @@ test("runner returns a failed result that keeps the partial transcript", async (
     },
     recordDeliveredMessage: () => undefined,
     getMessages: () => Promise.resolve([]),
+    warmParticipant: () => undefined,
     close: () => { closeCount += 1; return Promise.resolve(); },
   };
   const result = await runScenario(firstScenario, 5, {
@@ -248,16 +251,24 @@ test("scenario execution is concurrent: scenario B begins before scenario A fini
   assert.equal(results[1]?.status, "completed");
 });
 
-test("seeded long-term memory returns its facts on search and ignores writes", async () => {
-  const memory = new SeededLongTermMemory(["fact one", "fact two", "fact three"]);
+test("preseeded long-term memory is immediately available and ignores background hooks", async () => {
+  const memory = new PreseededLazyMemory(["fact one", "fact two", "fact three"]);
   const userId = longTermMemoryUserIdFromTelegramSender(7_001);
+  const stranger = longTermMemoryUserIdFromTelegramSender(999);
   const threadId = conversationThreadIdFromTelegramPrivateChat(7_003);
-  assert.deepEqual(await memory.search(userId, "query", 2),
-    [{ text: "fact one" }, { text: "fact two" }]);
-  assert.equal((await memory.search(userId, "query", 10)).length, 3);
-  await memory.rememberUserMessage(userId, threadId, "привіт");
-  await memory.deleteAll(userId);
-  assert.equal((await memory.search(userId, "query", 10)).length, 3);
+  const turn = memory.beginTurn();
+  assert.deepEqual(turn.snapshot.memoriesFor(userId),
+    [{ text: "fact one" }, { text: "fact two" }, { text: "fact three" }]);
+  assert.deepEqual(turn.snapshot.memoriesFor(stranger), []);
+  memory.warmUser(userId);
+  memory.observeUserMessage(userId, threadId, "привіт");
+  turn.release();
+  turn.release();
+  await memory.close();
+  const later = memory.beginTurn();
+  assert.deepEqual(later.snapshot.memoriesFor(userId),
+    [{ text: "fact one" }, { text: "fact two" }, { text: "fact three" }]);
+  later.release();
 });
 
 test("scenario header prints seeded long-term memory before the conversation", () => {
@@ -274,7 +285,7 @@ test("scenario header prints seeded long-term memory before the conversation", (
 
 test("seeded long-term memory reaches the planner context", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-seeded-memory-"));
-  const memory = new SeededLongTermMemory(["Марина prefers unsweetened coffee."]);
+  const memory = new PreseededLazyMemory(["Марина prefers unsweetened coffee."]);
   let recalled = "";
   const planner: SocialDecisionMaker = { decide: async (context) => {
     recalled = context.participantMemories.flatMap(({ memories }) =>
@@ -289,7 +300,7 @@ test("seeded long-term memory reaches the planner context", async () => {
   };
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner,
-    longTermMemory: memory });
+    lazyMemory: memory });
   try {
     await layer.respond({ threadId, message, hevroniaSender: { kind: "user", id: 7_002 } });
     assert.equal(recalled, "Марина prefers unsweetened coffee.");

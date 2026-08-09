@@ -7,12 +7,12 @@ import { test } from "node:test";
 import { fakeModel } from "@langchain/core/testing";
 
 import { createConversationLayer } from "../src/layer.js";
-import type { LongTermMemory } from "../src/long-term-memory/index.js";
+import type { LazyLongTermMemory } from "../src/long-term-memory/runtime.js";
 import { createObservedTelegramMessage, telegramSenderIdentity } from "../src/telegram-observation.js";
 import { renderTelegramEvent } from "../src/telegram-event.js";
 import { conversationThreadIdFromTelegramGroupChat } from "../src/identifiers.js";
 
-test("user and send-as-chat identities remain distinct and chat senders skip Mem0", async () => {
+test("user and send-as-chat identities remain distinct and chat senders skip memory work", async () => {
   assert.deepEqual(telegramSenderIdentity(777), { kind: "user", id: 777 });
   assert.deepEqual(telegramSenderIdentity(777, -500), { kind: "chat", id: -500 });
   const user = createObservedTelegramMessage({ messageId: 1,
@@ -26,14 +26,19 @@ test("user and send-as-chat identities remain distinct and chat senders skip Mem
   assert.match(renderTelegramEvent(user), /telegram-user:101/);
   assert.match(renderTelegramEvent(sendAsChat), /telegram-chat:-500/);
   const calls: string[] = [];
-  const memory: LongTermMemory = {
-    search: async (id) => { calls.push(`search:${id.toPersistenceKey()}`); return []; },
-    rememberUserMessage: async (id) => { calls.push(`write:${id.toPersistenceKey()}`); },
-    deleteAll: async () => undefined,
+  const memory: LazyLongTermMemory = {
+    beginTurn() {
+      return { snapshot: { memoriesFor: () => [] }, release() {} };
+    },
+    warmUser: (userId) => { calls.push(`warm:${userId.toPersistenceKey()}`); },
+    observeUserMessage: (userId, _threadId, _text) => {
+      calls.push(`observe:${userId.toPersistenceKey()}`);
+    },
+    close: async () => undefined,
   };
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-sender-"));
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
-    model: fakeModel(), summaryModel: fakeModel(), longTermMemory: memory,
+    model: fakeModel(), summaryModel: fakeModel(), lazyMemory: memory,
     decisionMaker: { decide: async () => ({ action: "silence" }) } });
   try {
     const threadId = conversationThreadIdFromTelegramGroupChat(-10);
@@ -41,9 +46,11 @@ test("user and send-as-chat identities remain distinct and chat senders skip Mem
       hevroniaSender: { kind: "user", id: 999 } });
     await layer.respond({ threadId, message: sendAsChat,
       hevroniaSender: { kind: "user", id: 999 } });
+    layer.warmParticipant({ kind: "chat", id: -700 });
+    layer.warmParticipant({ kind: "user", id: 101 });
     await layer.close();
-    assert.deepEqual(calls, ["search:telegram-user:101", "write:telegram-user:101",
-      "search:telegram-user:101"]);
+    assert.ok(calls.includes("observe:telegram-user:101"));
+    assert.ok(calls.includes("warm:telegram-user:101"));
     assert.ok(calls.every((call) => !call.includes("telegram-chat")));
   } finally {
     rmSync(dir, { recursive: true, force: true });
