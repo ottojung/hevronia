@@ -159,7 +159,8 @@ The user's message is offered to long-term memory exactly once per incoming
 message, regardless of whether Хевронія replies, stays silent, generation
 fails, or Telegram delivery later fails. Telegram delivery success no longer
 controls whether a message becomes memory evidence, and Хевронія's generated
-text is never person-scoped memory evidence.
+text is never person-scoped memory evidence. Bot-authored text participates in
+the conversation but is not person-scoped memory evidence.
 
 Each incoming message is persisted and compacted before the social decision.
 Silence is a first-class outcome. Generated outgoing text is persisted only after
@@ -174,10 +175,14 @@ Memory-write failures are logged without delaying or invalidating a delivered
 reply, and shutdown drains pending memory work with a bounded wait.
 
 Mem0 work runs on a single low-priority background worker that starts nothing
-while a foreground turn is active, waits briefly after foreground activity
-drops, and coalesces topical retrieval to the newest query while never
-coalescing message ingestion. The in-process cache is bounded by LRU-style
-eviction, which never deletes persistent Mem0 memory.
+while a foreground turn is active, waits one 100 ms grace period after
+foreground activity drops (not between jobs), and coalesces topical retrieval
+to the newest already-ingested query while never coalescing message ingestion.
+Topical searches run only after the relevant ingestion attempt finishes, still
+entirely in the background. The in-process cache is bounded by LRU-style
+eviction, which never deletes persistent Mem0 memory. Shutdown uses an explicit
+open/draining/closed lifecycle: a timed-out close discards jobs that never
+started, and releasing a foreground lease after close never restarts anything.
 
 Admission is deliberately conservative, retrieval is bounded, and there is no
 arbitrary size cap. Expiration and garbage collection are deferred until real

@@ -83,7 +83,11 @@ The user's observed message is offered to long-term memory exactly once per
 `respond()` call — regardless of whether Хевронія replies, stays silent,
 generation fails, or Telegram delivery later fails. Telegram delivery success
 no longer controls whether an incoming message becomes memory evidence.
-Хевронія's generated text is never person-scoped memory evidence.
+Хевронія's generated text is never person-scoped memory evidence. Bot-authored
+text enters the canonical conversation and normal social processing but is not
+person-scoped memory evidence: the transport marks `senderIsBot` on the
+`RespondInput` boundary, and the runtime never observes or warms that sender
+from the first-message path.
 
 ### The persistent store
 
@@ -121,21 +125,44 @@ lanes:
 - `learned` — memories returned by successful Mem0 ingestion, newest first,
   capped at 8.
 
-A model-visible memory list combines lanes in order topical → learned →
+A model-visible memory list combines lanes in order learned → topical →
 baseline, deduplicates by memory ID then by normalized text, and is capped at
 eight memories. Only the memory text is rendered to the model; IDs and scores
-are cache bookkeeping.
+are cache bookkeeping. Learned facts (extracted from the most recently
+processed actual messages) take precedence over broader retrieved context and
+general baseline fallback.
+
+### Topical retrieval follows ingestion
+
+`observeUserMessage()` queues the actual message for ingestion; it never queues
+a topical search directly. The ingestion job passes the message to Mem0 and,
+in a `finally`, requests a topical refresh — so a correcting message is
+retrieved only after Mem0 has learned the correction. The refresh marks the
+newest ingested message as the pending topical query and coalesces: at most one
+scheduled/running topical search exists per user, a not-yet-ingested message
+can never become the query, and a running search is never cancelled.
 
 ### The background queue
 
 A single low-priority worker (concurrency 1) owns all Mem0 calls. No new job
 starts while any foreground lease exists; once foreground activity drops to
-zero the queue waits 100 ms before starting the next job, and a new turn
-during that window postpones the start. An already-running Mem0 operation is
-never cancelled when a new turn begins. Provider failures are caught and
-logged, never propagated into conversational code. Shutdown stops accepting
-new jobs and drains for at most five seconds, then logs anything unfinished;
-no normal turn ever waits for that drain.
+zero the queue waits one 100 ms grace period before the first job, and a new
+turn during that window postpones the start. After a job has started, the next
+queued job begins immediately (no per-job delay) until the queue empties or a
+foreground turn begins. An already-running Mem0 operation is never cancelled
+when a new turn begins. Provider failures are caught and logged, never
+propagated into conversational code.
+
+### Shutdown lifecycle
+
+Shutdown is an explicit `open → draining → closed` lifecycle. `close()`
+enters `draining`, cancels any pending grace timer, starts queued work
+immediately (no grace period), and waits at most five seconds. On success it
+transitions to `closed`; on timeout it transitions to `closed`, discards the
+queued jobs that never started, and logs the counts. An already-running Mem0
+call is allowed to finish but cannot start another job after terminal close,
+and releasing a foreground lease after `close()` has returned never restarts
+anything. `close()` is idempotent.
 
 ### Cache bounds and warmup
 
