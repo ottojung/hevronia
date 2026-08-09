@@ -140,13 +140,15 @@ Models never experience the conversation as users messaging an assistant. The
 dream renderer (`backend/src/dream-render.ts`) presents every canonical event as
 something that appeared inside Хевронія's dream through Telegram: imagined dream
 characters produce visible messages, and Хевронія herself chooses which Telegram
-messages to make appear. Stable identities use ordinary spreadsheet language
-("in your spreadsheet this character is user 42"; "channel 123" for chat/channel
-senders) instead of internal keys. Raw canonical JSON, `telegram-user:` /
-`telegram-chat:` prefixes, candidate indexes, and memory-store vocabulary never
-reach the social-decision, realization, or summary models. The planner selects a
-reply by eligible Telegram message ID and describes her private interpretation,
-active desire, and desired outcome — not assistant speech-act metadata.
+messages to make appear. Stable identities use ordinary notebook language
+("In your notebook you labelled it as "character 42""; "channel 500" for
+chat/channel sources) instead of internal keys, and Telegram message IDs are
+never shown to a model. Raw canonical JSON, `telegram-user:` / `telegram-chat:`
+prefixes, candidate indexes, message IDs, and memory-store vocabulary never
+reach the social-decision, realization, or summary models. The planner chooses
+an ephemeral per-turn reply choice (A, B, C) and describes her private
+interpretation, active desire, and desired outcome — not assistant speech-act
+metadata and not a message ID.
 
 LangGraph owns thread-scoped conversational continuity under
 `telegram-private:<chat id>` or `telegram-group:<chat id>` and persists it in the ignored

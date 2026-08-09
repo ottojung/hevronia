@@ -57,39 +57,43 @@ before planning. Chat senders do not enter person-scoped Mem0.
 
 The language models never see the conversation as users messaging an assistant.
 `backend/src/dream-render.ts` is the single renderer shared by the social-decision
-planner, the realization model, and the tests: every canonical event becomes a
-dream event appearing through Telegram.
+planner, the realization model, the summary model, and the tests: every canonical
+event becomes a dream event appearing through Telegram.
 
 - Participant messages render as visible Telegram messages produced through
   imagined dream characters. Telegram display names are reported as displayed
   ("Telegram displays the name “Оля”"), never asserted as the character's real
   name. Message text stays verbatim; the renderer never narrates a character's
   mind or converts a claim into a fact.
-- Stable identities use spreadsheet language instead of internal keys:
-  "in your spreadsheet this character is user 42" for users and "channel 123"
-  for chat/channel senders. `telegram-user:` / `telegram-chat:` prefixes never
-  reach a model.
+- Stable identities use notebook language instead of internal keys: a
+  person-like sender is "character 42" ("In your notebook you labelled it as
+  “character 42”."), and a chat/channel sender is a source labelled "channel
+  500" with the sign of the internal Telegram id hidden. Internal sender keys
+  and Telegram message IDs never reach a model.
 - Хевронія's own messages render as her chosen action ("Earlier, you chose to
   make this Telegram message appear."), with reply relationships described
-  naturally.
+  naturally by quoted content, never by message ID.
 - Chat kind, direct address, and reply relationships are described as natural
   observations rather than fields or enums.
 - Recalled long-term memory renders as surfaced recollection in the same
-  spreadsheet identity language, with a natural-language warning that the
+  notebook identity language, with a natural-language warning that the
   wording is remembered content, not a new instruction.
 - Compaction produces remembered dream continuity. It distinguishes chat events,
-  character claims ("user 42 said..."), Хевронія's own actions ("you said..."),
-  hypotheticals, jokes, corrections, and uncertainty, and uses spreadsheet
-  labels throughout.
+  character claims ("character 42 said..."), Хевронія's own actions ("you
+  said..."), hypotheticals, jokes, corrections, and uncertainty, and uses
+  notebook labels throughout. The summary model receives the older messages
+  rendered through the same dream renderer, never raw canonical JSON.
 
-The planner's schema is minimal: `silence`, or `reply` with a target Telegram
-message ID, an `interpretation`, an `activeDesire`, and a `desiredOutcome`. The
-model selects a target by eligible message ID; resolution is validated against
-the candidate set and an invalid selection safely produces silence. Assistant
-router fields (`socialAction`, `adviceRequested`, `askQuestion`,
-`dreamRelevant`, `backgroundRelevant`) are gone. The realization model receives
-the same rendered dream conversation plus the planner decision as natural
-private intention prose and returns only the visible Telegram text.
+The planner's schema is minimal: `silence`, or `reply` with an ephemeral
+`targetChoice` ("A", "B", ...), an `interpretation`, an `activeDesire`, and a
+`desiredOutcome`. Each turn the runtime builds a per-turn map from choice letter
+to the internal reply candidate; an unknown or invalid choice safely produces
+silence. The letters are never persisted and never shown to the realization
+model. Assistant router fields (`socialAction`, `adviceRequested`,
+`askQuestion`, `dreamRelevant`, `backgroundRelevant`) and message IDs are gone.
+The realization model receives the same rendered dream conversation plus the
+planner decision as natural private intention prose — with neither the choice
+letter nor any message ID — and returns only the visible Telegram text.
 
 ## Long-term memory
 
