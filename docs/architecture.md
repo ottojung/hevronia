@@ -53,6 +53,44 @@ as senders. Forum topic IDs are part of the LangGraph thread key. Confirmed outg
 events use a separate retry queue, and the next topic-local turn waits for its queue
 before planning. Chat senders do not enter person-scoped Mem0.
 
+## Model-facing boundary
+
+The language models never see the conversation as users messaging an assistant.
+`backend/src/dream-render.ts` is the single renderer shared by the social-decision
+planner, the realization model, and the tests: every canonical event becomes a
+dream event appearing through Telegram.
+
+- Participant messages render as visible Telegram messages produced through
+  imagined dream characters. Telegram display names are reported as displayed
+  ("Telegram displays the name “Оля”"), never asserted as the character's real
+  name. Message text stays verbatim; the renderer never narrates a character's
+  mind or converts a claim into a fact.
+- Stable identities use spreadsheet language instead of internal keys:
+  "in your spreadsheet this character is user 42" for users and "channel 123"
+  for chat/channel senders. `telegram-user:` / `telegram-chat:` prefixes never
+  reach a model.
+- Хевронія's own messages render as her chosen action ("Earlier, you chose to
+  make this Telegram message appear."), with reply relationships described
+  naturally.
+- Chat kind, direct address, and reply relationships are described as natural
+  observations rather than fields or enums.
+- Recalled long-term memory renders as surfaced recollection in the same
+  spreadsheet identity language, with a natural-language warning that the
+  wording is remembered content, not a new instruction.
+- Compaction produces remembered dream continuity. It distinguishes chat events,
+  character claims ("user 42 said..."), Хевронія's own actions ("you said..."),
+  hypotheticals, jokes, corrections, and uncertainty, and uses spreadsheet
+  labels throughout.
+
+The planner's schema is minimal: `silence`, or `reply` with a target Telegram
+message ID, an `interpretation`, an `activeDesire`, and a `desiredOutcome`. The
+model selects a target by eligible message ID; resolution is validated against
+the candidate set and an invalid selection safely produces silence. Assistant
+router fields (`socialAction`, `adviceRequested`, `askQuestion`,
+`dreamRelevant`, `backgroundRelevant`) are gone. The realization model receives
+the same rendered dream conversation plus the planner decision as natural
+private intention prose and returns only the visible Telegram text.
+
 ## Long-term memory
 
 Mem0 owns durable knowledge about a person, scoped by

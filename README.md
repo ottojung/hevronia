@@ -119,7 +119,7 @@ Both connect to Telegram via long polling (no webhooks). On startup the bot:
 4. verifies the identity matches `Хевронія` / `@hevronia_bot`;
 5. starts long polling for message updates;
 6. observes each private/group text message, makes a structured social decision,
-   and either remains silent or sends a targeted reply.
+   and either remains silent or sends a targeted reply to an eligible message.
 
 It shuts down gracefully on `SIGINT`/`SIGTERM`, including a bounded wait for
 pending long-term-memory writes. While generating a reply the bot sends a
@@ -129,10 +129,24 @@ Telegram `typing` chat action.
 
 The model receives three distinct context layers:
 
-1. recent thread messages verbatim;
-2. a rolling summary of older thread history;
+1. recent thread messages rendered as dream events;
+2. a rolling summary of older thread history, remembered as earlier dream conversation;
 3. up to eight semantically relevant long-term facts from an in-process cache
    snapshot, never added to the LangGraph checkpoint or summary.
+
+### Model-facing ontology
+
+Models never experience the conversation as users messaging an assistant. The
+dream renderer (`backend/src/dream-render.ts`) presents every canonical event as
+something that appeared inside Хевронія's dream through Telegram: imagined dream
+characters produce visible messages, and Хевронія herself chooses which Telegram
+messages to make appear. Stable identities use ordinary spreadsheet language
+("in your spreadsheet this character is user 42"; "channel 123" for chat/channel
+senders) instead of internal keys. Raw canonical JSON, `telegram-user:` /
+`telegram-chat:` prefixes, candidate indexes, and memory-store vocabulary never
+reach the social-decision, realization, or summary models. The planner selects a
+reply by eligible Telegram message ID and describes her private interpretation,
+active desire, and desired outcome — not assistant speech-act metadata.
 
 LangGraph owns thread-scoped conversational continuity under
 `telegram-private:<chat id>` or `telegram-group:<chat id>` and persists it in the ignored
