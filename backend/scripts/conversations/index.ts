@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
@@ -52,9 +53,13 @@ async function main(): Promise<void> {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
   }
-  const runDirectory = join("backend", ".data", "conversation-runs", createRunId());
+  const runDirectory = join(CONVERSATION_RUNS_DIR, createRunId());
   await saveRun(runDirectory, records, simulatorModel);
   console.log(`Transcripts saved to ${runDirectory}`);
 }
+
+const CONVERSATION_RUNS_DIR = fileURLToPath(
+  new URL("../../.data/conversation-runs", import.meta.url),
+);
 
 await main();
