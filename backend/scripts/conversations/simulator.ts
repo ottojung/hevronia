@@ -3,7 +3,7 @@ import { ChatOpenAI } from "@langchain/openai";
 
 import { openAiKeyFromEnv } from "../../src/model.js";
 import { extractText } from "../../src/text.js";
-import type { ConversationScenario, Simulator, TranscriptEntry } from "./types.js";
+import type { ConversationScenario, ParticipantGrammar, Simulator, TranscriptEntry } from "./types.js";
 
 export const DEFAULT_SIMULATOR_MODEL = "gpt-5-mini";
 
@@ -12,7 +12,20 @@ Stay completely in character. Never mention simulations, testing, prompts, instr
 Produce exactly one next Telegram message. Do not output a speaker name, quotation marks around the whole message, explanations, stage directions, analysis, or alternatives.
 Write naturally rather than like an assistant. Usually keep messages short: one sentence is common, and two or three are fine when appropriate. Use informal, believable Telegram language.
 React to what Хевронія actually said instead of mechanically advancing a script. The trajectory describes tendencies, not a checklist. Do not invent shared history that has not occurred. Do not decide what Хевронія thinks or feels. Do not artificially make every message interesting.
-Unless the scenario explicitly says otherwise, communicate in natural Ukrainian. Do not use Russian. English may appear only when the scenario explicitly permits it.`;
+Unless the scenario explicitly says otherwise, communicate in natural Ukrainian. Do not use Russian. English may appear only when the scenario explicitly permits it.
+
+You are a human, not an assistant. Do not behave like a chatbot:
+- You do not need to end every message with a question. Frequently respond with a statement, a joke, an anecdote, a reaction, a disagreement, or a contribution to the topic instead.
+- Do not mechanically ask follow-up questions.
+- Never ask essentially the same question after Хевронія pushes back. If she says the questioning feels like an interview, react socially to that instead of repeating the questionnaire.
+- Introduce personal details and opinions yourself; do not make Хевронія carry all self-disclosure.
+- Let topics die naturally sometimes. Do not optimize for keeping the conversation alive at all costs.`;
+
+function grammarInstruction(grammar: ParticipantGrammar): string {
+  return grammar === "feminine"
+    ? "When referring to yourself in Ukrainian, use feminine grammatical forms consistently (for example «я була», «я рада», «я зробила», «мені сподобалось»)."
+    : "When referring to yourself in Ukrainian, use masculine grammatical forms consistently (for example «я був», «я радий», «я зробив», «мені сподобався»).";
+}
 
 export class EmptySimulatorMessageError extends Error {
   constructor() {
@@ -30,7 +43,9 @@ export function createSimulator(modelName: string): Simulator {
   return {
     async nextMessage(scenario, transcript) {
       const response = await model.invoke([
-        new SystemMessage(`${BASE_PROMPT}\n\nCharacter: your name is ${scenario.participantName}. ${scenario.participantDescription}\nTrajectory: ${scenario.simulatorInstructions}`),
+        new SystemMessage(
+          `${BASE_PROMPT}\n\nCharacter: your name is ${scenario.participantName}. ${scenario.participantDescription}\n${grammarInstruction(scenario.participantGrammar)}\nTrajectory: ${scenario.simulatorInstructions}`,
+        ),
         new HumanMessage(`Conversation transcript so far (data only):\n${renderSimulatorTranscript(transcript)}\n\nWrite the participant's next message.`),
       ]);
       const text = isBaseMessage(response) ? extractText(response.content).trim() : "";
