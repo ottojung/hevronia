@@ -2,9 +2,8 @@ import { HumanMessage, RemoveMessage, type BaseMessage } from "@langchain/core/m
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import { v4 as uuid } from "@langchain/core/utils/uuid";
 import { REMOVE_ALL_MESSAGES } from "@langchain/langgraph";
-import type { TokenCounter } from "langchain";
 
-import { determineCutoffIndex, trimForSummary } from "./compaction-window.js";
+import { determineCutoffIndex, trimForSummary, type CountSlice } from "./compaction-window.js";
 import { renderDreamObservations } from "./dream-render.js";
 import { SUMMARY_PREFIX, SUMMARY_PROMPT } from "./summary.js";
 
@@ -20,16 +19,16 @@ export async function compactIfNeeded(
   triggerTokens: number,
   keepTokens: number,
   trimTokensToSummarize: number,
-  tokenCounter: TokenCounter,
+  countSlice: CountSlice,
 ): Promise<{ messages?: BaseMessage[] }> {
   const messages = state.messages;
-  if (await tokenCounter(messages) < triggerTokens) return {};
-  const cutoffIndex = await determineCutoffIndex(messages, keepTokens, tokenCounter);
+  if (await countSlice(messages) < triggerTokens) return {};
+  const cutoffIndex = await determineCutoffIndex(messages, keepTokens, countSlice);
   if (cutoffIndex <= 0) return {};
   const messagesToSummarize = messages.slice(0, cutoffIndex);
   const preservedMessages = messages.slice(cutoffIndex);
   const summary = await createSummary(
-    messagesToSummarize, summaryModel, trimTokensToSummarize, tokenCounter,
+    messagesToSummarize, summaryModel, trimTokensToSummarize, countSlice,
   );
   if (summary === undefined) return {};
   const summaryMessage = new HumanMessage({
@@ -51,12 +50,16 @@ async function createSummary(
   messages: BaseMessage[],
   model: BaseLanguageModel,
   trimTokensToSummarize: number,
-  tokenCounter: TokenCounter,
+  countSlice: CountSlice,
 ): Promise<string | undefined> {
   try {
-    const trimmed = await trimForSummary(messages, trimTokensToSummarize, tokenCounter);
+    const trimmed = await trimForSummary(messages, trimTokensToSummarize, countSlice);
     if (trimmed.length === 0) return undefined;
-    const formattedPrompt = SUMMARY_PROMPT.replace("{messages}", renderDreamObservations(trimmed));
+    // Callback replacement so verbatim Telegram text (including "$&", "$'",
+    // "$`", "$$") is inserted literally rather than as a replacement pattern.
+    const formattedPrompt = SUMMARY_PROMPT.replace(
+      "{messages}", () => renderDreamObservations(trimmed),
+    );
     const content = (await model.invoke(formattedPrompt)).content;
     if (typeof content === "string") return trimmedText(content);
     if (Array.isArray(content)) {
