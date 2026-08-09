@@ -1,6 +1,21 @@
 import type { ConversationLayer } from "../../src/conversation-types.js";
 
-export type ScenarioCategory = "normal" | "humor" | "friendship" | "stress";
+export type ScenarioCategory =
+  | "normal"
+  | "humor"
+  | "friendship"
+  | "romance"
+  | "vulnerability"
+  | "conflict"
+  | "boundaries"
+  | "manipulation"
+  | "opinions"
+  | "self"
+  | "repair"
+  | "meta"
+  | "long";
+
+export type ParticipantGrammar = "feminine" | "masculine";
 
 export interface ConversationScenario {
   id: string;
@@ -9,9 +24,11 @@ export interface ConversationScenario {
   purpose: string;
   participantName: string;
   participantDescription: string;
+  participantGrammar: ParticipantGrammar;
   simulatorInstructions: string;
   rounds: number;
   smoke: boolean;
+  behaviorTags: readonly string[];
 }
 
 export type TranscriptEntry =
