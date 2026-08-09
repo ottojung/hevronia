@@ -253,3 +253,13 @@ memory, and transcript. During a run the terminal only shows short
 each complete transcript is printed as one uninterrupted block in catalog
 order, and the run index summarizes every scenario by category with its
 behavior tags.
+
+Scenarios may seed durable long-term memory about their participant via the
+scenario's `longTermMemory` field, so a conversation can begin with Хевронія
+already knowing someone (for example a friend who can ask more personal
+questions and expect more answers). When a scenario has seeded memory, it is
+printed at the top of that scenario's transcript block so the source of her
+knowledge is visible. Scenarios cover broad social dynamics plus an
+adversarial/meta family: walls of text, speakers of other languages, feigned
+hurt, technical questions, instruction overrides, memory quizzes, character
+sheet requests, direct commands, and ontology challenges.
