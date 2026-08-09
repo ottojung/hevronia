@@ -114,7 +114,11 @@ test("runner alternates messages, persists increasing reply IDs, records silence
   const firstScenario = scenarios[0];
   if (firstScenario === undefined) assert.fail("catalog is empty");
   const persisted: number[] = [];
-  const outcomes: readonly ("reply" | "silence")[] = ["reply", "silence", "reply", "silence", "silence"];
+  const outcomes: readonly ("reply" | "silence")[] = [
+    "reply", "silence", "reply",
+    "silence", "silence", "silence", "silence", "silence",
+    "silence", "silence", "silence", "silence", "silence",
+  ];
   let responseIndex = 0;
   let closeCount = 0;
   const layer: ConversationLayer = {
@@ -133,7 +137,7 @@ test("runner alternates messages, persists increasing reply IDs, records silence
     close: () => { closeCount += 1; return Promise.resolve(); },
   };
   const transcriptLengths: number[] = [];
-  const result = await runScenario(firstScenario, 9, {
+  const result = await runScenario(firstScenario, 15, {
     createLayer: () => layer,
     simulator: { nextMessage: (_scenario, transcript) => {
       transcriptLengths.push(transcript.length);
@@ -142,11 +146,11 @@ test("runner alternates messages, persists increasing reply IDs, records silence
     print: () => undefined,
   });
   if (result.status !== "completed") assert.fail("expected a completed scenario");
-  assert.equal(result.roundsCompleted, 5);
-  assert.equal(result.stoppingReason, "stopped after two consecutive silences");
-  assert.deepEqual(transcriptLengths, [0, 2, 4, 6, 8]);
+  assert.equal(result.roundsCompleted, 13);
+  assert.equal(result.stoppingReason, "stopped after several consecutive silences");
+  assert.deepEqual(transcriptLengths, [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24]);
   assert.deepEqual(persisted, [2, 5]);
-  assert.equal(result.transcript.length, 10);
+  assert.equal(result.transcript.length, 26);
   assert.deepEqual(result.transcript[3], { speaker: "hevronia", silence: true });
   assert.equal(closeCount, 1);
 });
