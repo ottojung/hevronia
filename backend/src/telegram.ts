@@ -2,13 +2,13 @@ import { Bot } from "grammy";
 
 import { recordDeliveredMessage, respond } from "./respond.js";
 import { conversationThreadIdFromTelegramChat } from "./identifiers.js";
+import { installMembershipWarmup } from "./telegram-membership.js";
 import { deliverFallbackMessage, deliverGeneratedTurn } from "./telegram-delivery.js";
 import { logBotIdentity, tokenFromEnv } from "./telegram-config.js";
 import { createObservedTelegramMessage, hasDirectMention, telegramDisplayName, telegramSenderIdentity } from "./telegram-observation.js";
 import { installTelegramRetry } from "./telegram-retry.js";
 import { isConversationThreadPersistenceError } from "./pending-conversation-writes.js";
 import type { TelegramSenderIdentity } from "./telegram-event.js";
-export { tokenFromEnv } from "./telegram-config.js";
 
 export async function startBot(): Promise<void> {
   const bot = new Bot(tokenFromEnv());
@@ -17,6 +17,8 @@ export async function startBot(): Promise<void> {
 
   const me = await bot.api.getMe();
   logBotIdentity(me);
+
+  installMembershipWarmup(bot);
 
   bot.on("message:text", async (ctx) => {
     const updateId = ctx.update.update_id;
@@ -100,7 +102,7 @@ export async function startBot(): Promise<void> {
 
   console.log("Starting long polling...");
   await bot.start({
-    allowed_updates: ["message"],
+    allowed_updates: ["message", "my_chat_member", "chat_member"],
     onStart: (botInfo) => { console.log(`Long polling started; listening as @${botInfo.username}`); },
   });
   console.log("Long polling stopped.");
