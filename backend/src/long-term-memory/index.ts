@@ -2,12 +2,15 @@ import { fileURLToPath } from "node:url";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
-import { Memory, type MemoryConfig, type MemoryItem } from "mem0ai/oss";
+import { Memory, type MemoryConfig } from "mem0ai/oss";
 
 import { LONG_TERM_MEMORY_POLICY, MEMORY_POLICY_VERSION } from "./policy.js";
 import type { ConversationThreadId, LongTermMemoryUserId } from "../identifiers.js";
+import { memoryRecordsFromItems, type MemoryRecord } from "./store-mapping.js";
 
-export const LONG_TERM_MEMORY_TOP_K = 5;
+export { memoryRecordsFromItems } from "./store-mapping.js";
+export type { MemoryRecord } from "./store-mapping.js";
+
 export const MEMORY_MODEL = "gpt-4o-mini-2024-07-18";
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSION = 1536;
@@ -18,17 +21,19 @@ export const VECTOR_DB_PATH = fileURLToPath(
   new URL("../../.data/mem0/vectors-v1.db", import.meta.url),
 );
 
-export interface RecalledMemory {
-  text: string;
-}
+export interface LongTermMemoryStore {
+  search(
+    userId: LongTermMemoryUserId,
+    query: string,
+    topK: number,
+  ): Promise<MemoryRecord[]>;
 
-export interface LongTermMemory {
-  search(userId: LongTermMemoryUserId, query: string, topK: number): Promise<RecalledMemory[]>;
   rememberUserMessage(
     userId: LongTermMemoryUserId,
     threadId: ConversationThreadId,
     userMessage: string,
-  ): Promise<void>;
+  ): Promise<MemoryRecord[]>;
+
   deleteAll(userId: LongTermMemoryUserId): Promise<void>;
 }
 
@@ -56,7 +61,7 @@ export function createMem0Config(apiKey: string): MemoryConfig {
   };
 }
 
-export function createMem0LongTermMemory(apiKey: string): LongTermMemory {
+export function createMem0Store(apiKey: string): LongTermMemoryStore {
   mkdirSync(dirname(HISTORY_DB_PATH), { recursive: true });
   const memory = new Memory(createMem0Config(apiKey));
   console.log("Long-term memory configured using local SQLite storage");
@@ -67,10 +72,10 @@ export function createMem0LongTermMemory(apiKey: string): LongTermMemory {
         topK,
         filters: { user_id: userId.toPersistenceKey() },
       });
-      return result.results.map((item: MemoryItem) => ({ text: item.memory }));
+      return memoryRecordsFromItems(result.results);
     },
     async rememberUserMessage(userId, threadId, userMessage) {
-      await memory.add(
+      const result = await memory.add(
         [{ role: "user", content: userMessage }],
         {
           userId: userId.toPersistenceKey(),
@@ -81,6 +86,7 @@ export function createMem0LongTermMemory(apiKey: string): LongTermMemory {
           },
         },
       );
+      return memoryRecordsFromItems(result.results);
     },
     async deleteAll(userId) {
       await memory.deleteAll({ userId: userId.toPersistenceKey() });

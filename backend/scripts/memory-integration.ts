@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
 
 import {
-  createMem0LongTermMemory,
+  createMem0Store,
   VECTOR_DB_PATH,
 } from "../src/long-term-memory/index.js";
 import { openAiKeyFromEnv } from "../src/model.js";
@@ -17,7 +17,7 @@ const threadId = conversationThreadIdFromTelegramPrivateChat(1);
 const query = "улюблений фрукт";
 const apiKey = openAiKeyFromEnv();
 
-const firstMemory = createMem0LongTermMemory(apiKey);
+const firstMemory = createMem0Store(apiKey);
 try {
   await firstMemory.rememberUserMessage(
     userId,
@@ -30,8 +30,12 @@ try {
   assert.ok(initialResults.length > 0, "Mem0 search should recall the test fact");
   assert.ok(existsSync(VECTOR_DB_PATH), "Mem0 should create the SQLite vector database");
   console.log(`Mem0 search returned ${initialResults.length} result(s)`);
+  assert.ok(initialResults.every(({ id }) => typeof id === "string" && id.length > 0),
+    "search results should retain the persistent memory id");
+  assert.ok(initialResults.every(({ text }) => typeof text === "string" && text.length > 0),
+    "search results should retain memory text");
 
-  const recreatedMemory = createMem0LongTermMemory(apiKey);
+  const recreatedMemory = createMem0Store(apiKey);
   const persistedResults = await recreatedMemory.search(userId, query, 5);
   assert.ok(persistedResults.length > 0, "memory should survive Memory instance recreation");
   console.log(`Mem0 recreation search returned ${persistedResults.length} result(s)`);
