@@ -1,5 +1,4 @@
-import type { LongTermMemory, RecalledMemory } from "./long-term-memory/index.js";
-import { recallForTurn } from "./long-term-memory/operations.js";
+import type { RecalledMemory, LongTermMemorySnapshot } from "./long-term-memory/runtime.js";
 import { longTermMemoryUserIdFromTelegramSender } from "./identifiers.js";
 import type { ReplyCandidate } from "./social-decision.js";
 
@@ -7,33 +6,35 @@ const MAX_MEMORY_PARTICIPANTS = 5;
 
 export interface ParticipantMemoryContext {
   participant: { kind: "user"; id: number };
-  memories: RecalledMemory[];
+  memories: readonly RecalledMemory[];
 }
 
-export async function recallForCandidates(
-  memory: LongTermMemory | undefined,
-  candidates: ReplyCandidate[],
-): Promise<ParticipantMemoryContext[]> {
-  const latestByUser = new Map<number, ReplyCandidate>();
+export function selectedParticipantIds(candidates: readonly ReplyCandidate[]): number[] {
+  const selected: number[] = [];
+  const seen = new Set<number>();
   for (let index = candidates.length - 1; index >= 0; index -= 1) {
     const candidate = candidates[index];
-    if (candidate?.sender.kind === "user" && !latestByUser.has(candidate.sender.id)) {
-      latestByUser.set(candidate.sender.id, candidate);
-    }
-    if (latestByUser.size >= MAX_MEMORY_PARTICIPANTS) break;
+    if (candidate?.sender.kind !== "user") continue;
+    if (seen.has(candidate.sender.id)) continue;
+    seen.add(candidate.sender.id);
+    selected.push(candidate.sender.id);
+    if (selected.length >= MAX_MEMORY_PARTICIPANTS) break;
   }
-  return Promise.all([...latestByUser.values()].map(async (candidate) => ({
-    participant: { kind: "user", id: candidate.sender.id },
-    memories: await recallForTurn(
-      memory,
-      longTermMemoryUserIdFromTelegramSender(candidate.sender.id),
-      candidate.text,
-    ),
-  })));
+  return selected;
+}
+
+export function memoriesForCandidates(
+  snapshot: LongTermMemorySnapshot,
+  candidates: readonly ReplyCandidate[],
+): ParticipantMemoryContext[] {
+  return selectedParticipantIds(candidates).map((id) => ({
+    participant: { kind: "user", id },
+    memories: snapshot.memoriesFor(longTermMemoryUserIdFromTelegramSender(id)),
+  }));
 }
 
 export function memoriesForTarget(
-  contexts: ParticipantMemoryContext[],
+  contexts: readonly ParticipantMemoryContext[],
   target: ReplyCandidate,
 ): ParticipantMemoryContext[] {
   if (target.sender.kind !== "user") return [];
