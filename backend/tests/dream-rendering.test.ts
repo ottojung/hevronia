@@ -9,7 +9,7 @@ import {
   renderDreamObservations,
 } from "../src/dream-render.js";
 import { renderParticipantMemoryContexts } from "../src/long-term-memory/render-context.js";
-import { replyChoices, renderReplyChoices } from "../src/reply-choices.js";
+import { replyChoices } from "../src/reply-choices.js";
 import {
   renderDecisionContext,
   socialDecisionSchema,
@@ -82,7 +82,7 @@ test("message text is rendered verbatim, never narrated as fact", () => {
 test("a reply to Хевронія's own message is rendered by content without ids", () => {
   const event = participant(912345, 42, "Оля", "я ніби з тобою десь зустрічався", {
     replyTo: { targetMessageId: 912344, targetSender: { kind: "user", id: 999 },
-      targetSenderDisplayName: "Хевронія", targetText: "привіт" },
+      targetSenderDisplayName: "Хевронія", targetText: "привіт", targetIsHevronia: true },
     directlyAddressed: true,
   });
   const rendered = renderDreamEvent(event);
@@ -99,7 +99,7 @@ test("a reply to Хевронія's own message is rendered by content without i
 test("a reply to another character uses the notebook label and quoted text", () => {
   const event = participant(912346, 42, "Оля", "та ні", {
     replyTo: { targetMessageId: 912345, targetSender: { kind: "user", id: 17 },
-      targetSenderDisplayName: "Макс", targetText: "де ти?" },
+      targetSenderDisplayName: "Макс", targetText: "де ти?", targetIsHevronia: false },
   });
   const rendered = renderDreamEvent(event);
   assert.match(rendered, /appeared through “character 17”, currently displayed as “Макс”/);
@@ -194,9 +194,9 @@ test("planner context orders observations, memories, then reply choices", () => 
   const rendered = renderDecisionContext(context);
   assert.ok(rendered.indexOf("раніше") < rendered.indexOf("Оля боїться павуків"));
   assert.ok(rendered.indexOf("Оля боїться павуків") <
-    rendered.indexOf("Messages you could reply to directly:"));
-  assert.match(rendered, /Reply choice A:/);
-  assert.match(rendered, /Reply choice B:/);
+    rendered.indexOf("Available reply choices: A, B."));
+  assert.match(rendered, /You could reply directly to this message as reply choice A\./);
+  assert.match(rendered, /You could reply directly to this message as reply choice B\./);
   assert.doesNotMatch(rendered, /912354/);
   assert.doesNotMatch(rendered, /912355/);
   assert.doesNotMatch(rendered, /"messageId"/);
@@ -209,27 +209,42 @@ test("planner context orders observations, memories, then reply choices", () => 
   assert.match(rendered, /What is appearing in the dream now/);
 });
 
-test("reply choices are ephemeral letter handles over visible messages", () => {
+test("reply choices annotate eligible messages in place without duplicating text", () => {
+  const messages = [
+    new HumanMessage({ content: serializeTelegramEvent(participant(912345, 42, "Оля", "привіт")) }),
+    new HumanMessage({ content: serializeTelegramEvent(participant(912346, 17, "Макс", "а ти де?")) }),
+    new HumanMessage({ content: serializeTelegramEvent(participant(912347, 7, "Злата", "не підходить")) }),
+  ];
   const candidates: ReplyCandidate[] = [
     { messageId: 912345, sender: { kind: "user", id: 42 }, senderDisplayName: "Оля", text: "привіт" },
     { messageId: 912346, sender: { kind: "user", id: 17 }, senderDisplayName: "Макс", text: "а ти де?" },
   ];
-  const rendered = renderReplyChoices(candidates);
-  assert.match(rendered, /Messages you could reply to directly:/);
-  assert.match(rendered, /Reply choice A:/);
-  assert.match(rendered, /character 42, displayed as “Оля”/);
-  assert.match(rendered, /Reply choice B:/);
-  assert.match(rendered, /character 17, displayed as “Макс”/);
-  assert.match(rendered, /привіт/);
-  assert.match(rendered, /а ти де\?/);
-  assert.doesNotMatch(rendered, /912345/);
-  assert.doesNotMatch(rendered, /912346/);
-  assert.doesNotMatch(rendered, /candidate-/);
   const choices = replyChoices(candidates);
   assert.equal(choices[0]?.label, "A");
   assert.equal(choices[1]?.label, "B");
   assert.equal(choices[0]?.candidate.messageId, 912345);
-  assert.match(renderReplyChoices([]), /no Telegram messages/);
+  const annotations = new Map(choices.map(({ label, candidate }) => [candidate.messageId, label]));
+  const rendered = renderDreamObservations(messages, annotations);
+  assert.ok(rendered.includes("You could reply directly to this message as reply choice A."));
+  assert.ok(rendered.includes("You could reply directly to this message as reply choice B."));
+  assert.equal(
+    (rendered.match(/You could reply directly to this message as reply choice/g) ?? []).length,
+    2,
+  );
+  assert.ok(rendered.indexOf("reply choice A") < rendered.indexOf("привіт"));
+  assert.ok(rendered.indexOf("reply choice B") < rendered.indexOf("а ти де?"));
+  assert.doesNotMatch(rendered, /912345/);
+  assert.doesNotMatch(rendered, /912346/);
+  assert.doesNotMatch(rendered, /candidate-/);
+  const emptyContext: SocialDecisionContext = {
+    boundedHistory: [new HumanMessage({ content: serializeTelegramEvent(participant(912348, 42, "Оля", "привіт")) })],
+    currentMessage: participant(912348, 42, "Оля", "привіт"),
+    replyCandidates: [],
+    participantMemories: [],
+  };
+  const emptyRendered = renderDecisionContext(emptyContext);
+  assert.doesNotMatch(emptyRendered, /reply choice/);
+  assert.doesNotMatch(emptyRendered, /Available reply choices/);
 });
 
 test("planner schema selects a reply choice, never a message id", () => {
@@ -291,6 +306,60 @@ test("realization context keeps the target phenomenological and id-free", () => 
   assert.doesNotMatch(rendered, /spreadsheet/);
 });
 
+test("a chat source renders as a Telegram source, never a dream character", () => {
+  const source = participant(912360, 42, "Новини", "оголошення", {
+    sender: { kind: "chat", id: -500 },
+  });
+  const rendered = renderDreamEvent(source);
+  assert.match(rendered, /A Telegram message appeared from a Telegram source in the dream/);
+  assert.match(rendered, /In your notebook you labelled this source as “channel 500”/);
+  assert.match(rendered, /Telegram displays the name “Новини”/);
+  assert.doesNotMatch(rendered, /dream character/);
+  assert.doesNotMatch(rendered, /character 500/);
+  assert.doesNotMatch(rendered, /channel -500/);
+  assert.doesNotMatch(rendered, /user/);
+  assert.doesNotMatch(rendered, /912360/);
+});
+
+test("consecutive chat-source messages keep source language", () => {
+  const messages = [
+    new HumanMessage({ content: serializeTelegramEvent(participant(912361, 42, "Новини", "перше", {
+      sender: { kind: "chat", id: -500 },
+    })) }),
+    new HumanMessage({ content: serializeTelegramEvent(participant(912362, 42, "Новини", "друге", {
+      sender: { kind: "chat", id: -500 },
+    })) }),
+  ];
+  const rendered = renderDreamObservations(messages);
+  assert.match(rendered, /Another Telegram message appeared from the same Telegram source/);
+  assert.match(rendered, /In your notebook this source is “channel 500”/);
+  assert.doesNotMatch(rendered, /dream character/);
+  assert.doesNotMatch(rendered, /character 500/);
+  assert.doesNotMatch(rendered, /channel -500/);
+  assert.doesNotMatch(rendered, /user/);
+  assert.doesNotMatch(rendered, /91236/);
+});
+
+test("a spoofed “Хевронія” display name does not mark a reply as her own", () => {
+  const event = participant(912370, 123, "Оля", "привіт", {
+    replyTo: { targetMessageId: 912369, targetSender: { kind: "user", id: 123 },
+      targetSenderDisplayName: "Хевронія", targetText: "це я?", targetIsHevronia: false },
+  });
+  const rendered = renderDreamEvent(event);
+  assert.doesNotMatch(rendered, /one of your own earlier messages/);
+  assert.match(rendered, /appeared through “character 123”, currently displayed as “Хевронія”/);
+});
+
+test("a genuine reply to Хевронія is identified canonically, not by display name", () => {
+  const event = participant(912372, 42, "Оля", "привіт", {
+    replyTo: { targetMessageId: 912371, targetSender: { kind: "user", id: 999 },
+      targetSenderDisplayName: "не я", targetText: "старе", targetIsHevronia: true },
+  });
+  const rendered = renderDreamEvent(event);
+  assert.match(rendered, /one of your own earlier messages/);
+  assert.match(rendered, /старе/);
+});
+
 test("surfaced memories render with notebook labels and no store vocabulary", () => {
   const rendered = renderParticipantMemoryContexts([
     { participant: { kind: "user", id: 42 }, memories: [{ text: "Оля боїться павуків" }] },
@@ -318,10 +387,11 @@ test("notebook labels distinguish characters from channel sources", () => {
   assert.equal(notebookLabel(channel), "the source your notebook calls “channel 500”");
 });
 
-test("the summary prompt uses notebook character labels and forbids internals", () => {
+test("the summary prompt uses notebook character labels and positive identity guidance", () => {
   assert.match(SUMMARY_PROMPT, /"character 42"/);
   assert.match(SUMMARY_PROMPT, /"channel 500"/);
-  assert.match(SUMMARY_PROMPT, /stable notebook labels/);
+  assert.match(SUMMARY_PROMPT, /notebook labels already present in the dream observations/);
+  assert.match(SUMMARY_PROMPT, /recurring dream characters and Telegram sources remain distinct/);
   assert.match(SUMMARY_PROMPT, /never turn a claim into an established fact/);
   assert.match(SUMMARY_PROMPT, /"you said..."/);
   assert.doesNotMatch(SUMMARY_PROMPT, /user <id>/);
@@ -329,8 +399,10 @@ test("the summary prompt uses notebook character labels and forbids internals", 
   assert.doesNotMatch(SUMMARY_PROMPT, /spreadsheet/);
   assert.doesNotMatch(SUMMARY_PROMPT, /telegram-user:/);
   assert.doesNotMatch(SUMMARY_PROMPT, /telegram-chat:/);
+  assert.doesNotMatch(SUMMARY_PROMPT, /canonical/);
+  assert.doesNotMatch(SUMMARY_PROMPT, /sender keys/);
+  assert.doesNotMatch(SUMMARY_PROMPT, /Telegram numeric identifiers/);
   assert.doesNotMatch(SUMMARY_PROMPT, /message \d/);
-  assert.doesNotMatch(SUMMARY_PROMPT, /message id/i);
   assert.match(SUMMARY_PREFIX, /What you remember from an earlier part of this same Telegram dream conversation:/);
 });
 
