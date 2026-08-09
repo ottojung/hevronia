@@ -49,7 +49,7 @@ export interface ScenarioDependencies {
 
 export type ScenarioStoppingReason =
   | "round limit reached"
-  | "stopped after two consecutive silences";
+  | "stopped after several consecutive silences";
 
 export type ScenarioResult =
   | {

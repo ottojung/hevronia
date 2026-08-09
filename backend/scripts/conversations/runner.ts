@@ -51,8 +51,9 @@ export async function runScenario(
         consecutiveSilences += 1;
         transcript.push({ speaker: "hevronia", silence: true });
         dependencies.print("Хевронія: [silence]");
-        if (consecutiveSilences === 2) {
-          stoppingReason = "stopped after two consecutive silences";
+        const maxSilences = 10;
+        if (consecutiveSilences === maxSilences) {
+          stoppingReason = "stopped after several consecutive silences";
           break;
         }
       } else {
