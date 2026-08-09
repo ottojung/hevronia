@@ -1,10 +1,11 @@
 import { type BaseMessage } from "@langchain/core/messages";
 
+import { renderDreamChatKind, renderDreamObservations } from "./dream-render.js";
 import { extractText } from "./text.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
 import type { ParticipantMemoryContext } from "./participant-memory.js";
 import { deserializeTelegramEvent } from "./telegram-event.js";
-import { renderBoundedConversation, type ReplyCandidate, type ResolvedSocialDecision, type SocialDecision } from "./social-decision.js";
+import type { ReplyCandidate, ResolvedSocialDecision, SocialDecision } from "./social-decision.js";
 import type { DeliveredHevroniaMessage, ObservedTelegramMessage, ReplyRelationship } from "./telegram-event.js";
 
 export class InvalidRealizationResponseError extends Error {
@@ -25,7 +26,6 @@ export function replyCandidates(messages: BaseMessage[]): ReplyCandidate[] {
     const event = deserializeTelegramEvent(extractText(message.content));
     if (event.kind === "participant") {
       candidates.push({
-        key: `candidate-${candidates.length}`,
         messageId: event.messageId,
         sender: event.sender,
         senderDisplayName: event.senderDisplayName,
@@ -38,24 +38,46 @@ export function replyCandidates(messages: BaseMessage[]): ReplyCandidate[] {
 
 export function realizationContext(
   history: BaseMessage[],
+  chatKind: "private" | "group" | "supergroup",
   memories: ParticipantMemoryContext[],
   decision: ResolvedSocialDecision,
 ): string {
-  return `Observed bounded Telegram conversation:\n${renderBoundedConversation(history)}\n\n` +
-    `${renderParticipantMemoryContexts(memories)}\n\n` +
-    `Resolved reply target and social decision: ${JSON.stringify(decision)}\n\n` +
-    "Realize that decision. Return only the Telegram text Хевронія sends; never expose planning metadata.";
+  const parts: string[] = [];
+  parts.push("What is appearing in the dream now");
+  parts.push(renderDreamChatKind(chatKind));
+  parts.push(renderDreamObservations(history));
+  const memoryText = renderParticipantMemoryContexts(memories);
+  if (memoryText !== "") parts.push(memoryText);
+  parts.push(renderPrivateDecision(decision));
+  parts.push("Make the Telegram message appear. Return only its visible text.");
+  return parts.join("\n\n");
+}
+
+function renderPrivateDecision(decision: ResolvedSocialDecision): string {
+  return [
+    "What you have privately decided:",
+    `You have decided to make a Telegram message appear in reply to message ${decision.target.messageId}.`,
+    "You understand the event as:",
+    decision.interpretation,
+    "The desire currently moving you is:",
+    decision.activeDesire,
+    "The result you want from speaking is:",
+    decision.desiredOutcome,
+  ].join("\n");
 }
 
 export function resolveDecision(
   decision: Exclude<SocialDecision, { action: "silence" }>,
   candidates: ReplyCandidate[],
 ): ResolvedSocialDecision | undefined {
-  const target = candidates.find(({ key }) => key === decision.targetCandidateKey);
+  const target = candidates.find(({ messageId }) => messageId === decision.targetMessageId);
   if (target === undefined) return undefined;
-  return { target, motive: decision.motive, socialAction: decision.socialAction,
-    adviceRequested: decision.adviceRequested, askQuestion: decision.askQuestion,
-    dreamRelevant: decision.dreamRelevant, backgroundRelevant: decision.backgroundRelevant };
+  return {
+    target,
+    interpretation: decision.interpretation,
+    activeDesire: decision.activeDesire,
+    desiredOutcome: decision.desiredOutcome,
+  };
 }
 
 export function deliveredEvent(
