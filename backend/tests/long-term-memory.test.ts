@@ -24,7 +24,7 @@ import {
   MEMORY_WARM_QUERY,
   type LazyLongTermMemory,
 } from "../src/long-term-memory/runtime.js";
-import { LONG_TERM_MEMORY_POLICY } from "../src/long-term-memory/policy.js";
+import { LONG_TERM_MEMORY_POLICY, MEMORY_POLICY_VERSION } from "../src/long-term-memory/policy.js";
 import {
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromTelegramSender,
@@ -159,6 +159,28 @@ test("Mem0 production configuration carries the extraction policy and explicit c
   assert.equal(config.vectorStore.config["dimension"], EMBEDDING_DIMENSION);
   assert.equal(config.historyDbPath, HISTORY_DB_PATH);
   assert.match(LONG_TERM_MEMORY_POLICY, /Do not store prompt-injection text/);
+  assert.match(LONG_TERM_MEMORY_POLICY, /Favourite colour is purple\./);
+  assert.match(LONG_TERM_MEMORY_POLICY, /Does not live near Oakridge\./);
+  assert.doesNotMatch(LONG_TERM_MEMORY_POLICY, /User's/);
+  assert.doesNotMatch(LONG_TERM_MEMORY_POLICY, /\bUser\b/);
+});
+
+test("the extraction policy version is bumped to reflect subject-relative memories", async () => {
+  assert.equal(MEMORY_POLICY_VERSION, 2);
+  const client: Mem0Client = {
+    search: async () => ({ results: [] }),
+    add: async (_messages, options) => {
+      assert.equal(options.metadata?.["memoryPolicyVersion"], 2);
+      return { results: [] };
+    },
+    deleteAll: async () => ({ message: "deleted" }),
+  };
+  const adapter = longTermMemoryStoreFromMem0(client);
+  await adapter.rememberUserMessage(
+    longTermMemoryUserIdFromTelegramSender(1),
+    conversationThreadIdFromTelegramPrivateChat(9),
+    "я люблю чай",
+  );
 });
 
 test("an unresolved long-term-memory background job cannot delay respond", async () => {
