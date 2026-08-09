@@ -78,9 +78,11 @@ test("reply relationships preserve a chat target identity", () => {
       targetText: "від каналу", targetsHevronia: false } });
   assert.equal(reply.replyTo?.targetSender.kind, "chat");
   const rendered = renderDreamEvent(reply);
-  assert.match(rendered, /appeared through “channel 500”, currently displayed as “Новини”/);
+  assert.match(rendered, /appeared from the Telegram source “channel 500”, currently displayed as “Новини”/);
   assert.match(rendered, /від каналу/);
   assert.match(rendered, /character 101/);
+  assert.doesNotMatch(rendered, /through “channel 500”/);
+  assert.doesNotMatch(rendered, /dream character “channel 500”/);
   assert.doesNotMatch(rendered, /telegram-chat:/);
   assert.doesNotMatch(rendered, /message 2/);
   assert.doesNotMatch(rendered, /message 3/);
