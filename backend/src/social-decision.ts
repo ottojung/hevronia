@@ -6,12 +6,13 @@ import { z } from "zod";
 import { renderDreamChatKind, renderDreamObservations } from "./dream-render.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
 import type { ParticipantMemoryContext } from "./participant-memory.js";
+import { renderReplyChoices } from "./reply-choices.js";
 
 export const socialDecisionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("silence") }).strict(),
   z.object({
     action: z.literal("reply"),
-    targetMessageId: z.number().int().positive(),
+    targetChoice: z.string().min(1),
     interpretation: z.string().min(1),
     activeDesire: z.string().min(1),
     desiredOutcome: z.string().min(1),
@@ -60,9 +61,11 @@ You are at the private moment before any new Telegram message appears from you.
 Observe what appeared in the dream and apply Хевронія's Procedural interpretation.
 Decide whether what appeared activates something Хевронія herself wants.
 If she wants nothing from speaking, choose silence.
-If she wants to speak, choose one eligible Telegram message to reply to, and state
-briefly how she interprets the event, which desire is active, and what result she
-wants from speaking.
+If she wants to speak, choose one reply choice (a currently visible Telegram
+message) and state briefly how she interprets the event, which desire is active,
+and what result she wants from speaking.
+Reply choices are private handles valid only for this moment; they are not
+identities.
 This is private cognition, not dialogue.
 Return only the requested structured data.
 `;
@@ -74,16 +77,8 @@ export function renderDecisionContext(context: SocialDecisionContext): string {
   sections.push(renderDreamObservations(context.boundedHistory));
   const memories = renderParticipantMemoryContexts(context.participantMemories);
   if (memories !== "") sections.push(memories);
-  sections.push(renderEligibleReplies(context.replyCandidates));
+  sections.push(renderReplyChoices(context.replyCandidates));
   return sections.join("\n\n");
-}
-
-export function renderEligibleReplies(candidates: readonly ReplyCandidate[]): string {
-  const ids = candidates.map(({ messageId }) => messageId);
-  if (ids.length === 0) {
-    return "There are no Telegram messages you could directly reply to right now.";
-  }
-  return `Messages still available for a direct Telegram reply: ${ids.join(", ")}.`;
 }
 
 export function createSocialDecisionMaker(

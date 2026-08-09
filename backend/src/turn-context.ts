@@ -4,7 +4,8 @@ import { renderDreamChatKind, renderDreamObservations } from "./dream-render.js"
 import { extractText } from "./text.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
 import type { ParticipantMemoryContext } from "./participant-memory.js";
-import { deserializeTelegramEvent } from "./telegram-event.js";
+import { replyChoices } from "./reply-choices.js";
+import { deserializeTelegramEvent, notebookLabel } from "./telegram-event.js";
 import type { ReplyCandidate, ResolvedSocialDecision, SocialDecision } from "./social-decision.js";
 import type { DeliveredHevroniaMessage, ObservedTelegramMessage, ReplyRelationship } from "./telegram-event.js";
 
@@ -54,10 +55,14 @@ export function realizationContext(
 }
 
 function renderPrivateDecision(decision: ResolvedSocialDecision): string {
+  const target = decision.target;
+  const reference = `${notebookLabel(target.sender)}, currently displayed by Telegram as “${target.senderDisplayName}”`;
   return [
     "What you have privately decided:",
-    `You have decided to make a Telegram message appear in reply to message ${decision.target.messageId}.`,
-    "You understand the event as:",
+    `You have decided to make a Telegram reply appear to ${reference}.`,
+    "The visible message you are responding to was:",
+    target.text,
+    "You understand what happened as:",
     decision.interpretation,
     "The desire currently moving you is:",
     decision.activeDesire,
@@ -70,10 +75,10 @@ export function resolveDecision(
   decision: Exclude<SocialDecision, { action: "silence" }>,
   candidates: ReplyCandidate[],
 ): ResolvedSocialDecision | undefined {
-  const target = candidates.find(({ messageId }) => messageId === decision.targetMessageId);
-  if (target === undefined) return undefined;
+  const choice = replyChoices(candidates).find(({ label }) => label === decision.targetChoice);
+  if (choice === undefined) return undefined;
   return {
-    target,
+    target: choice.candidate,
     interpretation: decision.interpretation,
     activeDesire: decision.activeDesire,
     desiredOutcome: decision.desiredOutcome,
