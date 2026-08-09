@@ -13,27 +13,32 @@ import {
 
 /**
  * Renders canonical Telegram events as Хевронія experiences them inside the
- * dream: imagined dream characters produce visible Telegram messages, and she
- * herself chooses which Telegram messages to make appear. Person-like senders
- * are labelled with the notebook identity "character N", chats and channels
- * are sources labelled "channel N", and internal message IDs never appear.
+ * dream: Telegram messages appear through imagined dream characters, and
+ * channel/chat senders are Telegram sources. Person-like senders carry the
+ * notebook identity "character N", sources are labelled "channel N", and
+ * internal message IDs never appear.
  */
 export function renderDreamEvent(
   event: CanonicalTelegramEvent,
-  sameCharacter = false,
+  sameSender = false,
+  replyChoice?: string,
 ): string {
   return event.kind === "hevronia"
     ? renderOwnMessage(event)
-    : renderParticipantMessage(event, sameCharacter);
+    : renderParticipantMessage(event, sameSender, replyChoice);
 }
 
 /**
  * Renders a bounded message history in the same dream ontology used by both
  * the planner and the realization model. Compaction summaries appear as
  * remembered earlier dream conversation; every other message is a rendered
- * dream event.
+ * dream event. An optional planner-only annotation map attaches ephemeral
+ * reply-choice labels to eligible events without exposing message IDs.
  */
-export function renderDreamObservations(messages: BaseMessage[]): string {
+export function renderDreamObservations(
+  messages: BaseMessage[],
+  replyChoiceAnnotations?: ReadonlyMap<number, string>,
+): string {
   const remembered: string[] = [];
   const observations: string[] = [];
   let previousSender: TelegramSenderIdentity | undefined;
@@ -49,10 +54,10 @@ export function renderDreamObservations(messages: BaseMessage[]): string {
       previousSender = undefined;
       continue;
     }
-    const sameCharacter = previousSender !== undefined
+    const sameSender = previousSender !== undefined
       && previousSender.kind === event.sender.kind
       && previousSender.id === event.sender.id;
-    observations.push(renderDreamEvent(event, sameCharacter));
+    observations.push(renderDreamEvent(event, sameSender, replyChoiceAnnotations?.get(event.messageId)));
     previousSender = event.sender;
   }
   const parts: string[] = [];
@@ -73,18 +78,27 @@ export function renderDreamChatKind(chatKind: "private" | "group" | "supergroup"
     : "This part of the dream currently appears as a Telegram group chat.";
 }
 
-function renderParticipantMessage(event: ObservedTelegramMessage, sameCharacter: boolean): string {
+function renderParticipantMessage(
+  event: ObservedTelegramMessage,
+  sameSender: boolean,
+  replyChoice?: string,
+): string {
   const lines: string[] = [];
+  const isUser = event.sender.kind === "user";
   const subject = notebookSubject(event.sender);
-  if (sameCharacter) {
-    lines.push("Another Telegram message appeared through the same dream character.");
-    lines.push(event.sender.kind === "user"
+  if (sameSender) {
+    lines.push(isUser
+      ? "Another Telegram message appeared through the same dream character."
+      : "Another Telegram message appeared from the same Telegram source.");
+    lines.push(isUser
       ? `In your notebook this is “${subject}”.`
       : `In your notebook this source is “${subject}”.`);
     lines.push(`Telegram currently displays the name “${event.senderDisplayName}”.`);
   } else {
-    lines.push("A Telegram message appeared through a dream character.");
-    lines.push(event.sender.kind === "user"
+    lines.push(isUser
+      ? "A Telegram message appeared through a dream character."
+      : "A Telegram message appeared from a Telegram source in the dream.");
+    lines.push(isUser
       ? `In your notebook you labelled it as “${subject}”.`
       : `In your notebook you labelled this source as “${subject}”.`);
     lines.push(`Telegram displays the name “${event.senderDisplayName}”.`);
@@ -94,6 +108,9 @@ function renderParticipantMessage(event: ObservedTelegramMessage, sameCharacter:
   }
   if (event.directlyAddressed) {
     lines.push("The way this message appeared makes it directly addressed to you.");
+  }
+  if (replyChoice !== undefined) {
+    lines.push(`You could reply directly to this message as reply choice ${replyChoice}.`);
   }
   lines.push("Visible message:");
   lines.push(event.text);
