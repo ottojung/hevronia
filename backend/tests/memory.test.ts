@@ -39,7 +39,7 @@ test("many consecutive silent observations compact bounded multi-participant sta
   const summary = fakeModel();
   for (let index = 0; index < 20; index += 1) {
     summary.respond(new AIMessage(
-      "user 11 Іра любить чай; user 22 Іра не любить чай",
+      "character 11 Іра любить чай; character 22 Іра не любить чай",
     ));
   }
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
@@ -57,9 +57,11 @@ test("many consecutive silent observations compact bounded multi-participant sta
       message.additional_kwargs["lc_source"] === "summarization");
     assert.ok(summaryMessage);
     assert.ok(String(summaryMessage.content).startsWith(SUMMARY_PREFIX));
-    assert.match(String(summaryMessage.content), /user 11 Іра любить чай/);
-    assert.match(String(summaryMessage.content), /user 22 Іра не любить чай/);
+    assert.match(String(summaryMessage.content), /character 11 Іра любить чай/);
+    assert.match(String(summaryMessage.content), /character 22 Іра не любить чай/);
     assert.doesNotMatch(String(summaryMessage.content), /telegram-user:/);
+    assert.doesNotMatch(String(summaryMessage.content), /spreadsheet/);
+    assert.doesNotMatch(String(summaryMessage.content), /user 11/);
     assert.ok(stored.length < 10);
     assert.ok(contexts.every(({ boundedHistory }) => boundedHistory.length < 10));
   } finally {
@@ -120,7 +122,7 @@ test("compaction preserves user and chat sender kinds with duplicate names", asy
   const summary = fakeModel();
   for (let index = 0; index < 10; index += 1) {
     summary.respond(new AIMessage(
-      "user 11 Новини любить чай; channel -22 Новини не любить чай",
+      "character 11 Новини любить чай; channel 22 Новини не любить чай",
     ));
   }
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
@@ -139,11 +141,48 @@ test("compaction preserves user and chat sender kinds with duplicate names", asy
     const compacted = (await layer.getMessages(threadId)).find((message) =>
       message.additional_kwargs["lc_source"] === "summarization");
     assert.ok(compacted);
-    assert.match(String(compacted.content), /user 11 Новини любить чай/);
-    assert.match(String(compacted.content), /channel -22 Новини не любить чай/);
+    assert.match(String(compacted.content), /character 11 Новини любить чай/);
+    assert.match(String(compacted.content), /channel 22 Новини не любить чай/);
     assert.doesNotMatch(String(compacted.content), /telegram-user:/);
     assert.doesNotMatch(String(compacted.content), /telegram-chat:/);
-    assert.doesNotMatch(String(compacted.content), /telegram-user:-22/);
+    assert.doesNotMatch(String(compacted.content), /user 11/);
+    assert.doesNotMatch(String(compacted.content), /channel -22/);
+    assert.doesNotMatch(String(compacted.content), /spreadsheet/);
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the summary model receives rendered dream input with no internal message ids", async () => {
+  const { dir, db } = tempPath();
+  const captured: string[] = [];
+  const summary = fakeModel();
+  for (let index = 0; index < 10; index += 1) {
+    summary.respond((messages) => {
+      captured.push(messages.map(({ content }) => String(content)).join("\n"));
+      return new AIMessage("character 11 said something about tea");
+    });
+  }
+  const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
+    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 100,
+    tokenCounter: (messages) => messages.length * 10 });
+  try {
+    for (let index = 0; index < 4; index += 1) {
+      await layer.respond({ threadId,
+        message: event(`повідомлення ${index}`, 912_345 + index, 11),
+        hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    }
+    const input = captured.join("\n");
+    assert.match(input, /character 11/);
+    assert.match(input, /notebook/);
+    assert.match(input, /повідомлення 0/);
+    assert.doesNotMatch(input, /912345/);
+    assert.doesNotMatch(input, /"messageId"/);
+    assert.doesNotMatch(input, /telegram-user:/);
+    assert.doesNotMatch(input, /spreadsheet/);
+    assert.doesNotMatch(input, /user 11/);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });

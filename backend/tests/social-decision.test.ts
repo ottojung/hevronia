@@ -58,8 +58,11 @@ test("real planner receives canonical personality, background, and recalled memo
     const input = messages.map((item) => typeof item.content === "string" ? item.content : JSON.stringify(item.content)).join("\n");
     assert.match(input, /You are Хевронія/);
     assert.match(input, /Warcraft is part of the dream/);
-    assert.match(input, /user 88/);
+    assert.match(input, /character 88/);
+    assert.match(input, /notebook/);
     assert.doesNotMatch(input, /telegram-user:88/);
+    assert.doesNotMatch(input, /spreadsheet/);
+    assert.doesNotMatch(input, /user 88/);
     assert.match(input, /боїться павуків/);
     return new AIMessage(JSON.stringify({ decision: { action: "silence" } }));
   });
@@ -74,7 +77,7 @@ test("real planner receives canonical personality, background, and recalled memo
 test("a non-candidate planner target cannot reach Telegram delivery", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-target-"));
   const planner: SocialDecisionMaker = { decide: async () => ({ action: "reply",
-    targetMessageId: 999_999, interpretation: "x", activeDesire: "y",
+    targetChoice: "Z", interpretation: "x", activeDesire: "y",
     desiredOutcome: "z" }) };
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner });
@@ -116,7 +119,7 @@ test("duplicate display names retain distinct stable identities", async () => {
 test("reply metadata is ephemeral and undelivered text never enters history", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-delivery-"));
   const planner: SocialDecisionMaker = { decide: async () => ({ action: "reply",
-    targetMessageId: 10, interpretation: "private motive", activeDesire: "want",
+    targetChoice: "A", interpretation: "private motive", activeDesire: "want",
     desiredOutcome: "outcome" }) };
   const model = fakeModel();
   model.respond(new AIMessage("недоставлена відповідь"));
@@ -145,7 +148,7 @@ test("silence and delivered reply persist the same canonical incoming representa
   let call = 0;
   const planner: SocialDecisionMaker = { decide: async () => ++call === 1
     ? { action: "silence" }
-    : { action: "reply", targetMessageId: 2, interpretation: "i",
+    : { action: "reply", targetChoice: "B", interpretation: "i",
       activeDesire: "a", desiredOutcome: "o" } };
   const model = fakeModel();
   model.respond(new AIMessage("ага"));

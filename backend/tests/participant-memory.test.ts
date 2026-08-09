@@ -68,7 +68,7 @@ test("older-target planning and realization receive attributed target memory", a
     const max = context.participantMemories.find(({ participant }) => participant.id === 202);
     assert.equal(max?.memories[0]?.text, "Макс любить еспресо");
     assert.ok(!context.participantMemories.some(({ participant }) => participant.id === -500));
-    return { action: "reply", targetMessageId: 1, interpretation: "pride",
+    return { action: "reply", targetChoice: "A", interpretation: "pride",
       activeDesire: "recognize the effort", desiredOutcome: "share the joy" };
   } };
   const model = fakeModel();

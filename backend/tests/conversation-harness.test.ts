@@ -276,11 +276,11 @@ test("scenario header prints seeded long-term memory before the conversation", (
   const plain = scenarios.find(({ id }) => id === "normal-stranger");
   if (seeded === undefined || plain === undefined) assert.fail("catalog missing expected scenarios");
   const seededLines = scenarioHeaderLines(seeded);
-  assert.ok(seededLines.includes("Long-term memory about this participant:"));
+  assert.ok(seededLines.includes("Long-term memory about this character:"));
   assert.ok(seededLines.some((line) => line.startsWith("- ")));
-  assert.ok(seededLines.indexOf("Long-term memory about this participant:") >
+  assert.ok(seededLines.indexOf("Long-term memory about this character:") >
     seededLines.indexOf("Purpose:"));
-  assert.ok(!scenarioHeaderLines(plain).includes("Long-term memory about this participant:"));
+  assert.ok(!scenarioHeaderLines(plain).includes("Long-term memory about this character:"));
 });
 
 test("seeded long-term memory reaches the planner context", async () => {

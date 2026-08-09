@@ -55,7 +55,7 @@ test("decide returns unwrapped silence decision", async () => {
 test("decide returns unwrapped reply decision", async () => {
   const decision = {
     action: "reply",
-    targetMessageId: 10,
+    targetChoice: "A",
     interpretation: "this character is asking me for a favour",
     activeDesire: "I want to help",
     desiredOutcome: "learn what they need",
@@ -70,14 +70,14 @@ test("malformed provider responses are rejected", async () => {
     JSON.stringify({ decision: { action: "jump" } }),
     JSON.stringify({ decision: { action: "reply" } }),
     JSON.stringify({ decision: { action: "silence", extra: true } }),
-    JSON.stringify({ decision: { action: "reply", targetMessageId: 10 } }),
-    JSON.stringify({ decision: { action: "reply", targetMessageId: 10,
-      interpretation: "", activeDesire: "a", desiredOutcome: "o" } }),
-    JSON.stringify({ decision: { action: "reply", targetMessageId: -1,
+    JSON.stringify({ decision: { action: "reply", targetChoice: "A" } }),
+    JSON.stringify({ decision: { action: "reply", targetChoice: "",
       interpretation: "a", activeDesire: "a", desiredOutcome: "o" } }),
-    JSON.stringify({ decision: { action: "reply", targetMessageId: 10,
+    JSON.stringify({ decision: { action: "reply", targetChoice: "A",
       interpretation: "a", activeDesire: "a", desiredOutcome: "o",
       socialAction: "reaction" } }),
+    JSON.stringify({ decision: { action: "reply", targetMessageId: 10,
+      interpretation: "a", activeDesire: "a", desiredOutcome: "o" } }),
   ];
   for (const content of cases) {
     const planner = plannerWithResponse(content);

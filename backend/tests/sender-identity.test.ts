@@ -23,12 +23,18 @@ test("user and send-as-chat identities remain distinct and chat senders skip mem
     sender: { kind: "chat", id: -500 }, senderDisplayName: "Новини",
     chatKind: "group", text: "від каналу", messageThreadId: null,
     mentionsHevronia: false, replyTo: null });
-  assert.match(renderDreamEvent(user), /user 101/);
+  assert.match(renderDreamEvent(user), /character 101/);
   assert.match(renderDreamEvent(user), /від людини/);
+  assert.match(renderDreamEvent(user), /notebook/);
   assert.doesNotMatch(renderDreamEvent(user), /telegram-user:101/);
-  assert.match(renderDreamEvent(sendAsChat), /channel -500/);
+  assert.doesNotMatch(renderDreamEvent(user), /user 101/);
+  assert.doesNotMatch(renderDreamEvent(user), /spreadsheet/);
+  assert.doesNotMatch(renderDreamEvent(user), /message 1/);
+  assert.match(renderDreamEvent(sendAsChat), /channel 500/);
   assert.match(renderDreamEvent(sendAsChat), /від каналу/);
   assert.doesNotMatch(renderDreamEvent(sendAsChat), /telegram-chat:-500/);
+  assert.doesNotMatch(renderDreamEvent(sendAsChat), /-500/);
+  assert.doesNotMatch(renderDreamEvent(sendAsChat), /message 2/);
   const calls: string[] = [];
   const memory: LazyLongTermMemory = {
     beginTurn() {
@@ -70,9 +76,11 @@ test("reply relationships preserve a chat target identity", () => {
       targetText: "від каналу", targetsHevronia: false } });
   assert.equal(reply.replyTo?.targetSender.kind, "chat");
   const rendered = renderDreamEvent(reply);
-  assert.match(rendered, /reply to message 2/);
-  assert.match(rendered, /character displayed as “Новини”/);
+  assert.match(rendered, /appeared through “channel 500”, currently displayed as “Новини”/);
   assert.match(rendered, /від каналу/);
-  assert.match(rendered, /user 101/);
+  assert.match(rendered, /character 101/);
   assert.doesNotMatch(rendered, /telegram-chat:/);
+  assert.doesNotMatch(rendered, /message 2/);
+  assert.doesNotMatch(rendered, /message 3/);
+  assert.doesNotMatch(rendered, /channel -500/);
 });

@@ -46,7 +46,7 @@ function replyingDecisionMaker(): SocialDecisionMaker {
   return {
     decide: async () => ({
       action: "reply",
-      targetMessageId: 1,
+      targetChoice: "A",
       interpretation: "personal concern",
       activeDesire: "want to help",
       desiredOutcome: "understand better",

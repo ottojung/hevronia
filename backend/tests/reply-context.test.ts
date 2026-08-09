@@ -25,20 +25,22 @@ test("realization receives the fully resolved older target", async () => {
   let planningCall = 0;
   const planner: SocialDecisionMaker = { decide: async () => ++planningCall === 1
     ? { action: "silence" }
-    : { action: "reply", targetMessageId: 10, interpretation: "concern",
+    : { action: "reply", targetChoice: "A", interpretation: "concern",
       activeDesire: "want to understand", desiredOutcome: "hear the reason" } };
   const model = fakeModel();
   model.respond((messages) => {
     const input = messages.map(({ content }) => String(content)).join("\n");
-    assert.match(input, /reply to message 10/);
-    assert.match(input, /user 101/);
-    assert.match(input, /Іра/);
+    assert.match(input, /You have decided to make a Telegram reply appear to the character your notebook calls “character 101”/);
+    assert.match(input, /The visible message you are responding to was:/);
     assert.match(input, /я звільняюся/);
-    assert.match(input, /Visible message 10/);
+    assert.match(input, /notebook/);
+    assert.doesNotMatch(input, /message 10/);
+    assert.doesNotMatch(input, /message 11/);
+    assert.doesNotMatch(input, /targetChoice/);
+    assert.doesNotMatch(input, /reply choice/i);
     assert.doesNotMatch(input, /telegram-user:/);
+    assert.doesNotMatch(input, /spreadsheet/);
     assert.doesNotMatch(input, /"targetMessageId"/);
-    assert.doesNotMatch(input, /candidate-/);
-    assert.doesNotMatch(input, /resolved reply target and social decision/);
     return new AIMessage("стій. а шо сталося?");
   });
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"), model,
@@ -68,10 +70,19 @@ test("incoming and outgoing events share one reply relationship and render its t
       targetSenderDisplayName: "Іра", targetText: "та ні" } };
   if (outgoing.replyTo === null) assert.fail("expected outgoing reply relationship");
   assert.deepEqual(Object.keys(incoming.replyTo ?? {}), Object.keys(outgoing.replyTo));
-  assert.match(renderDreamEvent(incoming), /ти точно прийдеш\?/);
-  assert.match(renderDreamEvent(incoming), /та ні/);
-  assert.doesNotMatch(renderDreamEvent(incoming), /telegram-user:/);
-  assert.match(renderDreamEvent(outgoing), /reply to message 6/);
-  assert.match(renderDreamEvent(outgoing), /ну ясно/);
-  assert.match(renderDreamEvent(outgoing), /you chose to make this Telegram message appear/);
+  const incomingRendered = renderDreamEvent(incoming);
+  assert.match(incomingRendered, /reply to one of your own earlier messages/);
+  assert.match(incomingRendered, /ти точно прийдеш\?/);
+  assert.match(incomingRendered, /та ні/);
+  assert.match(incomingRendered, /character 101/);
+  assert.doesNotMatch(incomingRendered, /message 5/);
+  assert.doesNotMatch(incomingRendered, /message 6/);
+  assert.doesNotMatch(incomingRendered, /telegram-user:/);
+  const outgoingRendered = renderDreamEvent(outgoing);
+  assert.match(outgoingRendered, /you chose to make this Telegram message appear/);
+  assert.match(outgoingRendered, /reply to an earlier message from the character Telegram displayed as “Іра”/);
+  assert.match(outgoingRendered, /Your reply was:/);
+  assert.match(outgoingRendered, /ну ясно/);
+  assert.doesNotMatch(outgoingRendered, /message 6/);
+  assert.doesNotMatch(outgoingRendered, /"targetMessageId"/);
 });
