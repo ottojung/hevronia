@@ -254,16 +254,24 @@ test("an empty summary response aborts compaction without destroying history", a
   }
 });
 
-test("compaction budgets tokens over dream-rendered content, not raw canonical JSON", async () => {
+test("compaction measures dream-rendered slices and never canonical JSON", async () => {
   const { dir, db } = tempPath();
   const summary = fakeModel();
   for (let index = 0; index < 10; index += 1) {
-    summary.respond(new AIMessage("character 11 said something"));
+    summary.respond(new AIMessage("character 11 said something about tea"));
   }
+  const dreamOnlyCounter = (messages: { content: unknown }[]): number => {
+    const text = messages.map((m) => String(m.content)).join("\n");
+    assert.ok(!text.includes('"messageId"'), "token counter received canonical JSON");
+    assert.ok(!text.includes('"senderDisplayName"'), "token counter received canonical JSON");
+    assert.ok(!text.includes('"kind":"participant"'), "token counter received canonical JSON");
+    assert.ok(!text.includes('"replyTo"'), "token counter received canonical JSON");
+    return text.length;
+  };
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
     decisionMaker: { decide: async () => ({ action: "silence" }) },
     triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 100,
-    tokenCounter: (messages) => messages.length * 10 });
+    tokenCounter: dreamOnlyCounter });
   try {
     for (let index = 0; index < 5; index += 1) {
       await layer.respond({ threadId,
@@ -271,8 +279,37 @@ test("compaction budgets tokens over dream-rendered content, not raw canonical J
         hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     }
     const stored = await layer.getMessages(threadId);
-    assert.equal(stored.length, 5);
-    assert.ok(!stored.some((m) => m.additional_kwargs["lc_source"] === "summarization"));
+    const summaryMessage = stored.find((m) => m.additional_kwargs["lc_source"] === "summarization");
+    assert.ok(summaryMessage);
+    assert.match(String(summaryMessage.content), /character 11 said something about tea/);
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("visible dollar sequences reach the summary model exactly", async () => {
+  const { dir, db } = tempPath();
+  const dollarText = "$& $' $` $$";
+  const captured: string[] = [];
+  const summary = fakeModel();
+  for (let index = 0; index < 10; index += 1) {
+    summary.respond((messages) => {
+      captured.push(messages.map(({ content }) => String(content)).join("\n"));
+      return new AIMessage("character 11 said something with dollar signs");
+    });
+  }
+  const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
+    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 100,
+    tokenCounter: contentLengthTokens });
+  try {
+    await layer.respond({ threadId, message: event(dollarText, 912_401, 11),
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    await layer.respond({ threadId, message: event("друге повідомлення", 912_402, 11),
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    const input = captured.join("\n");
+    assert.ok(input.includes("$& $' $` $$"), "visible dollar text must be preserved exactly");
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
