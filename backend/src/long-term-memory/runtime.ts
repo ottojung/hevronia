@@ -1,8 +1,7 @@
-import { ensureEntry, project, userKey } from "./runtime-cache.js";
+import { ensureEntry, touchUser } from "./runtime-cache.js";
 import { evictIfNeeded } from "./runtime-eviction.js";
-import { drain, pump } from "./runtime-queue.js";
 import { scheduleIngestion, scheduleWarm } from "./runtime-scheduling.js";
-import { scheduleTopical } from "./runtime-topical.js";
+import { beginTurn, closeRuntime } from "./runtime-turn.js";
 import {
   MEMORY_BACKGROUND_CONCURRENCY,
   MEMORY_BACKGROUND_IDLE_DELAY_MS,
@@ -50,51 +49,28 @@ export function createLazyLongTermMemory(options: LazyLongTermMemoryOptions): La
     queue: [],
     foregroundCount: 0,
     running: 0,
-    closed: false,
+    lifecycle: "open",
+    graceElapsed: false,
     idleTimer: undefined,
     idleWaiters: [],
-    inFlight: new Set(),
   };
   return {
-    beginTurn() {
-      state.foregroundCount += 1;
-      const snapshotCache = new Map(state.cache);
-      let released = false;
-      return {
-        snapshot: {
-          memoriesFor(userId) {
-            return project(config, snapshotCache.get(userKey(userId)));
-          },
-        },
-        release() {
-          if (released) return;
-          released = true;
-          if (state.foregroundCount > 0) state.foregroundCount -= 1;
-          if (state.foregroundCount === 0) pump(state, config);
-        },
-      };
-    },
+    beginTurn: () => beginTurn(state, config),
     warmUser(userId) {
       ensureEntry(state, config, userId);
+      touchUser(state, config, userId);
       scheduleWarm(state, config, userId);
       evictIfNeeded(state, config);
     },
     observeUserMessage(userId, threadId, text) {
       ensureEntry(state, config, userId);
+      touchUser(state, config, userId);
       scheduleWarm(state, config, userId);
-      scheduleTopical(state, config, userId, text);
       scheduleIngestion(state, config, userId, threadId, text);
       evictIfNeeded(state, config);
     },
     async close() {
-      if (state.closed) return;
-      state.closed = true;
-      if (state.idleTimer !== undefined) {
-        state.idleTimer();
-        state.idleTimer = undefined;
-      }
-      pump(state, config);
-      await drain(state, config);
+      await closeRuntime(state, config);
     },
   };
 }

@@ -9,6 +9,7 @@ import {
   replaceEntry,
 } from "./runtime-cache.js";
 import { enqueue } from "./runtime-queue.js";
+import { requestTopicalRefresh } from "./runtime-topical.js";
 import type { RuntimeConfig, RuntimeState } from "./runtime-types.js";
 import { MEMORY_WARM_QUERY } from "./runtime-types.js";
 
@@ -19,7 +20,7 @@ export function scheduleWarm(
 ): void {
   const entry = ensureEntry(state, config, userId);
   if (entry.baselinePending) return;
-  if (entry.baselineLoadedAt !== 0 && config.now() - entry.baselineLoadedAt < config.warmTtlMs) {
+  if (entry.baselineLoadedAt !== undefined && config.now() - entry.baselineLoadedAt < config.warmTtlMs) {
     return;
   }
   replaceEntry(state, userId, (current) => ({ ...current, baselinePending: true }));
@@ -51,6 +52,8 @@ export function scheduleIngestion(
         mergeLearned(state, config, userId, records);
       } catch (error) {
         console.warn(`Long-term-memory ingestion failed: ${operationalErrorDetail(error)}`);
+      } finally {
+        requestTopicalRefresh(state, config, userId, text);
       }
     },
   });

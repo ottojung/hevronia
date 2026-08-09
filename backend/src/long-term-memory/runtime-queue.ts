@@ -10,7 +10,7 @@ export function enqueue(
   userId: LongTermMemoryUserId,
   job: MemoryJob,
 ): void {
-  if (state.closed) return;
+  if (state.lifecycle !== "open") return;
   state.queue.push(job);
   const key = userKey(userId);
   state.queuedByUser.set(key, (state.queuedByUser.get(key) ?? 0) + 1);
@@ -22,14 +22,16 @@ export function pump(state: RuntimeState, config: RuntimeConfig): void {
   if (state.foregroundCount > 0) return;
   if (state.running >= config.concurrency) return;
   if (state.queue.length === 0) return;
+  if (state.lifecycle === "closed") return;
   const start = (): void => {
     if (state.foregroundCount > 0) return;
     if (state.running >= config.concurrency) return;
     if (state.queue.length === 0) return;
+    if (state.lifecycle === "closed") return;
     startNextJob(state, config);
     pump(state, config);
   };
-  if (state.closed) {
+  if (state.lifecycle === "draining" || state.graceElapsed) {
     start();
     return;
   }
@@ -43,8 +45,9 @@ export function startNextJob(state: RuntimeState, config: RuntimeConfig): void {
   const job = state.queue.shift();
   if (job === undefined) return;
   state.running += 1;
+  state.graceElapsed = true;
   const key = userKey(job.userId);
-  const task = (async () => {
+  void (async () => {
     try {
       await job.run();
     } catch (error) {
@@ -60,20 +63,16 @@ export function startNextJob(state: RuntimeState, config: RuntimeConfig): void {
       afterJob(state, config);
     }
   })();
-  state.inFlight.add(task);
-  void task.then(
-    () => state.inFlight.delete(task),
-    () => state.inFlight.delete(task),
-  );
 }
 
 export function afterJob(state: RuntimeState, config: RuntimeConfig): void {
-  pump(state, config);
   if (state.running === 0 && state.queue.length === 0) {
+    state.graceElapsed = false;
     const waiters = state.idleWaiters;
     state.idleWaiters = [];
     for (const waiter of waiters) waiter();
   }
+  pump(state, config);
 }
 
 export function whenIdle(state: RuntimeState): Promise<void> {
@@ -81,17 +80,19 @@ export function whenIdle(state: RuntimeState): Promise<void> {
   return new Promise((resolve) => { state.idleWaiters.push(resolve); });
 }
 
-export async function drain(state: RuntimeState, config: RuntimeConfig): Promise<void> {
-  if (state.running === 0 && state.queue.length === 0) return;
+export async function drainUntilIdle(
+  state: RuntimeState,
+  config: RuntimeConfig,
+): Promise<"drained" | "timeout"> {
+  if (state.running === 0 && state.queue.length === 0) return "drained";
   let cancel: (() => void) | undefined;
   const deadline = new Promise<"timeout">((resolve) => {
     cancel = config.scheduler.schedule(() => resolve("timeout"), config.shutdownDrainTimeoutMs);
   });
-  const outcome = await Promise.race([whenIdle(state).then(() => "drained"), deadline]);
+  const outcome = await Promise.race([
+    whenIdle(state).then((): "drained" => "drained"),
+    deadline,
+  ]);
   cancel?.();
-  if (outcome === "timeout") {
-    console.warn(
-      `Timed out draining ${state.running} running and ${state.queue.length} queued long-term-memory jobs`,
-    );
-  }
+  return outcome;
 }

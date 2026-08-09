@@ -10,7 +10,7 @@ export function emptyUserCache(now: number): UserCache {
   return {
     baseline: [],
     baselinePending: false,
-    baselineLoadedAt: 0,
+    baselineLoadedAt: undefined,
     topical: [],
     topicalScheduled: false,
     pendingTopicalQuery: undefined,
@@ -51,6 +51,10 @@ export function touch(config: RuntimeConfig, entry: UserCache): UserCache {
   return { ...entry, lastActivityAt: config.now() };
 }
 
+export function touchUser(state: RuntimeState, config: RuntimeConfig, userId: LongTermMemoryUserId): void {
+  replaceEntry(state, userId, (entry) => touch(config, entry));
+}
+
 export function mergeLearned(
   state: RuntimeState,
   config: RuntimeConfig,
@@ -61,8 +65,7 @@ export function mergeLearned(
     const merged: MemoryRecord[] = [];
     for (const record of [...records, ...entry.learned]) {
       if (merged.some((existing) => existing.id === record.id)) continue;
-      const normalized = normalizeText(record.text);
-      if (merged.some((existing) => normalizeText(existing.text) === normalized)) continue;
+      if (merged.some((existing) => normalizeText(existing.text) === normalizeText(record.text))) continue;
       merged.push(record);
       if (merged.length >= config.learnedLimit) break;
     }
@@ -98,10 +101,9 @@ export function clearBaselinePending(state: RuntimeState, userId: LongTermMemory
 export function project(config: RuntimeConfig, entry: UserCache | undefined): RecalledMemory[] {
   if (entry === undefined) return [];
   const combined: MemoryRecord[] = [];
-  for (const record of [...entry.topical, ...entry.learned, ...entry.baseline]) {
+  for (const record of [...entry.learned, ...entry.topical, ...entry.baseline]) {
     if (record.id !== undefined && combined.some((existing) => existing.id === record.id)) continue;
-    const normalized = normalizeText(record.text);
-    if (combined.some((existing) => normalizeText(existing.text) === normalized)) continue;
+    if (combined.some((existing) => normalizeText(existing.text) === normalizeText(record.text))) continue;
     combined.push(record);
     if (combined.length >= config.contextLimit) break;
   }

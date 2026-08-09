@@ -59,7 +59,7 @@ export const MEMORY_WARM_QUERY =
 export interface UserCache {
   baseline: readonly MemoryRecord[];
   baselinePending: boolean;
-  baselineLoadedAt: number;
+  baselineLoadedAt: number | undefined;
   topical: readonly MemoryRecord[];
   topicalScheduled: boolean;
   pendingTopicalQuery: string | undefined;
@@ -71,6 +71,8 @@ export interface MemoryJob {
   userId: LongTermMemoryUserId;
   run(): Promise<void>;
 }
+
+export type RuntimeLifecycle = "open" | "draining" | "closed";
 
 export interface RuntimeConfig {
   store: LongTermMemoryStore;
@@ -93,8 +95,8 @@ export interface RuntimeState {
   queue: MemoryJob[];
   foregroundCount: number;
   running: number;
-  closed: boolean;
+  lifecycle: RuntimeLifecycle;
+  graceElapsed: boolean;
   idleTimer: (() => void) | undefined;
   idleWaiters: (() => void)[];
-  inFlight: Set<Promise<void>>;
 }

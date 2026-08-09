@@ -54,7 +54,7 @@ function scheduleTopicalSearch(
   });
 }
 
-export function scheduleTopical(
+export function requestTopicalRefresh(
   state: RuntimeState,
   config: RuntimeConfig,
   userId: LongTermMemoryUserId,

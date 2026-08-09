@@ -221,7 +221,7 @@ test("successful ingestion results appear in the learned cache", async () => {
   await memory.close();
 });
 
-test("topical, learned, and baseline lanes combine in the required order", async () => {
+test("learned, topical, and baseline lanes combine in the required order", async () => {
   const { memory, store, scheduler } = createMemory();
   store.searchImpl = (_key, query) =>
     query === MEMORY_WARM_QUERY ? [fact("b1", "baseline")] : [fact("t1", "topical")];
@@ -231,7 +231,24 @@ test("topical, learned, and baseline lanes combine in the required order", async
   await scheduler.fireAll();
   const turn = memory.beginTurn();
   assert.deepEqual(turn.snapshot.memoriesFor(userId).map(({ text }) => text),
-    ["topical", "learned", "baseline"]);
+    ["learned", "topical", "baseline"]);
+  turn.release();
+  await memory.close();
+});
+
+test("a newly learned correction precedes an older retrieved fact", async () => {
+  const { memory, store, scheduler } = createMemory();
+  store.searchImpl = (_key, query) =>
+    query === MEMORY_WARM_QUERY
+      ? [fact("b1", "The user lives in Vancouver.")]
+      : [fact("t1", "The user lives in Vancouver.")];
+  store.rememberImpl = () => [fact("l1", "The user lives in Toronto.")];
+  memory.warmUser(userId);
+  memory.observeUserMessage(userId, threadId, "I moved to Toronto.");
+  await scheduler.fireAll();
+  const turn = memory.beginTurn();
+  assert.deepEqual(turn.snapshot.memoriesFor(userId).map(({ text }) => text),
+    ["The user lives in Toronto.", "The user lives in Vancouver."]);
   turn.release();
   await memory.close();
 });
@@ -240,7 +257,7 @@ test("memories are deduplicated by id and normalized text", async () => {
   const { memory, store, scheduler } = createMemory();
   store.searchImpl = (_key, query) =>
     query === MEMORY_WARM_QUERY
-      ? [fact("t1", "Something else"), fact("b2", "Love tea")]
+      ? [fact("l1", "Something else")]
       : [fact("t1", "Love tea")];
   store.rememberImpl = () => [fact("l1", "love tea"), fact("l2", "Different fact")];
   memory.warmUser(userId);
@@ -248,7 +265,7 @@ test("memories are deduplicated by id and normalized text", async () => {
   await scheduler.fireAll();
   const turn = memory.beginTurn();
   assert.deepEqual(turn.snapshot.memoriesFor(userId).map(({ text }) => text),
-    ["Love tea", "Different fact"]);
+    ["love tea", "Different fact"]);
   turn.release();
   await memory.close();
 });
@@ -269,24 +286,53 @@ test("the visible context is capped at eight memories", async () => {
   const visible = turn.snapshot.memoriesFor(userId);
   assert.equal(visible.length, 8);
   assert.deepEqual(visible.map(({ text }) => text).slice(0, 4),
-    ["topical 0", "topical 1", "topical 2", "topical 3"]);
-  assert.deepEqual(visible.map(({ text }) => text).slice(4, 8),
     ["learned 0", "learned 1", "learned 2", "learned 3"]);
+  assert.deepEqual(visible.map(({ text }) => text).slice(4, 8),
+    ["topical 0", "topical 1", "topical 2", "topical 3"]);
   turn.release();
   await memory.close();
 });
 
-test("search failures leave old cached values intact", async () => {
-  const { memory, store, scheduler } = createMemory();
+test("search failures leave old cached values intact and a failed warm does not set a new TTL", async () => {
+  const { memory, store, scheduler, advance } = createMemory({ warmTtlMs: 100 });
+  const warmCalls = () => store.searchCalls.filter(({ query }) => query === MEMORY_WARM_QUERY).length;
   store.searchImpl = () => [fact("m1", "stable fact")];
   memory.warmUser(userId);
   await scheduler.fireAll();
+  assert.equal(warmCalls(), 1);
+  advance(200);
   store.searchImpl = () => { throw new Error("search broke"); };
   memory.warmUser(userId);
   await scheduler.fireAll();
-  const turn = memory.beginTurn();
+  assert.equal(warmCalls(), 2);
+  let turn = memory.beginTurn();
   assert.deepEqual(turn.snapshot.memoriesFor(userId), [{ text: "stable fact" }]);
   turn.release();
+  advance(50);
+  store.searchImpl = () => [fact("m2", "refreshed fact")];
+  memory.warmUser(userId);
+  await scheduler.fireAll();
+  assert.equal(warmCalls(), 3);
+  turn = memory.beginTurn();
+  assert.deepEqual(turn.snapshot.memoriesFor(userId), [{ text: "refreshed fact" }]);
+  turn.release();
+  await memory.close();
+});
+
+test("a successful empty warm establishes a TTL and timestamp zero works", async () => {
+  const { memory, store, scheduler, advance } = createMemory({ warmTtlMs: 100 });
+  const warmCalls = () => store.searchCalls.filter(({ query }) => query === MEMORY_WARM_QUERY).length;
+  store.searchImpl = () => [];
+  memory.warmUser(userId);
+  await scheduler.fireAll();
+  assert.equal(warmCalls(), 1);
+  memory.warmUser(userId);
+  await scheduler.fireAll();
+  assert.equal(warmCalls(), 1);
+  advance(200);
+  memory.warmUser(userId);
+  await scheduler.fireAll();
+  assert.equal(warmCalls(), 2);
   await memory.close();
 });
 
@@ -341,22 +387,134 @@ test("cache eviction does not delete persistent memory", async () => {
   await memory.close();
 });
 
-test("shutdown drains normally when jobs finish", async () => {
+test("shutdown drains normally when jobs finish and is idempotent", async () => {
   const { memory, store } = createMemory();
   store.searchImpl = () => [fact("m1", "fact")];
   memory.observeUserMessage(userId, threadId, "hello");
+  await memory.close();
   await memory.close();
   assert.ok(store.searchCalls.length > 0);
   assert.equal(store.rememberCalls.length, 1);
 });
 
-test("shutdown returns after the bounded timeout when jobs do not finish", async () => {
+test("draining starts queued work immediately without the grace delay", async () => {
+  const { memory, store, scheduler } = createMemory();
+  store.searchImpl = () => [fact("m1", "fact")];
+  memory.observeUserMessage(userId, threadId, "hello");
+  assert.equal(scheduler.count, 1);
+  const closing = memory.close();
+  assert.ok(store.searchCalls.length > 0);
+  await closing;
+  assert.equal(store.rememberCalls.length, 1);
+});
+
+test("shutdown timeout discards queued jobs and a later release starts nothing", async () => {
   const { memory, store, scheduler } = createMemory({ shutdownDrainTimeoutMs: 5 });
-  store.searchImpl = () => deferred<MemoryRecord[]>().promise;
+  const hangingSearch = deferred<MemoryRecord[]>();
+  let searchCount = 0;
+  store.searchImpl = () => { searchCount += 1; return hangingSearch.promise; };
   memory.observeUserMessage(userId, threadId, "hello");
   const closing = memory.close();
   await Promise.resolve();
-  await scheduler.fireAll();
+  scheduler.fireEarliest();
   await closing;
-  assert.equal(store.searchCalls.length, 1);
+  assert.equal(searchCount, 1);
+  assert.equal(store.rememberCalls.length, 0);
+  hangingSearch.resolve([fact("m1", "fact")]);
+  await scheduler.fireAll();
+  assert.equal(store.rememberCalls.length, 0);
+  const turn = memory.beginTurn();
+  turn.release();
+  await scheduler.fireAll();
+  assert.equal(searchCount, 1);
+  assert.equal(store.rememberCalls.length, 0);
+});
+
+test("close with an active foreground waits only up to the shutdown deadline", async () => {
+  const { memory, store, scheduler } = createMemory({ shutdownDrainTimeoutMs: 5 });
+  store.searchImpl = () => [fact("m1", "fact")];
+  const turn = memory.beginTurn();
+  memory.observeUserMessage(userId, threadId, "hello");
+  const closing = memory.close();
+  await Promise.resolve();
+  scheduler.fireEarliest();
+  await closing;
+  assert.equal(store.searchCalls.length, 0);
+  assert.equal(store.rememberCalls.length, 0);
+  turn.release();
+  await scheduler.fireAll();
+  assert.equal(store.searchCalls.length, 0);
+  assert.equal(store.rememberCalls.length, 0);
+});
+
+test("the idle grace period happens once per foreground-to-background transition, not per job", async () => {
+  const { memory, store, scheduler } = createMemory();
+  store.searchImpl = () => [fact("m1", "fact")];
+  for (let index = 0; index < 5; index += 1) {
+    memory.observeUserMessage(userId, threadId, `message ${index}`);
+  }
+  assert.equal(scheduler.pending.length, 1);
+  await scheduler.fireAll();
+  assert.equal(store.rememberCalls.length, 5);
+  assert.ok(store.searchCalls.length > 0);
+  assert.equal(scheduler.pending.length, 1);
+  await memory.close();
+});
+
+test("topical retrieval does not begin before the relevant ingestion attempt finishes", async () => {
+  const { memory, store, scheduler } = createMemory();
+  const pendingIngest = deferred<MemoryRecord[]>();
+  store.searchImpl = (_key, query) =>
+    query === MEMORY_WARM_QUERY ? [fact("w1", "warm")] : [fact("t1", "topical")];
+  store.rememberImpl = () => pendingIngest.promise;
+  memory.observeUserMessage(userId, threadId, "hello");
+  await scheduler.fireAll();
+  const topicalCalls = () => store.searchCalls.filter(({ query }) => query !== MEMORY_WARM_QUERY);
+  assert.equal(topicalCalls().length, 0);
+  pendingIngest.resolve([fact("l1", "learned")]);
+  await scheduler.fireAll();
+  assert.equal(topicalCalls().length, 1);
+  assert.equal(topicalCalls()[0]?.query, "hello");
+  await memory.close();
+});
+
+test("beginTurn cancels a pending background-start timer and release restarts a fresh grace", async () => {
+  const { memory, store, scheduler } = createMemory();
+  store.searchImpl = () => [fact("m1", "fact")];
+  memory.observeUserMessage(userId, threadId, "hello");
+  assert.equal(scheduler.count, 1);
+  const turn = memory.beginTurn();
+  assert.equal(scheduler.count, 0);
+  assert.equal(store.searchCalls.length, 0);
+  turn.release();
+  assert.equal(scheduler.count, 1);
+  scheduler.fireEarliest();
+  assert.ok(store.searchCalls.length > 0);
+  await memory.close();
+});
+
+test("participant activity synchronously refreshes LRU age", async () => {
+  const { memory, store, scheduler, advance } = createMemory({ maxCachedUsers: 2, warmTtlMs: 100_000 });
+  store.searchImpl = (key) => [fact("m1", `memory for ${key}`)];
+  memory.warmUser(userId);
+  await scheduler.fireAll();
+  advance(10);
+  memory.warmUser(otherUserId);
+  await scheduler.fireAll();
+  advance(10);
+  memory.warmUser(userId);
+  await scheduler.fireAll();
+  advance(10);
+  memory.warmUser(userId);
+  await scheduler.fireAll();
+  advance(10);
+  const third: LongTermMemoryUserId = longTermMemoryUserIdFromTelegramSender(303);
+  memory.warmUser(third);
+  await scheduler.fireAll();
+  const turn = memory.beginTurn();
+  assert.deepEqual(turn.snapshot.memoriesFor(userId), [{ text: "memory for telegram-user:101" }]);
+  assert.deepEqual(turn.snapshot.memoriesFor(otherUserId), []);
+  assert.deepEqual(turn.snapshot.memoriesFor(third), [{ text: "memory for telegram-user:303" }]);
+  turn.release();
+  await memory.close();
 });
