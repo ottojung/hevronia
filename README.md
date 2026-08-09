@@ -137,18 +137,20 @@ The model receives three distinct context layers:
 ### Model-facing ontology
 
 Models never experience the conversation as users messaging an assistant. The
-dream renderer (`backend/src/dream-render.ts`) presents every canonical event as
-something that appeared inside Хевронія's dream through Telegram: imagined dream
-characters produce visible messages, and Хевронія herself chooses which Telegram
+dream renderer (`backend/src/dream-render.ts`) presents every canonical event
+as something that appeared inside Хевронія's dream through Telegram: Telegram
+messages appear in the dream through imagined dream characters, chat/channel
+senders appear as Telegram sources, and Хевронія herself chooses which Telegram
 messages to make appear. Stable identities use ordinary notebook language
 ("In your notebook you labelled it as "character 42""; "channel 500" for
 chat/channel sources) instead of internal keys, and Telegram message IDs are
-never shown to a model. Raw canonical JSON, `telegram-user:` / `telegram-chat:`
-prefixes, candidate indexes, message IDs, and memory-store vocabulary never
-reach the social-decision, realization, or summary models. The planner chooses
-an ephemeral per-turn reply choice (A, B, C) and describes her private
-interpretation, active desire, and desired outcome — not assistant speech-act
-metadata and not a message ID.
+never shown to a model. No Hevronia-facing model input labels a dream character
+as a user. Raw canonical JSON, `telegram-user:` / `telegram-chat:` prefixes,
+candidate indexes, message IDs, and memory-store vocabulary never reach the
+social-decision, realization, or summary models. The planner chooses an
+ephemeral per-turn reply choice (A, B, C) annotated in place on the matching
+dream observation, and describes her private interpretation, active desire, and
+desired outcome — not assistant speech-act metadata and not a message ID.
 
 LangGraph owns thread-scoped conversational continuity under
 `telegram-private:<chat id>` or `telegram-group:<chat id>` and persists it in the ignored
