@@ -34,11 +34,32 @@ export async function saveRun(
 
 function renderScenario(record: RunRecord, simulatorModel: string): string {
   const result = record.result;
-  const metadata = `# ${record.scenario.title}\n\n- **ID:** ${record.scenario.id}\n- **Category:** ${record.scenario.category}\n- **Purpose:** ${record.scenario.purpose}\n- **Participant:** ${record.scenario.participantName}\n- **Behavior tags:** ${record.scenario.behaviorTags.join(", ")}\n- **Configured rounds:** ${result.scenario.rounds}\n- **Actual rounds:** ${result.roundsCompleted}\n- **Stopping reason:** ${result.status === "completed" ? result.stoppingReason : `failed: ${singleLine(result.failure)}`}\n- **Simulator model:** ${simulatorModel}\n\n## Transcript\n\n`;
+  const meta = [
+    `# ${record.scenario.title}`,
+    "",
+    `- **ID:** ${record.scenario.id}`,
+    `- **Category:** ${record.scenario.category}`,
+    `- **Purpose:** ${record.scenario.purpose}`,
+    `- **Participant:** ${record.scenario.participantName}`,
+    `- **Behavior tags:** ${record.scenario.behaviorTags.join(", ")}`,
+  ];
+  const memories = record.scenario.longTermMemory;
+  if (memories !== undefined && memories.length > 0) {
+    meta.push(`- **Long-term memory:** ${memories.join(" · ")}`);
+  }
+  meta.push(
+    `- **Configured rounds:** ${result.scenario.rounds}`,
+    `- **Actual rounds:** ${result.roundsCompleted}`,
+    `- **Stopping reason:** ${result.status === "completed" ? result.stoppingReason : `failed: ${singleLine(result.failure)}`}`,
+    `- **Simulator model:** ${simulatorModel}`,
+    "",
+    "## Transcript",
+    "",
+  );
   const transcript = result.transcript.length === 0
     ? "_No transcript was produced._\n"
     : renderEntries(result.transcript);
-  return metadata + transcript;
+  return meta.join("\n") + transcript;
 }
 
 function renderEntries(entries: readonly TranscriptEntry[]): string {

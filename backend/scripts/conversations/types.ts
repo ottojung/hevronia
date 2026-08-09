@@ -29,6 +29,7 @@ export interface ConversationScenario {
   rounds: number;
   smoke: boolean;
   behaviorTags: readonly string[];
+  longTermMemory?: readonly string[];
 }
 
 export type TranscriptEntry =

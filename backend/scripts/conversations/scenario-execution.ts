@@ -3,10 +3,18 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { createConversationLayer } from "../../src/layer.js";
+import type { LongTermMemory } from "../../src/long-term-memory/index.js";
 import { EmptyLongTermMemory } from "./empty-long-term-memory.js";
+import { SeededLongTermMemory } from "./seeded-long-term-memory.js";
 import { errorDetail, runScenario } from "./runner.js";
 import { failedScenarioResult } from "./types.js";
 import type { ConversationScenario, ScenarioResult, Simulator } from "./types.js";
+
+function createScenarioMemory(scenario: ConversationScenario): LongTermMemory {
+  return scenario.longTermMemory !== undefined && scenario.longTermMemory.length > 0
+    ? new SeededLongTermMemory(scenario.longTermMemory)
+    : new EmptyLongTermMemory();
+}
 
 export async function runScenarioEntry(
   scenario: ConversationScenario,
@@ -21,7 +29,7 @@ export async function runScenarioEntry(
       simulator,
       createLayer: () => createConversationLayer({
         dbPath: join(directory, "checkpoints.sqlite"),
-        longTermMemory: new EmptyLongTermMemory(),
+        longTermMemory: createScenarioMemory(scenario),
       }),
       print: (line) => lines.push(line),
     });
@@ -41,13 +49,22 @@ export async function runScenarioEntry(
 }
 
 export function scenarioHeaderLines(scenario: ConversationScenario): string[] {
-  return [
+  const lines = [
     "=".repeat(60),
     `${scenario.id} — ${scenario.title}`,
     "=".repeat(60),
     `Purpose: ${scenario.purpose}`,
     "",
   ];
+  const memories = scenario.longTermMemory;
+  if (memories !== undefined && memories.length > 0) {
+    lines.push("Long-term memory about this participant:");
+    for (const fact of memories) {
+      lines.push(`- ${fact}`);
+    }
+    lines.push("");
+  }
+  return lines;
 }
 
 export function completionLine(scenario: ConversationScenario, result: ScenarioResult): string {
