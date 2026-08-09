@@ -29,10 +29,12 @@ export function parseCli(arguments_: readonly string[]): CliCommand {
     if (argument === "--all") { all = true; continue; }
     if (argument === "--rounds") {
       const value = arguments_[index + 1];
-      if (value === undefined || !/^[1-9]\d*$/u.test(value)) {
-        throw new ConversationCliError("--rounds requires a positive integer");
+      const parsed = Number(value);
+      if (value === undefined || !/^[1-9]\d*$/u.test(value) ||
+          !Number.isSafeInteger(parsed) || String(parsed) !== value) {
+        throw new ConversationCliError("--rounds requires a positive safe integer");
       }
-      rounds = Number(value);
+      rounds = parsed;
       index += 1;
       continue;
     }
