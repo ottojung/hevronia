@@ -129,7 +129,7 @@ test("Хевронія's standalone own message contains no message id", () => {
 test("Хевронія's own reply quotes the earlier message without exposing its id", () => {
   const rendered = renderDreamEvent(ownMessage(912401, "не пригадую", {
     targetMessageId: 912346, targetSender: { kind: "user", id: 42 },
-    targetSenderDisplayName: "Оля", targetText: "привіт",
+    targetSenderDisplayName: "Оля", targetText: "привіт", targetIsHevronia: false,
   }));
   assert.match(rendered, /reply to an earlier message from the character Telegram displayed as “Оля”/);
   assert.match(rendered, /Your reply was:/);

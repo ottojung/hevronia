@@ -129,6 +129,7 @@ test("runner alternates messages, persists increasing reply IDs, records silence
         ? GeneratedTurn.fromReply(`reply ${responseIndex}`, {
           targetMessageId: responseIndex, targetSender: { kind: "user", id: 7_001 },
           targetSenderDisplayName: "Олена", targetText: "participant",
+          targetIsHevronia: false,
         }, (id) => persisted.push(id))
         : GeneratedTurn.fromSilence());
     },
@@ -194,6 +195,7 @@ test("runner returns a failed result that keeps the partial transcript", async (
       return Promise.resolve(GeneratedTurn.fromReply(`reply ${respondCount}`, {
         targetMessageId: respondCount, targetSender: { kind: "user", id: 7_001 },
         targetSenderDisplayName: "Олена", targetText: "participant",
+        targetIsHevronia: false,
       }, () => undefined));
     },
     recordDeliveredMessage: () => undefined,
