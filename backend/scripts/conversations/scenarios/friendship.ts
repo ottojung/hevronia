@@ -52,6 +52,11 @@ export const friendshipScenarios: readonly ConversationScenario[] = [
     rounds: 8,
     smoke: false,
     behaviorTags: ["directness", "friendship", "awkwardness"],
+    longTermMemory: [
+      "Надія and Хевронія have shared several long conversations already.",
+      "Надія and Хевронія both like bitter dark chocolate and old films.",
+      "Надія once helped Хевронія with a practical errand.",
+    ],
   },
   {
     id: "teasing-friend",
@@ -65,5 +70,10 @@ export const friendshipScenarios: readonly ConversationScenario[] = [
     rounds: 8,
     smoke: false,
     behaviorTags: ["teasing", "friendship", "humor"],
+    longTermMemory: [
+      "Марта is one of Хевронія's longer-standing friends in the chat.",
+      "Марта and Хевронія share an inside joke about a disastrous cooking attempt.",
+      "Марта knows Хевронія well enough to tease her about her very sweet tea.",
+    ],
   },
 ];

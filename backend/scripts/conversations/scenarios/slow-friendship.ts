@@ -12,4 +12,9 @@ export const slowFriendshipScenario: ConversationScenario = {
   rounds: 10,
   smoke: true,
   behaviorTags: ["friendship", "trust"],
+  longTermMemory: [
+    "Марина and Хевронія have already had several pleasant conversations.",
+    "Марина recently moved to the city and does not know many people yet.",
+    "Марина prefers unsweetened coffee.",
+  ],
 };

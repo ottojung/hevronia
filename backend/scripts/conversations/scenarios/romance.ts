@@ -13,6 +13,11 @@ export const romanceScenarios: readonly ConversationScenario[] = [
     rounds: 8,
     smoke: false,
     behaviorTags: ["flirting", "curiosity", "affection"],
+    longTermMemory: [
+      "Остап and Хевронія have been talking for a while in a shared group.",
+      "Остап is usually dry, playful, and quick to tease.",
+      "Остап recently started flirting with Хевронія a little.",
+    ],
   },
   {
     id: "obvious-flirting",
@@ -65,5 +70,10 @@ export const romanceScenarios: readonly ConversationScenario[] = [
     rounds: 7,
     smoke: false,
     behaviorTags: ["directness", "flirting", "affection"],
+    longTermMemory: [
+      "Вероніка and Хевронія have been chatting almost daily for weeks.",
+      "Вероніка often compliments Хевронія and remembers small details about her.",
+      "Вероніка has hinted more than once that she likes Хевронія.",
+    ],
   },
 ];

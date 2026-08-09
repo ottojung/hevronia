@@ -12,4 +12,9 @@ export const vulnerableFriendshipScenario: ConversationScenario = {
   rounds: 8,
   smoke: false,
   behaviorTags: ["vulnerability", "comfort"],
+  longTermMemory: [
+    "Ірина and Хевронія have chatted regularly for a while.",
+    "Ірина recently changed jobs and is still settling in.",
+    "Ірина tends to deflect serious topics with a joke.",
+  ],
 };

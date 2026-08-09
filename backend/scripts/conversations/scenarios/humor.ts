@@ -78,5 +78,10 @@ export const humorScenarios: readonly ConversationScenario[] = [
     rounds: 6,
     smoke: false,
     behaviorTags: ["teasing", "humor", "boundaries"],
+    longTermMemory: [
+      "Григорій and Хевронія have been close friends for a long time.",
+      "Григорій teases Хевронія constantly and she knows it is affection.",
+      "Григорій remembers that Хевронія once burned a pot of borscht.",
+    ],
   },
 ];

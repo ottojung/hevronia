@@ -39,6 +39,11 @@ export const longScenarios: readonly ConversationScenario[] = [
     rounds: 20,
     smoke: false,
     behaviorTags: ["long", "friendship", "trust"],
+    longTermMemory: [
+      "Ярослава and Хевронія have been friends for months.",
+      "Ярослава shares Хевронія's love of strong black tea and long walks.",
+      "Ярослава is moving apartments soon and is a bit stressed about it.",
+    ],
   },
   {
     id: "long-disagreement-repair",
