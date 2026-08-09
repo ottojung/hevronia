@@ -36,27 +36,30 @@ export async function determineCutoffIndex(
   return cutoff;
 }
 
-export async function trimForSummary(
+/**
+ * The largest non-empty oldest prefix of `messages` whose rendered
+ * representation fits within `maxTokens`, or 0 when even the oldest message
+ * alone does not fit. Compaction may summarize only this prefix, never a
+ * suffix cut away from the beginning of the removable range.
+ */
+export async function determineSummaryPrefixCount(
   messages: BaseMessage[],
-  trimTokensToSummarize: number,
+  maxTokens: number,
   countSlice: CountSlice,
-): Promise<BaseMessage[]> {
-  if (await countSlice(messages) <= trimTokensToSummarize) return messages;
-  let left = 0;
-  let right = messages.length;
-  let cutoff = messages.length;
-  const maxIterations = Math.floor(Math.log2(messages.length)) + 1;
-  for (let index = 0; index < maxIterations; index += 1) {
-    if (left >= right) break;
-    const mid = Math.floor((left + right) / 2);
-    if (await countSlice(messages.slice(mid)) <= trimTokensToSummarize) {
-      cutoff = mid;
-      right = mid;
+): Promise<number> {
+  if (messages.length === 0) return 0;
+  if (await countSlice(messages.slice(0, 1)) > maxTokens) return 0;
+  let low = 1;
+  let high = messages.length;
+  let best = 1;
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    if (await countSlice(messages.slice(0, mid)) <= maxTokens) {
+      best = mid;
+      low = mid + 1;
     } else {
-      left = mid + 1;
+      high = mid - 1;
     }
   }
-  if (cutoff === messages.length) cutoff = left;
-  if (cutoff >= messages.length) cutoff = messages.length - 1;
-  return messages.slice(Math.max(cutoff, 0));
+  return best;
 }
