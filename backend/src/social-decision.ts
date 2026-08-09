@@ -6,7 +6,7 @@ import { z } from "zod";
 import { renderDreamChatKind, renderDreamObservations } from "./dream-render.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
 import type { ParticipantMemoryContext } from "./participant-memory.js";
-import { renderReplyChoices } from "./reply-choices.js";
+import { replyChoices } from "./reply-choices.js";
 
 export const socialDecisionSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("silence") }).strict(),
@@ -67,17 +67,23 @@ and what result she wants from speaking.
 Reply choices are private handles valid only for this moment; they are not
 identities.
 This is private cognition, not dialogue.
-Return only the requested structured data.
+Give only the private decision in the required form.
 `;
 
 export function renderDecisionContext(context: SocialDecisionContext): string {
   const sections: string[] = [];
   sections.push("What is appearing in the dream now");
   sections.push(renderDreamChatKind(context.currentMessage.chatKind));
-  sections.push(renderDreamObservations(context.boundedHistory));
+  const choices = replyChoices(context.replyCandidates);
+  const annotations = new Map(
+    choices.map(({ label, candidate }) => [candidate.messageId, label]),
+  );
+  sections.push(renderDreamObservations(context.boundedHistory, annotations));
   const memories = renderParticipantMemoryContexts(context.participantMemories);
   if (memories !== "") sections.push(memories);
-  sections.push(renderReplyChoices(context.replyCandidates));
+  if (choices.length > 0) {
+    sections.push(`Available reply choices: ${choices.map(({ label }) => label).join(", ")}.`);
+  }
   return sections.join("\n\n");
 }
 
