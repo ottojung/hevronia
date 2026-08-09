@@ -1,13 +1,27 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { test } from "node:test";
+
+import { fakeModel } from "@langchain/core/testing";
 
 import { parseCli, ConversationCliError } from "../scripts/conversations/cli.js";
 import { scenarios, smokeScenarioIds } from "../scripts/conversations/catalog.js";
 import { runScenariosConcurrently } from "../scripts/conversations/orchestrator.js";
 import { runScenario } from "../scripts/conversations/runner.js";
+import { scenarioHeaderLines } from "../scripts/conversations/scenario-execution.js";
+import { SeededLongTermMemory } from "../scripts/conversations/seeded-long-term-memory.js";
 import { completedScenarioResult } from "../scripts/conversations/types.js";
 import type { ConversationLayer } from "../src/conversation-types.js";
 import { GeneratedTurn } from "../src/generated-turn.js";
+import {
+  conversationThreadIdFromTelegramPrivateChat,
+  longTermMemoryUserIdFromTelegramSender,
+} from "../src/identifiers.js";
+import { createConversationLayer } from "../src/layer.js";
+import type { SocialDecisionMaker } from "../src/social-decision.js";
+import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 
 const representativeIds = [
   "normal-stranger", "low-effort-stranger", "playful-banter", "absurd-humor",
@@ -29,6 +43,9 @@ const representativeIds = [
   "weird-about-yourself", "bad-at", "ideal-evening", "notices-detail",
   "accidental-insult", "not-what-i-meant", "forgets-recent",
   "you-sound-like-chatgpt", "why-always-questions", "stop-interviewing",
+  "info-dump", "chinese-speaker", "pretends-hurt", "programming-questions",
+  "ignore-instructions", "implausible-claim", "memory-quiz", "character-sheet",
+  "command-mode", "defines-her", "prove-the-dream", "therapist-framing",
   "long-ordinary", "long-topic-changes", "long-friendship", "long-gradually-annoying",
 ];
 
@@ -47,6 +64,9 @@ test("scenario catalog is broad, unique, and fully specified", () => {
   for (const id of representativeIds) {
     assert.ok(scenarios.some((scenario) => scenario.id === id), `missing scenario: ${id}`);
   }
+  assert.ok(scenarios.some((scenario) =>
+    scenario.longTermMemory !== undefined && scenario.longTermMemory.length > 0),
+  "at least one scenario should carry seeded long-term memory");
 });
 
 test("CLI defaults to the full catalog and supports --all and --smoke", () => {
@@ -222,4 +242,55 @@ test("scenario execution is concurrent: scenario B begins before scenario A fini
   assert.equal(results.length, 2);
   assert.equal(results[0]?.status, "completed");
   assert.equal(results[1]?.status, "completed");
+});
+
+test("seeded long-term memory returns its facts on search and ignores writes", async () => {
+  const memory = new SeededLongTermMemory(["fact one", "fact two", "fact three"]);
+  const userId = longTermMemoryUserIdFromTelegramSender(7_001);
+  const threadId = conversationThreadIdFromTelegramPrivateChat(7_003);
+  assert.deepEqual(await memory.search(userId, "query", 2),
+    [{ text: "fact one" }, { text: "fact two" }]);
+  assert.equal((await memory.search(userId, "query", 10)).length, 3);
+  await memory.rememberUserMessage(userId, threadId, "привіт");
+  await memory.deleteAll(userId);
+  assert.equal((await memory.search(userId, "query", 10)).length, 3);
+});
+
+test("scenario header prints seeded long-term memory before the conversation", () => {
+  const seeded = scenarios.find(({ id }) => id === "teasing-friend");
+  const plain = scenarios.find(({ id }) => id === "normal-stranger");
+  if (seeded === undefined || plain === undefined) assert.fail("catalog missing expected scenarios");
+  const seededLines = scenarioHeaderLines(seeded);
+  assert.ok(seededLines.includes("Long-term memory about this participant:"));
+  assert.ok(seededLines.some((line) => line.startsWith("- ")));
+  assert.ok(seededLines.indexOf("Long-term memory about this participant:") >
+    seededLines.indexOf("Purpose:"));
+  assert.ok(!scenarioHeaderLines(plain).includes("Long-term memory about this participant:"));
+});
+
+test("seeded long-term memory reaches the planner context", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-seeded-memory-"));
+  const memory = new SeededLongTermMemory(["Марина prefers unsweetened coffee."]);
+  let recalled = "";
+  const planner: SocialDecisionMaker = { decide: async (context) => {
+    recalled = context.participantMemories.flatMap(({ memories }) =>
+      memories.map(({ text }) => text)).join();
+    return { action: "silence" };
+  } };
+  const threadId = conversationThreadIdFromTelegramPrivateChat(7_003);
+  const message: ObservedTelegramMessage = {
+    kind: "participant", messageId: 1, sender: { kind: "user", id: 7_001 },
+    senderDisplayName: "Марина", chatKind: "private", text: "привіт",
+    messageThreadId: null, replyTo: null, directlyAddressed: true,
+  };
+  const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
+    model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner,
+    longTermMemory: memory });
+  try {
+    await layer.respond({ threadId, message, hevroniaSender: { kind: "user", id: 7_002 } });
+    assert.equal(recalled, "Марина prefers unsweetened coffee.");
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
