@@ -55,16 +55,17 @@ export function deserializeTelegramEvent(serialized: string): CanonicalTelegramE
 }
 
 /**
- * Spreadsheet label for a Telegram sender: the ordinary private bookkeeping
- * Хевронія uses to tell recurring dream characters apart. Users and other
- * senders (chats/channels) use distinct plain-language forms.
+ * Notebook label for a Telegram sender: the ordinary private bookkeeping
+ * Хевронія uses to tell recurring dream characters apart. Person-like
+ * characters are "character N"; chats and channels are sources named
+ * "channel N" with the sign of the internal Telegram id hidden.
  */
-export function spreadsheetSubject(sender: TelegramSenderIdentity): string {
-  return sender.kind === "user" ? `user ${sender.id}` : `channel ${sender.id}`;
+export function notebookSubject(sender: TelegramSenderIdentity): string {
+  return sender.kind === "user" ? `character ${sender.id}` : `channel ${Math.abs(sender.id)}`;
 }
 
-export function spreadsheetLabel(sender: TelegramSenderIdentity): string {
+export function notebookLabel(sender: TelegramSenderIdentity): string {
   return sender.kind === "user"
-    ? `the character your spreadsheet calls user ${sender.id}`
-    : `the source your spreadsheet calls channel ${sender.id}`;
+    ? `the character your notebook calls “character ${sender.id}”`
+    : `the source your notebook calls “channel ${Math.abs(sender.id)}”`;
 }
