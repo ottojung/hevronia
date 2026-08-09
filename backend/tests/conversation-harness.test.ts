@@ -302,7 +302,7 @@ test("seeded long-term memory reaches the planner context", async () => {
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner,
     lazyMemory: memory });
   try {
-    await layer.respond({ threadId, message, hevroniaSender: { kind: "user", id: 7_002 } });
+    await layer.respond({ threadId, message, hevroniaSender: { kind: "user", id: 7_002 }, senderIsBot: false });
     assert.equal(recalled, "Марина prefers unsweetened coffee.");
   } finally {
     await layer.close();

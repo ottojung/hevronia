@@ -31,7 +31,7 @@ export async function respondTurn(
   const memoryTurn = lazyMemory?.beginTurn();
   try {
     const userId = memoryUserIdForSender(input.message.sender);
-    if (userId !== undefined) {
+    if (userId !== undefined && !input.senderIsBot) {
       lazyMemory?.observeUserMessage(
         userId, input.threadId, input.message.text,
       );
@@ -41,7 +41,11 @@ export async function respondTurn(
     );
     const history = await dependencies.store.getMessages(input.threadId);
     const candidates = replyCandidates(history);
+    const currentSenderId = input.message.sender.kind === "user"
+      ? input.message.sender.id
+      : undefined;
     for (const participantId of selectedParticipantIds(candidates)) {
+      if (input.senderIsBot && participantId === currentSenderId) continue;
       lazyMemory?.warmUser(longTermMemoryUserIdFromTelegramSender(participantId));
     }
     const snapshot = memoryTurn?.snapshot;

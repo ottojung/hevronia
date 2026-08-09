@@ -49,7 +49,7 @@ test("many consecutive silent observations compact bounded multi-participant sta
     for (let index = 0; index < 10; index += 1) {
       const senderId = index % 2 === 0 ? 11 : 22;
       const turn = await layer.respond({ threadId,
-        message: event(`повідомлення ${index}`, index + 1, senderId), hevroniaSender: { kind: "user", id: 999 } });
+        message: event(`повідомлення ${index}`, index + 1, senderId), hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
       assert.equal(turn.outcome.action, "silence");
     }
     const stored = await layer.getMessages(threadId);
@@ -73,7 +73,7 @@ test("canonical observed state survives layer recreation", async () => {
   try {
     const first = createConversationLayer({ dbPath: db, model: fakeModel(),
       summaryModel: fakeModel(), decisionMaker: silence });
-    await first.respond({ threadId, message: event("перше", 1), hevroniaSender: { kind: "user", id: 999 } });
+    await first.respond({ threadId, message: event("перше", 1), hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await first.close();
     const second = createConversationLayer({ dbPath: db, model: fakeModel(),
       summaryModel: fakeModel(), decisionMaker: silence });
@@ -101,9 +101,9 @@ test("forum topics in one group have isolated histories and reply candidates", a
   const topicB = conversationThreadIdFromTelegramGroupChat(-100, 22);
   try {
     await layer.respond({ threadId: topicA, message: event("тільки A", 1, 1, "Іра", 11),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await layer.respond({ threadId: topicB, message: event("тільки B", 2, 2, "Макс", 22),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.deepEqual(seen.get("11"), ["тільки A"]);
     assert.deepEqual(seen.get("22"), ["тільки B"]);
     assert.equal((await layer.getMessages(topicA)).length, 1);
@@ -138,7 +138,7 @@ test("compaction preserves user and chat sender kinds with duplicate names", asy
       const observed: ObservedTelegramMessage = { ...event(`факт ${index}`, index + 1, 11, "Новини"),
         sender };
       await layer.respond({ threadId, message: observed,
-        hevroniaSender: { kind: "user", id: 999 } });
+        hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     }
     const compacted = (await layer.getMessages(threadId)).find((message) =>
       message.additional_kwargs["lc_source"] === "summarization");

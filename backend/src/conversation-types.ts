@@ -11,6 +11,7 @@ export interface RespondInput {
   threadId: ConversationThreadId;
   message: ObservedTelegramMessage;
   hevroniaSender: TelegramSenderIdentity;
+  senderIsBot: boolean;
 }
 
 export interface ConversationLayerOptions {

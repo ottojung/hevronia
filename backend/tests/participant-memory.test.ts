@@ -86,13 +86,13 @@ test("older-target planning and realization receive attributed target memory", a
   try {
     await layer.respond({ threadId,
       message: message(1, { kind: "user", id: 101 }, "Іра", "я нарешті це зробила"),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await layer.respond({ threadId,
       message: message(2, { kind: "chat", id: -500 }, "Канал", "оголошення"),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     const turn = await layer.respond({ threadId,
       message: message(3, { kind: "user", id: 202 }, "Макс", "хтось буде каву?"),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(turn.outcome.action, "reply");
   } finally {
     await layer.close();

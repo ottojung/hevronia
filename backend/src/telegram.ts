@@ -46,7 +46,8 @@ export async function startBot(): Promise<void> {
         mentionsHevronia: hasDirectMention(ctx.message.text, ctx.message.entities, me.id, me.username),
       });
       const turn = await respond({ threadId, message,
-        hevroniaSender: { kind: "user", id: me.id } });
+        hevroniaSender: { kind: "user", id: me.id },
+        senderIsBot: ctx.from.is_bot });
       const result = await deliverGeneratedTurn(turn, {
         showTyping: async () => { await ctx.replyWithChatAction("typing"); },
         reply: async (text, replyToMessageId) => {
@@ -97,8 +98,7 @@ export async function startBot(): Promise<void> {
     await bot.stop();
     console.log("Stopped cleanly.");
   };
-  process.once("SIGINT", () => void stop("SIGINT"));
-  process.once("SIGTERM", () => void stop("SIGTERM"));
+  process.once("SIGINT", () => void stop("SIGINT")); process.once("SIGTERM", () => void stop("SIGTERM"));
 
   console.log("Starting long polling...");
   await bot.start({

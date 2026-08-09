@@ -42,7 +42,8 @@ export async function runScenario(
         senderDisplayName: scenario.participantName, chatKind: "private", text: participantText,
         messageThreadId: null, replyTo: null, directlyAddressed: true,
       };
-      const turn = await layer.respond({ threadId, message, hevroniaSender });
+      const turn = await layer.respond({ threadId, message, hevroniaSender,
+        senderIsBot: false });
       roundsCompleted += 1;
       if (turn.outcome.action === "silence") {
         consecutiveSilences += 1;

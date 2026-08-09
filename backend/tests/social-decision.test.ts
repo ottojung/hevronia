@@ -80,7 +80,7 @@ test("a non-candidate planner target cannot reach Telegram delivery", async () =
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner });
   try {
     const turn = await layer.respond({ threadId, message: message(),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     let delivered = false;
     const sent = await deliverGeneratedTurn(turn, { showTyping: async () => undefined,
       reply: async () => { delivered = true; return 100; } });
@@ -103,9 +103,9 @@ test("duplicate display names retain distinct stable identities", async () => {
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner });
   try {
     await layer.respond({ threadId, message: message({ sender: { kind: "user", id: 11 } }),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await layer.respond({ threadId, message: message({ messageId: 11, sender: { kind: "user", id: 22 } }),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.deepEqual(seen.at(-1), [11, 22]);
   } finally {
     await layer.close();
@@ -125,7 +125,7 @@ test("reply metadata is ephemeral and undelivered text never enters history", as
     model, summaryModel: fakeModel(), decisionMaker: planner });
   try {
     const turn = await layer.respond({ threadId, message: message(),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await assert.rejects(() => deliverGeneratedTurn(turn, {
       showTyping: async () => undefined,
       reply: async () => { throw new Error("Telegram failed"); },
@@ -155,11 +155,11 @@ test("silence and delivered reply persist the same canonical incoming representa
     summaryModel: fakeModel(), decisionMaker: planner });
   try {
     const silent = await layer.respond({ threadId, message: message({ messageId: 1 }),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await deliverGeneratedTurn(silent, { showTyping: async () => undefined,
       reply: async () => 100 });
     const reply = await layer.respond({ threadId, message: message({ messageId: 2 }),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     const sentTexts: string[] = [];
     await deliverGeneratedTurn(reply, { showTyping: async () => undefined,
       reply: async (text) => { sentTexts.push(text); return 101; } });
@@ -182,7 +182,7 @@ test("a planner exception fails safely to silence instead of crashing", async ()
     decisionMaker: { decide: async () => { throw new Error("planner boom"); } } });
   try {
     const turn = await layer.respond({ threadId, message: message(),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     let delivered = false;
     const sent = await deliverGeneratedTurn(turn, { showTyping: async () => undefined,
       reply: async () => { delivered = true; return 100; } });
@@ -210,7 +210,7 @@ test("recalled memory reaches the planner before silence decision", async () => 
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner,
     lazyMemory: memory });
   try {
-    await layer.respond({ threadId, message: message(), hevroniaSender: { kind: "user", id: 999 } });
+    await layer.respond({ threadId, message: message(), hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(recalled, "важлива обіцянка");
   } finally {
     await layer.close();

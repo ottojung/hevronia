@@ -43,9 +43,9 @@ test("user and send-as-chat identities remain distinct and chat senders skip mem
   try {
     const threadId = conversationThreadIdFromTelegramGroupChat(-10);
     await layer.respond({ threadId, message: user,
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await layer.respond({ threadId, message: sendAsChat,
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     layer.warmParticipant({ kind: "chat", id: -700 });
     layer.warmParticipant({ kind: "user", id: 101 });
     await layer.close();

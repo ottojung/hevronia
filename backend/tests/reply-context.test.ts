@@ -41,9 +41,9 @@ test("realization receives the fully resolved older target", async () => {
     summaryModel: fakeModel(), decisionMaker: planner });
   try {
     await layer.respond({ threadId, message: participant(10, 101, "Іра", "я звільняюся"),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     const turn = await layer.respond({ threadId,
-      message: participant(11, 202, "Макс", "хто буде каву"), hevroniaSender: { kind: "user", id: 999 } });
+      message: participant(11, 202, "Макс", "хто буде каву"), hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(turn.outcome.action, "reply");
     if (turn.outcome.action === "reply") assert.equal(turn.outcome.replyTo.targetMessageId, 10);
   } finally {

@@ -51,13 +51,13 @@ test("confirmed outgoing persistence retries before the next planner context", a
     conversationStore: store, decisionMaker: planner });
   try {
     const turn = await layer.respond({ threadId, message: message(1, "важлива річ"),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     let sends = 0;
     const result = await deliverGeneratedTurn(turn, { showTyping: async () => undefined,
       reply: async () => { sends += 1; return 2; } });
     assert.deepEqual(result, { status: "delivered", persistence: "queued" });
     await layer.respond({ threadId, message: message(3, "наступне"),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(outgoingAttempts, 2);
     assert.equal(events.filter(({ kind }) => kind === "hevronia").length, 1);
     assert.equal(laterSawReply, true);
@@ -92,7 +92,7 @@ test("incoming canonical persistence recovers before planning", async () => {
     conversationStore: store, decisionMaker: planner });
   try {
     await layer.respond({ threadId, message: message(4, "вхідне"),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(attempts, 2);
     assert.equal(planned, true);
     assert.equal(events.filter(({ kind }) => kind === "participant").length, 1);
