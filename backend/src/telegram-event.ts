@@ -54,13 +54,17 @@ export function deserializeTelegramEvent(serialized: string): CanonicalTelegramE
   return canonicalTelegramEventSchema.parse(JSON.parse(serialized));
 }
 
-export function renderTelegramEvent(event: CanonicalTelegramEvent): string {
-  const identity = `${event.senderDisplayName} [telegram-${event.sender.kind}:${event.sender.id}]`;
-  const reply = event.replyTo !== null
-    ? ` (reply to ${event.replyTo.targetSenderDisplayName} [telegram-${event.replyTo.targetSender.kind}:${event.replyTo.targetSender.id}], message ${event.replyTo.targetMessageId}: ${event.replyTo.targetText ?? "text unavailable"})`
-    : "";
-  const direct = event.kind === "participant" && event.directlyAddressed
-    ? " [directly addressing Хевронія]"
-    : "";
-  return `[message ${event.messageId}] ${identity}${reply}${direct}: ${event.text}`;
+/**
+ * Spreadsheet label for a Telegram sender: the ordinary private bookkeeping
+ * Хевронія uses to tell recurring dream characters apart. Users and other
+ * senders (chats/channels) use distinct plain-language forms.
+ */
+export function spreadsheetSubject(sender: TelegramSenderIdentity): string {
+  return sender.kind === "user" ? `user ${sender.id}` : `channel ${sender.id}`;
+}
+
+export function spreadsheetLabel(sender: TelegramSenderIdentity): string {
+  return sender.kind === "user"
+    ? `the character your spreadsheet calls user ${sender.id}`
+    : `the source your spreadsheet calls channel ${sender.id}`;
 }
