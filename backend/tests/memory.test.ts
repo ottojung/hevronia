@@ -10,7 +10,12 @@ import { fakeModel } from "@langchain/core/testing";
 import { createConversationLayer } from "../src/layer.js";
 import type { SocialDecisionContext, SocialDecisionMaker } from "../src/social-decision.js";
 import { SUMMARY_PREFIX } from "../src/summary.js";
-import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../src/telegram-event.js";
+import { extractText } from "../src/text.js";
+import {
+  deserializeTelegramEvent,
+  type ObservedTelegramMessage,
+  type TelegramSenderIdentity,
+} from "../src/telegram-event.js";
 import {
   conversationThreadIdFromTelegramGroupChat,
   conversationThreadIdFromTelegramPrivateChat,
@@ -23,6 +28,9 @@ function event(text: string, messageId: number, senderId = 1, name = "Іра",
   return { kind: "participant", messageId, sender: { kind: "user", id: senderId }, senderDisplayName: name,
     chatKind: "group", text, messageThreadId, replyTo: null, directlyAddressed: false };
 }
+
+const contentLengthTokens = (messages: { content: unknown }[]): number =>
+  messages.reduce((total, m) => total + String(m.content).length, 0);
 
 function tempPath(): { dir: string; db: string } {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-memory-"));
@@ -44,7 +52,7 @@ test("many consecutive silent observations compact bounded multi-participant sta
   }
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
     decisionMaker: planner, triggerTokens: 20, keepTokens: 12,
-    trimTokensToSummarize: 100, tokenCounter: (messages) => messages.length * 10 });
+    trimTokensToSummarize: 100, tokenCounter: contentLengthTokens });
   try {
     for (let index = 0; index < 10; index += 1) {
       const senderId = index % 2 === 0 ? 11 : 22;
@@ -128,7 +136,7 @@ test("compaction preserves user and chat sender kinds with duplicate names", asy
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
     decisionMaker: { decide: async () => ({ action: "silence" }) },
     triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 100,
-    tokenCounter: (messages) => messages.length * 10 });
+    tokenCounter: contentLengthTokens });
   try {
     for (let index = 0; index < 6; index += 1) {
       const sender: TelegramSenderIdentity = index % 2 === 0
@@ -167,7 +175,7 @@ test("the summary model receives rendered dream input with no internal message i
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
     decisionMaker: { decide: async () => ({ action: "silence" }) },
     triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 100,
-    tokenCounter: (messages) => messages.length * 10 });
+    tokenCounter: contentLengthTokens });
   try {
     for (let index = 0; index < 4; index += 1) {
       await layer.respond({ threadId,
@@ -183,6 +191,88 @@ test("the summary model receives rendered dream input with no internal message i
     assert.doesNotMatch(input, /telegram-user:/);
     assert.doesNotMatch(input, /spreadsheet/);
     assert.doesNotMatch(input, /user 11/);
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a throwing summary model aborts compaction without destroying history", async () => {
+  const { dir, db } = tempPath();
+  const summary = fakeModel().alwaysThrow(new Error("summary offline"));
+  const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
+    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 100,
+    tokenCounter: contentLengthTokens });
+  try {
+    for (let index = 0; index < 6; index += 1) {
+      await layer.respond({ threadId,
+        message: event(`факт ${index}`, index + 1, 11),
+        hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    }
+    const stored = await layer.getMessages(threadId);
+    assert.equal(stored.length, 6);
+    assert.ok(!stored.some((m) => m.additional_kwargs["lc_source"] === "summarization"));
+    assert.ok(!String(stored.map((m) => String(m.content)).join()).includes("Error generating summary"));
+    for (const message of stored) {
+      const parsed = deserializeTelegramEvent(extractText(String(message.content)));
+      assert.equal(parsed.kind, "participant");
+    }
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an empty summary response aborts compaction without destroying history", async () => {
+  const { dir, db } = tempPath();
+  const summary = fakeModel();
+  for (let index = 0; index < 10; index += 1) {
+    summary.respond(new AIMessage("   "));
+  }
+  const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
+    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 100,
+    tokenCounter: contentLengthTokens });
+  try {
+    for (let index = 0; index < 6; index += 1) {
+      await layer.respond({ threadId,
+        message: event(`факт ${index}`, index + 1, 11),
+        hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    }
+    const stored = await layer.getMessages(threadId);
+    assert.equal(stored.length, 6);
+    assert.ok(!stored.some((m) => m.additional_kwargs["lc_source"] === "summarization"));
+    assert.ok(!String(stored.map((m) => String(m.content)).join()).includes("Error generating summary"));
+    for (const message of stored) {
+      const parsed = deserializeTelegramEvent(extractText(String(message.content)));
+      assert.equal(parsed.kind, "participant");
+    }
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("compaction budgets tokens over dream-rendered content, not raw canonical JSON", async () => {
+  const { dir, db } = tempPath();
+  const summary = fakeModel();
+  for (let index = 0; index < 10; index += 1) {
+    summary.respond(new AIMessage("character 11 said something"));
+  }
+  const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
+    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 100,
+    tokenCounter: (messages) => messages.length * 10 });
+  try {
+    for (let index = 0; index < 5; index += 1) {
+      await layer.respond({ threadId,
+        message: event(`факт ${index}`, index + 1, 11),
+        hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    }
+    const stored = await layer.getMessages(threadId);
+    assert.equal(stored.length, 5);
+    assert.ok(!stored.some((m) => m.additional_kwargs["lc_source"] === "summarization"));
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
