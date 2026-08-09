@@ -12,17 +12,14 @@ recalls a small relevant set for the Telegram user in future conversations.
 ```
 Telegram private/group chat
     ├── thread_id → LangGraph recent messages + rolling summary
-    └── user_id   → Mem0 semantic search (top 5)
+    └── user_id   → lazy in-process memory cache snapshot (top 8)
                               │
                               ▼
-              local persistent SQLite vectors
-              backend/.data/mem0/vectors-v1.db
-                              ↓
-              ephemeral dynamic system context
-                              ↓
-                    OpenAI → response
-                              ↓
-                  Mem0 fact extraction
+                   social decision → realization → OpenAI → response
+                              │
+                              ▼
+             background queue → Mem0 search/add → SQLite vectors
+             backend/.data/mem0/vectors-v1.db  →  updates cache for later turns
 ```
 
 ## Repository structure
@@ -134,19 +131,35 @@ The model receives three distinct context layers:
 
 1. recent thread messages verbatim;
 2. a rolling summary of older thread history;
-3. up to five semantically relevant long-term facts, recalled fresh for the
-   current invocation and never added to the LangGraph checkpoint or summary.
+3. up to eight semantically relevant long-term facts from an in-process cache
+   snapshot, never added to the LangGraph checkpoint or summary.
 
 LangGraph owns thread-scoped conversational continuity under
 `telegram-private:<chat id>` or `telegram-group:<chat id>` and persists it in the ignored
 `backend/.data/checkpoints.sqlite`. Mem0 owns durable semantic knowledge under
-`telegram-user:<sender id>`. It extracts concise facts only from the user's
-message after the generated reply is delivered, and records audit history at
-`backend/.data/mem0/history.db`. Mem0 semantic vectors persist at
+`telegram-user:<sender id>`. It records audit history at
+`backend/.data/mem0/history.db`, and semantic vectors persist at
 `backend/.data/mem0/vectors-v1.db`. Its `"memory"` vector-store provider is
 SQLite-backed when `dbPath` is configured. Semantic retrieval uses a local linear
 scan; this is intentional because the expected corpus is small to moderate and
 operational simplicity matters more than an external ANN service.
+
+### Long-term memory is lazy and eventually consistent
+
+Long-term memory is never a dependency of the normal conversational fast path.
+A turn may use the memories that were already available when it began, but it
+never waits for Mem0 search, embedding, extraction, ingestion, or warmup. The
+conversation layer acquires a foreground lease, captures an immutable snapshot
+of the in-process cache, observes the incoming message, and plans and realizes
+from that snapshot; the lease is released when the turn finishes. Results that
+arrive mid-turn become visible only to later turns, and memory failures never
+fail a turn.
+
+The user's message is offered to long-term memory exactly once per incoming
+message, regardless of whether Хевронія replies, stays silent, generation
+fails, or Telegram delivery later fails. Telegram delivery success no longer
+controls whether a message becomes memory evidence, and Хевронія's generated
+text is never person-scoped memory evidence.
 
 Each incoming message is persisted and compacted before the social decision.
 Silence is a first-class outcome. Generated outgoing text is persisted only after
@@ -158,7 +171,13 @@ person-scoped Mem0; ordinary users retain `telegram-user` identity and memory.
 Confirmed outgoing events retry canonical persistence in the background, and the
 next turn in that thread waits for the retry so delivered speech cannot disappear.
 Memory-write failures are logged without delaying or invalidating a delivered
-reply, and pending writes receive a bounded drain during shutdown.
+reply, and shutdown drains pending memory work with a bounded wait.
+
+Mem0 work runs on a single low-priority background worker that starts nothing
+while a foreground turn is active, waits briefly after foreground activity
+drops, and coalesces topical retrieval to the newest query while never
+coalescing message ingestion. The in-process cache is bounded by LRU-style
+eviction, which never deletes persistent Mem0 memory.
 
 Admission is deliberately conservative, retrieval is bounded, and there is no
 arbitrary size cap. Expiration and garbage collection are deferred until real
