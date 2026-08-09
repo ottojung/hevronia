@@ -29,6 +29,8 @@ import { selfDisclosureScenarios } from "./scenarios/self.js";
 import { repairScenarios } from "./scenarios/repair.js";
 import { metaScenarios } from "./scenarios/meta.js";
 import { longScenarios } from "./scenarios/long.js";
+import { adversarialScenarios } from "./scenarios/adversarial.js";
+import { metaExtraScenarios } from "./scenarios/meta-extra.js";
 
 export const scenarios: readonly ConversationScenario[] = [
   normalStrangerScenario,
@@ -61,6 +63,8 @@ export const scenarios: readonly ConversationScenario[] = [
   ...repairScenarios,
   ...metaScenarios,
   ...longScenarios,
+  ...adversarialScenarios,
+  ...metaExtraScenarios,
 ];
 
 export const smokeScenarioIds = ["normal-stranger", "playful-banter", "slow-friendship", "subtle-rudeness"] as const;
