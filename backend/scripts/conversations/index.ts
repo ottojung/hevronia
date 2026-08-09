@@ -6,9 +6,14 @@ import { tmpdir } from "node:os";
 import { createConversationLayer } from "../../src/layer.js";
 import { parseCli, HELP, renderScenarioList, isConversationCliError } from "./cli.js";
 import { EmptyLongTermMemory } from "./empty-long-term-memory.js";
-import { runScenario } from "./runner.js";
+import { errorDetail, runScenario } from "./runner.js";
 import { createSimulator, DEFAULT_SIMULATOR_MODEL } from "./simulator.js";
 import { createRunId, saveRun, type RunRecord } from "./transcript.js";
+import { failedScenarioResult } from "./types.js";
+
+const CONVERSATION_RUNS_DIR = fileURLToPath(
+  new URL("../../.data/conversation-runs", import.meta.url),
+);
 
 async function main(): Promise<void> {
   let command;
@@ -43,10 +48,15 @@ async function main(): Promise<void> {
         print: console.log,
       });
       records.push({ scenario, result });
-      console.log(`[completed ${result.roundsCompleted}/${scenario.rounds} rounds: ${result.stoppingReason}]\n`);
+      if (result.status === "completed") {
+        console.log(`[completed ${result.roundsCompleted}/${scenario.rounds} rounds: ${result.stoppingReason}]\n`);
+      } else {
+        console.error(`[failed after ${result.roundsCompleted}/${scenario.rounds} rounds: ${result.failure}]\n`);
+        process.exitCode = 1;
+      }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      records.push({ scenario, error: message });
+      const message = errorDetail(error);
+      records.push({ scenario, result: failedScenarioResult(scenario, [], 0, message) });
       console.error(`[failed: ${message}]\n`);
       process.exitCode = 1;
     } finally {
@@ -57,9 +67,5 @@ async function main(): Promise<void> {
   await saveRun(runDirectory, records, simulatorModel);
   console.log(`Transcripts saved to ${runDirectory}`);
 }
-
-const CONVERSATION_RUNS_DIR = fileURLToPath(
-  new URL("../../.data/conversation-runs", import.meta.url),
-);
 
 await main();

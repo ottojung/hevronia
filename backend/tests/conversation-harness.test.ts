@@ -42,13 +42,16 @@ test("CLI parses smoke, all, explicit IDs, and round overrides", () => {
 test("CLI rejects invalid rounds, unknown scenarios, and incompatible selection", () => {
   assert.throws(() => parseCli(["--rounds", "0"]), ConversationCliError);
   assert.throws(() => parseCli(["--rounds", "1.5"]), ConversationCliError);
+  assert.throws(() => parseCli(["--rounds", "9007199254740993"]), ConversationCliError);
+  assert.throws(() => parseCli(["--rounds", "99999999999999999999"]), ConversationCliError);
+  assert.doesNotThrow(() => parseCli(["--rounds", "9007199254740991"]));
   assert.throws(() => parseCli(["missing"]), ConversationCliError);
   assert.throws(() => parseCli(["--all", "normal-stranger"]), ConversationCliError);
 });
 
 test("runner alternates messages, persists increasing reply IDs, records silence, and resets silence", async () => {
   const persisted: number[] = [];
-  const outcomes = ["reply", "silence", "reply", "silence", "silence"] as const;
+  const outcomes: readonly ("reply" | "silence")[] = ["reply", "silence", "reply", "silence", "silence"];
   let responseIndex = 0;
   let closeCount = 0;
   const layer: ConversationLayer = {
@@ -75,6 +78,7 @@ test("runner alternates messages, persists increasing reply IDs, records silence
     } },
     print: () => undefined,
   });
+  if (result.status !== "completed") assert.fail("expected a completed scenario");
   assert.equal(result.roundsCompleted, 5);
   assert.equal(result.stoppingReason, "stopped after two consecutive silences");
   assert.deepEqual(transcriptLengths, [0, 2, 4, 6, 8]);
@@ -100,7 +104,51 @@ test("runner respects round limit and gives each run an empty simulator transcri
   };
   const first = await runScenario(scenarios[0], 1, dependencies);
   const second = await runScenario(scenarios[0], 1, dependencies);
+  if (first.status !== "completed") assert.fail("expected a completed scenario");
+  if (second.status !== "completed") assert.fail("expected a completed scenario");
   assert.equal(first.roundsCompleted, 1);
   assert.equal(second.roundsCompleted, 1);
   assert.deepEqual(firstLengths, [0, 0]);
+});
+
+test("runner returns a failed result that keeps the partial transcript", async () => {
+  let respondCount = 0;
+  let closeCount = 0;
+  const layer: ConversationLayer = {
+    respond: () => {
+      respondCount += 1;
+      if (respondCount === 2) return Promise.reject(new Error("boom"));
+      return Promise.resolve(GeneratedTurn.fromReply(`reply ${respondCount}`, {
+        targetMessageId: respondCount, targetSender: { kind: "user", id: 7_001 },
+        targetSenderDisplayName: "Олена", targetText: "participant",
+      }, () => undefined));
+    },
+    recordDeliveredMessage: () => undefined,
+    getMessages: () => Promise.resolve([]),
+    close: () => { closeCount += 1; return Promise.resolve(); },
+  };
+  const result = await runScenario(scenarios[0], 5, {
+    createLayer: () => layer,
+    simulator: { nextMessage: (_scenario, transcript) =>
+      Promise.resolve(`participant ${transcript.length + 1}`) },
+    print: () => undefined,
+  });
+  if (result.status !== "failed") assert.fail("expected a failed scenario");
+  assert.equal(result.failure, "boom");
+  assert.equal(result.roundsCompleted, 1);
+  assert.deepEqual(result.transcript.map(({ speaker }) => speaker),
+    ["participant", "hevronia", "participant"]);
+  assert.equal(closeCount, 1);
+});
+
+test("runner returns a failed result when the layer cannot be created", async () => {
+  const result = await runScenario(scenarios[0], 3, {
+    createLayer: () => { throw new Error("no layer"); },
+    simulator: { nextMessage: () => Promise.resolve("привіт") },
+    print: () => undefined,
+  });
+  if (result.status !== "failed") assert.fail("expected a failed scenario");
+  assert.equal(result.failure, "no layer");
+  assert.equal(result.roundsCompleted, 0);
+  assert.deepEqual(result.transcript, []);
 });

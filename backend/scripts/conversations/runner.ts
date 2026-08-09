@@ -1,17 +1,22 @@
 import { conversationThreadIdFromTelegramPrivateChat } from "../../src/identifiers.js";
+import type { ConversationLayer } from "../../src/conversation-types.js";
 import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../../src/telegram-event.js";
-import type { ConversationScenario, ScenarioDependencies, ScenarioResult, TranscriptEntry } from "./types.js";
+import type { ConversationScenario, ScenarioDependencies, ScenarioResult, ScenarioStoppingReason, TranscriptEntry } from "./types.js";
+import { completedScenarioResult, failedScenarioResult } from "./types.js";
 
 const PARTICIPANT_ID = 7_001;
 const HEVRONIA_ID = 7_002;
 const CHAT_ID = 7_003;
+
+export function errorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
 
 export async function runScenario(
   scenario: ConversationScenario,
   rounds: number,
   dependencies: ScenarioDependencies,
 ): Promise<ScenarioResult> {
-  const layer = await dependencies.createLayer();
   const transcript: TranscriptEntry[] = [];
   const threadId = conversationThreadIdFromTelegramPrivateChat(CHAT_ID);
   const participantSender: TelegramSenderIdentity = { kind: "user", id: PARTICIPANT_ID };
@@ -19,8 +24,16 @@ export async function runScenario(
   let messageId = 0;
   let consecutiveSilences = 0;
   let roundsCompleted = 0;
-  let stoppingReason: ScenarioResult["stoppingReason"] = "round limit reached";
+  let stoppingReason: ScenarioStoppingReason = "round limit reached";
+  let layer: ConversationLayer | undefined;
+  let layerClosed = false;
+  const closeLayer = async (): Promise<void> => {
+    if (layer === undefined || layerClosed) return;
+    layerClosed = true;
+    await layer.close();
+  };
   try {
+    layer = await dependencies.createLayer();
     for (let round = 0; round < rounds; round += 1) {
       const participantText = await dependencies.simulator.nextMessage(scenario, transcript);
       transcript.push({ speaker: "participant", text: participantText });
@@ -50,8 +63,15 @@ export async function runScenario(
       }
       dependencies.print("");
     }
-    return { scenario, transcript, roundsCompleted, stoppingReason };
-  } finally {
-    await layer.close();
+    await closeLayer();
+    return completedScenarioResult(scenario, transcript, roundsCompleted, stoppingReason);
+  } catch (error) {
+    let failure = errorDetail(error);
+    try {
+      await closeLayer();
+    } catch (closeError) {
+      failure = `${failure}; additionally failed to close the conversation layer: ${errorDetail(closeError)}`;
+    }
+    return failedScenarioResult(scenario, transcript, roundsCompleted, failure);
   }
 }

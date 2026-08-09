@@ -1,12 +1,11 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import type { ScenarioResult, TranscriptEntry } from "./types.js";
+import type { ConversationScenario, ScenarioResult, TranscriptEntry } from "./types.js";
 
 export interface RunRecord {
-  scenario: ScenarioResult["scenario"];
-  result?: ScenarioResult;
-  error?: string;
+  scenario: ConversationScenario;
+  result: ScenarioResult;
 }
 
 export function createRunId(date = new Date()): string {
@@ -27,8 +26,11 @@ export async function saveRun(
 
 function renderScenario(record: RunRecord, simulatorModel: string): string {
   const result = record.result;
-  const metadata = `# ${record.scenario.title}\n\n- **ID:** ${record.scenario.id}\n- **Category:** ${record.scenario.category}\n- **Purpose:** ${record.scenario.purpose}\n- **Participant:** ${record.scenario.participantName}\n- **Configured rounds:** ${result?.scenario.rounds ?? record.scenario.rounds}\n- **Actual rounds:** ${result?.roundsCompleted ?? 0}\n- **Stopping reason:** ${record.error === undefined ? result?.stoppingReason ?? "unknown" : `failed: ${record.error}`}\n- **Simulator model:** ${simulatorModel}\n\n## Transcript\n\n`;
-  return metadata + (result === undefined ? "_No transcript was produced._\n" : renderEntries(result.transcript));
+  const metadata = `# ${record.scenario.title}\n\n- **ID:** ${record.scenario.id}\n- **Category:** ${record.scenario.category}\n- **Purpose:** ${record.scenario.purpose}\n- **Participant:** ${record.scenario.participantName}\n- **Configured rounds:** ${result.scenario.rounds}\n- **Actual rounds:** ${result.roundsCompleted}\n- **Stopping reason:** ${result.status === "completed" ? result.stoppingReason : `failed: ${result.failure}`}\n- **Simulator model:** ${simulatorModel}\n\n## Transcript\n\n`;
+  const transcript = result.transcript.length === 0
+    ? "_No transcript was produced._\n"
+    : renderEntries(result.transcript);
+  return metadata + transcript;
 }
 
 function renderEntries(entries: readonly TranscriptEntry[]): string {
@@ -41,7 +43,7 @@ function renderEntries(entries: readonly TranscriptEntry[]): string {
 
 function renderIndex(records: readonly RunRecord[], simulatorModel: string): string {
   const lines = records.map((record) => {
-    const status = record.error === undefined ? "completed" : `failed — ${record.error}`;
+    const status = record.result.status === "completed" ? "completed" : `failed — ${record.result.failure}`;
     return `- [${record.scenario.id}](./${record.scenario.id}.md) — ${status}`;
   });
   return `# Conversation simulation run\n\nSimulator model: ${simulatorModel}\n\n${lines.join("\n")}\n`;

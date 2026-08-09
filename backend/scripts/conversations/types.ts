@@ -29,9 +29,40 @@ export interface ScenarioDependencies {
   print(line: string): void;
 }
 
-export interface ScenarioResult {
-  scenario: ConversationScenario;
-  transcript: TranscriptEntry[];
-  roundsCompleted: number;
-  stoppingReason: "round limit reached" | "stopped after two consecutive silences";
+export type ScenarioStoppingReason =
+  | "round limit reached"
+  | "stopped after two consecutive silences";
+
+export type ScenarioResult =
+  | {
+      status: "completed";
+      scenario: ConversationScenario;
+      transcript: TranscriptEntry[];
+      roundsCompleted: number;
+      stoppingReason: ScenarioStoppingReason;
+    }
+  | {
+      status: "failed";
+      scenario: ConversationScenario;
+      transcript: TranscriptEntry[];
+      roundsCompleted: number;
+      failure: string;
+    };
+
+export function completedScenarioResult(
+  scenario: ConversationScenario,
+  transcript: TranscriptEntry[],
+  roundsCompleted: number,
+  stoppingReason: ScenarioStoppingReason,
+): ScenarioResult {
+  return { status: "completed", scenario, transcript, roundsCompleted, stoppingReason };
+}
+
+export function failedScenarioResult(
+  scenario: ConversationScenario,
+  transcript: TranscriptEntry[],
+  roundsCompleted: number,
+  failure: string,
+): ScenarioResult {
+  return { status: "failed", scenario, transcript, roundsCompleted, failure };
 }
