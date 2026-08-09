@@ -3,17 +3,14 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { createConversationLayer } from "../../src/layer.js";
-import type { LongTermMemory } from "../../src/long-term-memory/index.js";
-import { EmptyLongTermMemory } from "./empty-long-term-memory.js";
-import { SeededLongTermMemory } from "./seeded-long-term-memory.js";
+import type { LazyLongTermMemory } from "../../src/long-term-memory/runtime.js";
+import { PreseededLazyMemory } from "./preseeded-lazy-memory.js";
 import { errorDetail, runScenario } from "./runner.js";
 import { failedScenarioResult } from "./types.js";
 import type { ConversationScenario, ScenarioResult, Simulator } from "./types.js";
 
-function createScenarioMemory(scenario: ConversationScenario): LongTermMemory {
-  return scenario.longTermMemory !== undefined && scenario.longTermMemory.length > 0
-    ? new SeededLongTermMemory(scenario.longTermMemory)
-    : new EmptyLongTermMemory();
+function createScenarioMemory(scenario: ConversationScenario): LazyLongTermMemory {
+  return new PreseededLazyMemory(scenario.longTermMemory ?? []);
 }
 
 export async function runScenarioEntry(
@@ -29,7 +26,7 @@ export async function runScenarioEntry(
       simulator,
       createLayer: () => createConversationLayer({
         dbPath: join(directory, "checkpoints.sqlite"),
-        longTermMemory: createScenarioMemory(scenario),
+        lazyMemory: createScenarioMemory(scenario),
       }),
       print: (line) => lines.push(line),
     });

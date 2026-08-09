@@ -3,10 +3,7 @@ import type { ConversationLayer } from "../../src/conversation-types.js";
 import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../../src/telegram-event.js";
 import type { ConversationScenario, ScenarioDependencies, ScenarioResult, ScenarioStoppingReason, TranscriptEntry } from "./types.js";
 import { completedScenarioResult, failedScenarioResult } from "./types.js";
-
-const PARTICIPANT_ID = 7_001;
-const HEVRONIA_ID = 7_002;
-const CHAT_ID = 7_003;
+import { PARTICIPANT_ID, HEVRONIA_ID, CHAT_ID } from "./identities.js";
 
 export function errorDetail(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
