@@ -32,6 +32,8 @@ test("user and send-as-chat identities remain distinct and chat senders skip mem
   assert.doesNotMatch(renderDreamEvent(user), /message 1/);
   assert.match(renderDreamEvent(sendAsChat), /channel 500/);
   assert.match(renderDreamEvent(sendAsChat), /від каналу/);
+  assert.match(renderDreamEvent(sendAsChat), /A Telegram message appeared from a Telegram source in the dream/);
+  assert.doesNotMatch(renderDreamEvent(sendAsChat), /dream character/);
   assert.doesNotMatch(renderDreamEvent(sendAsChat), /telegram-chat:-500/);
   assert.doesNotMatch(renderDreamEvent(sendAsChat), /-500/);
   assert.doesNotMatch(renderDreamEvent(sendAsChat), /message 2/);

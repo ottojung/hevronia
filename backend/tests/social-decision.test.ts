@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { AIMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
 
 import { createConversationLayer } from "../src/layer.js";
@@ -16,7 +16,7 @@ import { SYSTEM_PROMPT } from "../src/personality.js";
 import { createSocialDecisionMaker, type SocialDecisionMaker } from "../src/social-decision.js";
 import { createObservedTelegramMessage, hasDirectMention } from "../src/telegram-observation.js";
 import { deliverGeneratedTurn } from "../src/telegram-delivery.js";
-import type { ObservedTelegramMessage } from "../src/telegram-event.js";
+import { serializeTelegramEvent, type ObservedTelegramMessage } from "../src/telegram-event.js";
 import { staticMemory } from "./memory-fixtures.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(77);
@@ -60,6 +60,7 @@ test("real planner receives canonical personality, background, and recalled memo
     assert.match(input, /Warcraft is part of the dream/);
     assert.match(input, /character 88/);
     assert.match(input, /notebook/);
+    assert.match(input, /You could reply directly to this message as reply choice A\./);
     assert.doesNotMatch(input, /telegram-user:88/);
     assert.doesNotMatch(input, /spreadsheet/);
     assert.doesNotMatch(input, /user 88/);
@@ -67,7 +68,10 @@ test("real planner receives canonical personality, background, and recalled memo
     return new AIMessage(JSON.stringify({ decision: { action: "silence" } }));
   });
   const planner = createSocialDecisionMaker(model, SYSTEM_PROMPT);
-  await planner.decide({ boundedHistory: [], currentMessage: message(),
+  const current = message();
+  await planner.decide({
+    boundedHistory: [new HumanMessage({ content: serializeTelegramEvent(current) })],
+    currentMessage: current,
     replyCandidates: [{ messageId: 10, sender: { kind: "user", id: 88 },
       senderDisplayName: "Іра", text: "та ні" }], participantMemories: [{
         participant: { kind: "user", id: 88 }, memories: [{ text: "Іра боїться павуків" }],
