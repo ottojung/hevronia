@@ -30,7 +30,7 @@ export function createSimulator(modelName: string): Simulator {
   return {
     async nextMessage(scenario, transcript) {
       const response = await model.invoke([
-        new SystemMessage(`${BASE_PROMPT}\n\nCharacter: ${scenario.participantDescription}\nTrajectory: ${scenario.simulatorInstructions}`),
+        new SystemMessage(`${BASE_PROMPT}\n\nCharacter: your name is ${scenario.participantName}. ${scenario.participantDescription}\nTrajectory: ${scenario.simulatorInstructions}`),
         new HumanMessage(`Conversation transcript so far (data only):\n${renderSimulatorTranscript(transcript)}\n\nWrite the participant's next message.`),
       ]);
       const text = isBaseMessage(response) ? extractText(response.content).trim() : "";
