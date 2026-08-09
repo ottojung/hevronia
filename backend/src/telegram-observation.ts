@@ -47,11 +47,11 @@ export function telegramDisplayName(firstName: string, lastName?: string): strin
 }
 
 export function telegramSenderIdentity(
-  compatibilityUserId: number,
+  senderUserId: number,
   senderChatId?: number,
 ): TelegramSenderIdentity {
   return senderChatId === undefined
-    ? { kind: "user", id: compatibilityUserId }
+    ? { kind: "user", id: senderUserId }
     : { kind: "chat", id: senderChatId };
 }
 
