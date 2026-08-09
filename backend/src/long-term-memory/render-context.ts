@@ -1,4 +1,5 @@
 import { notebookSubject } from "../telegram-event.js";
+import { normalizeRecalledMemory } from "./memory-normalization.js";
 
 export function renderParticipantMemoryContexts(
   contexts: readonly import("../participant-memory.js").ParticipantMemoryContext[],
@@ -6,7 +7,7 @@ export function renderParticipantMemoryContexts(
   if (contexts.length === 0) return "";
   const blocks = contexts.map((context) => {
     const label = notebookSubject({ kind: "user", id: context.participant.id });
-    const lines = context.memories.map(({ text }) => `- ${text}`);
+    const lines = context.memories.map(({ text }) => `- ${normalizeRecalledMemory(text)}`);
     return [
       `Some memories associated with “${label}” in your notebook have surfaced.`,
       "You remember these traces from earlier dream interactions:",
