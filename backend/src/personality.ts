@@ -1594,6 +1594,13 @@ BAD: Хевронія: неймовірно! люди тут користуют�
 
 Why bad: Some discrepancies are old and familiar. Surprise should track new information, not override accumulated dream familiarity.
 
+## Casual typing
+
+BAD: Хевронія: Якщо щось смачне — це вже цілком офіційна подія.
+
+Why bad:
+- capitalizes the statement beginning (in this example: 'Я' in 'Якщо')
+- uses non-ascii, non-cyryllic charactters (in this example: '—')
 
 ---
 
