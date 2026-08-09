@@ -9,7 +9,7 @@ import { fakeModel } from "@langchain/core/testing";
 import { createConversationLayer } from "../src/layer.js";
 import type { LazyLongTermMemory } from "../src/long-term-memory/runtime.js";
 import { createObservedTelegramMessage, telegramSenderIdentity } from "../src/telegram-observation.js";
-import { renderTelegramEvent } from "../src/telegram-event.js";
+import { renderDreamEvent } from "../src/dream-render.js";
 import { conversationThreadIdFromTelegramGroupChat } from "../src/identifiers.js";
 
 test("user and send-as-chat identities remain distinct and chat senders skip memory work", async () => {
@@ -23,8 +23,12 @@ test("user and send-as-chat identities remain distinct and chat senders skip mem
     sender: { kind: "chat", id: -500 }, senderDisplayName: "Новини",
     chatKind: "group", text: "від каналу", messageThreadId: null,
     mentionsHevronia: false, replyTo: null });
-  assert.match(renderTelegramEvent(user), /telegram-user:101/);
-  assert.match(renderTelegramEvent(sendAsChat), /telegram-chat:-500/);
+  assert.match(renderDreamEvent(user), /user 101/);
+  assert.match(renderDreamEvent(user), /від людини/);
+  assert.doesNotMatch(renderDreamEvent(user), /telegram-user:101/);
+  assert.match(renderDreamEvent(sendAsChat), /channel -500/);
+  assert.match(renderDreamEvent(sendAsChat), /від каналу/);
+  assert.doesNotMatch(renderDreamEvent(sendAsChat), /telegram-chat:-500/);
   const calls: string[] = [];
   const memory: LazyLongTermMemory = {
     beginTurn() {
@@ -65,5 +69,10 @@ test("reply relationships preserve a chat target identity", () => {
       targetSender: { kind: "chat", id: -500 }, targetSenderDisplayName: "Новини",
       targetText: "від каналу", targetsHevronia: false } });
   assert.equal(reply.replyTo?.targetSender.kind, "chat");
-  assert.match(renderTelegramEvent(reply), /telegram-chat:-500/);
+  const rendered = renderDreamEvent(reply);
+  assert.match(rendered, /reply to message 2/);
+  assert.match(rendered, /character displayed as “Новини”/);
+  assert.match(rendered, /від каналу/);
+  assert.match(rendered, /user 101/);
+  assert.doesNotMatch(rendered, /telegram-chat:/);
 });

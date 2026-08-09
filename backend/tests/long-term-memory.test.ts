@@ -46,13 +46,10 @@ function replyingDecisionMaker(): SocialDecisionMaker {
   return {
     decide: async () => ({
       action: "reply",
-      targetCandidateKey: "candidate-0",
-      motive: "personal concern",
-      socialAction: "brief personal reaction",
-      adviceRequested: false,
-      askQuestion: false,
-      dreamRelevant: false,
-      backgroundRelevant: false,
+      targetMessageId: 1,
+      interpretation: "personal concern",
+      activeDesire: "want to help",
+      desiredOutcome: "understand better",
     }),
   };
 }

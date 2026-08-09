@@ -38,9 +38,9 @@ test("confirmed outgoing persistence retries before the next planner context", a
   let laterSawReply = false;
   const planner: SocialDecisionMaker = { decide: async (context) => {
     plannerCall += 1;
-    if (plannerCall === 1) return { action: "reply", targetCandidateKey: "candidate-0",
-      motive: "care", socialAction: "reaction", adviceRequested: false,
-      askQuestion: false, dreamRelevant: false, backgroundRelevant: false };
+    if (plannerCall === 1) return { action: "reply", targetMessageId: 1,
+      interpretation: "care", activeDesire: "support",
+      desiredOutcome: "reassure" };
     laterSawReply = context.boundedHistory.some(({ content }) =>
       String(content).includes("доставлена відповідь"));
     return { action: "silence" };

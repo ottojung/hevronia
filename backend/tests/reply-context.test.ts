@@ -9,7 +9,8 @@ import { fakeModel } from "@langchain/core/testing";
 
 import { createConversationLayer } from "../src/layer.js";
 import type { SocialDecisionMaker } from "../src/social-decision.js";
-import { renderTelegramEvent, type DeliveredHevroniaMessage, type ObservedTelegramMessage, type ReplyRelationship } from "../src/telegram-event.js";
+import { renderDreamEvent } from "../src/dream-render.js";
+import type { DeliveredHevroniaMessage, ObservedTelegramMessage, ReplyRelationship } from "../src/telegram-event.js";
 import { conversationThreadIdFromTelegramPrivateChat } from "../src/identifiers.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(71);
@@ -24,17 +25,20 @@ test("realization receives the fully resolved older target", async () => {
   let planningCall = 0;
   const planner: SocialDecisionMaker = { decide: async () => ++planningCall === 1
     ? { action: "silence" }
-    : { action: "reply", targetCandidateKey: "candidate-0", motive: "concern",
-      socialAction: "personal reaction", adviceRequested: false, askQuestion: true,
-      dreamRelevant: false, backgroundRelevant: false } };
+    : { action: "reply", targetMessageId: 10, interpretation: "concern",
+      activeDesire: "want to understand", desiredOutcome: "hear the reason" } };
   const model = fakeModel();
   model.respond((messages) => {
     const input = messages.map(({ content }) => String(content)).join("\n");
-    assert.match(input, /"messageId":10/);
-    assert.match(input, /"sender":\{"kind":"user","id":101\}/);
-    assert.match(input, /"senderDisplayName":"Іра"/);
-    assert.match(input, /"text":"я звільняюся"/);
-    assert.doesNotMatch(input, /"targetCandidateKey"/);
+    assert.match(input, /reply to message 10/);
+    assert.match(input, /user 101/);
+    assert.match(input, /Іра/);
+    assert.match(input, /я звільняюся/);
+    assert.match(input, /Visible message 10/);
+    assert.doesNotMatch(input, /telegram-user:/);
+    assert.doesNotMatch(input, /"targetMessageId"/);
+    assert.doesNotMatch(input, /candidate-/);
+    assert.doesNotMatch(input, /resolved reply target and social decision/);
     return new AIMessage("стій. а шо сталося?");
   });
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"), model,
@@ -64,6 +68,10 @@ test("incoming and outgoing events share one reply relationship and render its t
       targetSenderDisplayName: "Іра", targetText: "та ні" } };
   if (outgoing.replyTo === null) assert.fail("expected outgoing reply relationship");
   assert.deepEqual(Object.keys(incoming.replyTo ?? {}), Object.keys(outgoing.replyTo));
-  assert.match(renderTelegramEvent(incoming), /ти точно прийдеш\?/);
-  assert.match(renderTelegramEvent(outgoing), /Іра.*та ні/);
+  assert.match(renderDreamEvent(incoming), /ти точно прийдеш\?/);
+  assert.match(renderDreamEvent(incoming), /та ні/);
+  assert.doesNotMatch(renderDreamEvent(incoming), /telegram-user:/);
+  assert.match(renderDreamEvent(outgoing), /reply to message 6/);
+  assert.match(renderDreamEvent(outgoing), /ну ясно/);
+  assert.match(renderDreamEvent(outgoing), /you chose to make this Telegram message appear/);
 });

@@ -58,13 +58,14 @@ test("real planner receives canonical personality, background, and recalled memo
     const input = messages.map((item) => typeof item.content === "string" ? item.content : JSON.stringify(item.content)).join("\n");
     assert.match(input, /You are Хевронія/);
     assert.match(input, /Warcraft is part of the dream/);
-    assert.match(input, /telegram-user:88/);
+    assert.match(input, /user 88/);
+    assert.doesNotMatch(input, /telegram-user:88/);
     assert.match(input, /боїться павуків/);
     return new AIMessage(JSON.stringify({ decision: { action: "silence" } }));
   });
   const planner = createSocialDecisionMaker(model, SYSTEM_PROMPT);
   await planner.decide({ boundedHistory: [], currentMessage: message(),
-    replyCandidates: [{ key: "candidate-0", messageId: 10, sender: { kind: "user", id: 88 },
+    replyCandidates: [{ messageId: 10, sender: { kind: "user", id: 88 },
       senderDisplayName: "Іра", text: "та ні" }], participantMemories: [{
         participant: { kind: "user", id: 88 }, memories: [{ text: "Іра боїться павуків" }],
       }] });
@@ -73,9 +74,8 @@ test("real planner receives canonical personality, background, and recalled memo
 test("a non-candidate planner target cannot reach Telegram delivery", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-target-"));
   const planner: SocialDecisionMaker = { decide: async () => ({ action: "reply",
-    targetCandidateKey: "invented", motive: "x", socialAction: "reaction",
-    adviceRequested: false, askQuestion: false, dreamRelevant: false,
-    backgroundRelevant: false }) };
+    targetMessageId: 999_999, interpretation: "x", activeDesire: "y",
+    desiredOutcome: "z" }) };
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner });
   try {
@@ -116,9 +116,8 @@ test("duplicate display names retain distinct stable identities", async () => {
 test("reply metadata is ephemeral and undelivered text never enters history", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-delivery-"));
   const planner: SocialDecisionMaker = { decide: async () => ({ action: "reply",
-    targetCandidateKey: "candidate-0", motive: "private motive",
-    socialAction: "brief reaction", adviceRequested: false, askQuestion: false,
-    dreamRelevant: false, backgroundRelevant: false }) };
+    targetMessageId: 10, interpretation: "private motive", activeDesire: "want",
+    desiredOutcome: "outcome" }) };
   const model = fakeModel();
   model.respond(new AIMessage("недоставлена відповідь"));
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
@@ -146,9 +145,8 @@ test("silence and delivered reply persist the same canonical incoming representa
   let call = 0;
   const planner: SocialDecisionMaker = { decide: async () => ++call === 1
     ? { action: "silence" }
-    : { action: "reply", targetCandidateKey: "candidate-1", motive: "m",
-      socialAction: "reaction", adviceRequested: false, askQuestion: false,
-      dreamRelevant: false, backgroundRelevant: false } };
+    : { action: "reply", targetMessageId: 2, interpretation: "i",
+      activeDesire: "a", desiredOutcome: "o" } };
   const model = fakeModel();
   model.respond(new AIMessage("ага"));
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"), model,

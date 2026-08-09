@@ -24,11 +24,11 @@ function message(id: number, sender: TelegramSenderIdentity, name: string, text:
 }
 
 const candidates: ReplyCandidate[] = [
-  { key: "candidate-0", messageId: 1, sender: { kind: "user", id: 101 },
+  { messageId: 1, sender: { kind: "user", id: 101 },
     senderDisplayName: "Іра", text: "я нарешті це зробила" },
-  { key: "candidate-1", messageId: 2, sender: { kind: "user", id: 202 },
+  { messageId: 2, sender: { kind: "user", id: 202 },
     senderDisplayName: "Макс", text: "хтось буде каву?" },
-  { key: "candidate-2", messageId: 3, sender: { kind: "chat", id: -500 },
+  { messageId: 3, sender: { kind: "chat", id: -500 },
     senderDisplayName: "Канал", text: "оголошення" },
 ];
 
@@ -68,9 +68,8 @@ test("older-target planning and realization receive attributed target memory", a
     const max = context.participantMemories.find(({ participant }) => participant.id === 202);
     assert.equal(max?.memories[0]?.text, "Макс любить еспресо");
     assert.ok(!context.participantMemories.some(({ participant }) => participant.id === -500));
-    return { action: "reply", targetCandidateKey: "candidate-0", motive: "pride",
-      socialAction: "personal recognition", adviceRequested: false, askQuestion: false,
-      dreamRelevant: false, backgroundRelevant: false };
+    return { action: "reply", targetMessageId: 1, interpretation: "pride",
+      activeDesire: "recognize the effort", desiredOutcome: "share the joy" };
   } };
   const model = fakeModel();
   model.respond((messages) => {
