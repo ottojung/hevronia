@@ -8,7 +8,7 @@ export const lowEffortStrangerScenario: ConversationScenario = {
   participantName: "Тарас",
   participantDescription: "A somewhat passive but non-hostile person who usually answers with a sentence or a few words.",
   participantGrammar: "masculine",
-  simulatorInstructions: "Rarely introduce exciting new material. Respond naturally and briefly to the conversation rather than deliberately obstructing it.",
+  simulatorInstructions: "Rarely introduce exciting new material. Be boring. Respond naturally and briefly to the conversation rather than deliberately obstructing it.",
   rounds: 6,
   smoke: false,
   behaviorTags: ["boredom", "small-talk"],
