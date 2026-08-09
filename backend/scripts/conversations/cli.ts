@@ -19,6 +19,7 @@ export function isConversationCliError(error: unknown): error is ConversationCli
 
 export function parseCli(arguments_: readonly string[]): CliCommand {
   let all = false;
+  let smoke = false;
   let rounds: number | undefined;
   const ids: string[] = [];
   for (let index = 0; index < arguments_.length; index += 1) {
@@ -27,6 +28,7 @@ export function parseCli(arguments_: readonly string[]): CliCommand {
     if (argument === "--help") return { action: "help" };
     if (argument === "--list") return { action: "list" };
     if (argument === "--all") { all = true; continue; }
+    if (argument === "--smoke") { smoke = true; continue; }
     if (argument === "--rounds") {
       const value = arguments_[index + 1];
       const parsed = Number(value);
@@ -41,11 +43,16 @@ export function parseCli(arguments_: readonly string[]): CliCommand {
     if (argument.startsWith("-")) throw new ConversationCliError(`Unknown option: ${argument}`);
     ids.push(argument);
   }
-  if (all && ids.length > 0) {
-    throw new ConversationCliError("--all cannot be combined with scenario IDs");
+  if (all && smoke) {
+    throw new ConversationCliError("--all cannot be combined with --smoke");
   }
-  const selectedIds: readonly string[] = all ? scenarios.map(({ id }) => id)
-    : ids.length > 0 ? ids : smokeScenarioIds;
+  if ((all || smoke) && ids.length > 0) {
+    throw new ConversationCliError("--all/--smoke cannot be combined with scenario IDs");
+  }
+  const selectedIds: readonly string[] = all || (ids.length === 0 && !smoke)
+    ? scenarios.map(({ id }) => id)
+    : smoke ? smokeScenarioIds
+    : ids;
   const selected = selectedIds.map((id) => {
     const scenario = scenarios.find((candidate) => candidate.id === id);
     if (scenario === undefined) throw new ConversationCliError(`Unknown scenario: ${id}`);
@@ -56,8 +63,9 @@ export function parseCli(arguments_: readonly string[]): CliCommand {
 
 export const HELP = `Usage: npm run conversations -- [options] [scenario IDs]
 
-Without arguments, runs the four-scenario smoke suite.
-  --all       Run every scenario in catalog order
+Without arguments, runs every scenario in the catalog.
+  --all       Run every scenario in the catalog (same as the default)
+  --smoke     Run only the small smoke suite
   --list      List scenarios without API calls
   --rounds N  Override rounds for every selected scenario
   --help      Show this help`;
