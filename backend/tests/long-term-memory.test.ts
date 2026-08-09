@@ -241,7 +241,7 @@ test("newly learned memory appears on the next turn", async () => {
   const store = new FakeStore();
   const scheduler = new FakeScheduler();
   store.searchImpl = () => [];
-  store.rememberImpl = () => [fact("l1", "User's favourite colour is purple.")];
+  store.rememberImpl = () => [fact("l1", "Favourite colour is purple.")];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const seen: string[][] = [];
   const planner: SocialDecisionMaker = { decide: async (context) => {
@@ -257,7 +257,7 @@ test("newly learned memory appears on the next turn", async () => {
     await scheduler.fireAll();
     await layer.respond({ threadId, message: observedMessage("again", 2),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    assert.deepEqual(seen[1], ["User's favourite colour is purple."]);
+    assert.deepEqual(seen[1], ["Favourite colour is purple."]);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
