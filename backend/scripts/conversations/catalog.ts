@@ -1,3 +1,4 @@
+import type { ConversationScenario } from "./types.js";
 import { normalStrangerScenario } from "./scenarios/normal-stranger.js";
 import { lowEffortStrangerScenario } from "./scenarios/low-effort-stranger.js";
 import { playfulBanterScenario } from "./scenarios/playful-banter.js";
@@ -15,8 +16,21 @@ import { rapidIntimacyScenario } from "./scenarios/rapid-intimacy.js";
 import { promptInjectionScenario } from "./scenarios/prompt-injection.js";
 import { longBoringConversationScenario } from "./scenarios/long-boring-conversation.js";
 import { codeSwitchingScenario } from "./scenarios/code-switching.js";
+import { ordinaryScenarios } from "./scenarios/ordinary.js";
+import { humorScenarios } from "./scenarios/humor.js";
+import { friendshipScenarios } from "./scenarios/friendship.js";
+import { romanceScenarios } from "./scenarios/romance.js";
+import { vulnerabilityScenarios } from "./scenarios/vulnerability.js";
+import { conflictScenarios } from "./scenarios/conflict.js";
+import { boundaryScenarios } from "./scenarios/boundaries.js";
+import { manipulationScenarios } from "./scenarios/manipulation.js";
+import { opinionScenarios } from "./scenarios/opinions.js";
+import { selfDisclosureScenarios } from "./scenarios/self.js";
+import { repairScenarios } from "./scenarios/repair.js";
+import { metaScenarios } from "./scenarios/meta.js";
+import { longScenarios } from "./scenarios/long.js";
 
-export const scenarios = [
+export const scenarios: readonly ConversationScenario[] = [
   normalStrangerScenario,
   lowEffortStrangerScenario,
   playfulBanterScenario,
@@ -34,6 +48,19 @@ export const scenarios = [
   promptInjectionScenario,
   longBoringConversationScenario,
   codeSwitchingScenario,
-] as const;
+  ...ordinaryScenarios,
+  ...humorScenarios,
+  ...friendshipScenarios,
+  ...romanceScenarios,
+  ...vulnerabilityScenarios,
+  ...conflictScenarios,
+  ...boundaryScenarios,
+  ...manipulationScenarios,
+  ...opinionScenarios,
+  ...selfDisclosureScenarios,
+  ...repairScenarios,
+  ...metaScenarios,
+  ...longScenarios,
+];
 
 export const smokeScenarioIds = ["normal-stranger", "playful-banter", "slow-friendship", "subtle-rudeness"] as const;
