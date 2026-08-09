@@ -61,16 +61,14 @@ export function createMem0Config(apiKey: string): MemoryConfig {
   };
 }
 
-export function createMem0Store(apiKey: string): LongTermMemoryStore {
-  mkdirSync(dirname(HISTORY_DB_PATH), { recursive: true });
-  const memory = new Memory(createMem0Config(apiKey));
-  console.log("Long-term memory configured using local SQLite storage");
+export type Mem0Client = Pick<Memory, "search" | "add" | "deleteAll">;
 
+export function longTermMemoryStoreFromMem0(memory: Mem0Client): LongTermMemoryStore {
   return {
     async search(userId, query, topK) {
       const result = await memory.search(query, {
         topK,
-        filters: { user_id: userId.toPersistenceKey() },
+        filters: { userId: userId.toPersistenceKey() },
       });
       return memoryRecordsFromItems(result.results);
     },
@@ -92,4 +90,11 @@ export function createMem0Store(apiKey: string): LongTermMemoryStore {
       await memory.deleteAll({ userId: userId.toPersistenceKey() });
     },
   };
+}
+
+export function createMem0Store(apiKey: string): LongTermMemoryStore {
+  mkdirSync(dirname(HISTORY_DB_PATH), { recursive: true });
+  const memory = new Memory(createMem0Config(apiKey));
+  console.log("Long-term memory configured using local SQLite storage");
+  return longTermMemoryStoreFromMem0(memory);
 }

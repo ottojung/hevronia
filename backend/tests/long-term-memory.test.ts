@@ -14,7 +14,9 @@ import {
   EMBEDDING_DIMENSION,
   HISTORY_DB_PATH,
   VECTOR_DB_PATH,
+  longTermMemoryStoreFromMem0,
   memoryRecordsFromItems,
+  type Mem0Client,
   type MemoryRecord,
 } from "../src/long-term-memory/index.js";
 import {
@@ -95,6 +97,61 @@ test("memoryRecordsFromItems maps an empty result set to no records", () => {
   assert.deepEqual(memoryRecordsFromItems([]), []);
 });
 
+test("the Mem0 adapter searches with TypeScript userId filters, preserving topK", async () => {
+  const captured: Parameters<Mem0Client["search"]>[] = [];
+  const client: Mem0Client = {
+    search: async (query, options) => {
+      captured.push([query, options]);
+      return { results: [] };
+    },
+    add: async () => ({ results: [] }),
+    deleteAll: async () => ({ message: "deleted" }),
+  };
+  const store = longTermMemoryStoreFromMem0(client);
+  await store.search(longTermMemoryUserIdFromTelegramSender(777), "питання", 5);
+  const call = captured[0];
+  assert.ok(call !== undefined);
+  const [query, options] = call;
+  assert.equal(query, "питання");
+  assert.equal(options.topK, 5);
+  assert.ok(options.filters !== undefined);
+  assert.equal(options.filters["userId"], "telegram-user:777");
+  assert.equal("user_id" in options.filters, false);
+});
+
+test("the Mem0 adapter passes add metadata, maps extraction results, and scopes deleteAll", async () => {
+  const addCalls: Parameters<Mem0Client["add"]>[] = [];
+  const deleteCalls: Parameters<Mem0Client["deleteAll"]>[] = [];
+  const client: Mem0Client = {
+    search: async () => ({ results: [] }),
+    add: async (messages, options) => {
+      addCalls.push([messages, options]);
+      return { results: [{ id: "m1", memory: "extracted fact" }] };
+    },
+    deleteAll: async (options) => {
+      deleteCalls.push([options]);
+      return { message: "deleted" };
+    },
+  };
+  const store = longTermMemoryStoreFromMem0(client);
+  const userId = longTermMemoryUserIdFromTelegramSender(555);
+  const threadId = conversationThreadIdFromTelegramPrivateChat(2);
+  const records = await store.rememberUserMessage(userId, threadId, "я люблю чай");
+  assert.equal(records.length, 1);
+  assert.equal(records[0]?.id, "m1");
+  assert.equal(records[0]?.text, "extracted fact");
+  const addCall = addCalls[0];
+  assert.ok(addCall !== undefined);
+  const [, options] = addCall;
+  assert.equal(options.userId, "telegram-user:555");
+  assert.equal(options.metadata?.["source"], "telegram");
+  assert.equal(options.metadata?.["threadId"], "telegram-private:2");
+  await store.deleteAll(userId);
+  const deleteCall = deleteCalls[0];
+  assert.ok(deleteCall !== undefined);
+  assert.equal(deleteCall[0].userId, "telegram-user:555");
+});
+
 test("Mem0 production configuration carries the extraction policy and explicit credentials", () => {
   const config = createMem0Config("test-key");
   assert.equal(config.customInstructions, LONG_TERM_MEMORY_POLICY);
@@ -118,7 +175,7 @@ test("an unresolved long-term-memory background job cannot delay respond", async
   try {
     model.respond(new AIMessage("valid reply"));
     const turn = await layer.respond({ threadId,
-      message: observedMessage("hello", 1), hevroniaSender: { kind: "user", id: 999 } });
+      message: observedMessage("hello", 1), hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     if (turn.outcome.action === "silence") assert.fail("expected a reply");
     assert.equal(turn.outcome.replyText, "valid reply");
     assert.equal(store.searchCalls.length, 0);
@@ -148,10 +205,10 @@ test("the current turn uses only the snapshot captured at turn start", async () 
   const { dir, layer } = fixture({ lazyMemory: memory, decisionMaker: planner });
   try {
     await layer.respond({ threadId, message: observedMessage("hello", 1),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
     await layer.respond({ threadId, message: observedMessage("again", 2),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
     assert.deepEqual(seen[0], ["baseline fact"]);
     assert.deepEqual(seen[1]?.sort(), ["baseline fact", "topical fact"]);
@@ -176,11 +233,11 @@ test("newly learned memory appears on the next turn", async () => {
   try {
     await layer.respond({ threadId,
       message: observedMessage("my favourite colour is purple", 1),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.deepEqual(seen[0], []);
     await scheduler.fireAll();
     await layer.respond({ threadId, message: observedMessage("again", 2),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.deepEqual(seen[1], ["User's favourite colour is purple."]);
   } finally {
     await layer.close();
@@ -197,7 +254,7 @@ test("a silent turn still observes the user's message for future memory", async 
     decisionMaker: { decide: async () => ({ action: "silence" }) } });
   try {
     const turn = await layer.respond({ threadId, message: observedMessage("ambient", 1, 111),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(turn.outcome.action, "silence");
     await scheduler.fireAll();
     assert.deepEqual(store.rememberCalls.map(({ text }) => text), ["ambient"]);
@@ -216,7 +273,7 @@ test("an undelivered reply still observes the user's message", async () => {
   try {
     model.respond(new AIMessage("delivered reply"));
     const turn = await layer.respond({ threadId, message: observedMessage("hello", 1),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     if (turn.outcome.action === "silence") assert.fail("expected a reply");
     await scheduler.fireAll();
     assert.deepEqual(store.rememberCalls.map(({ text }) => text), ["hello"]);
@@ -235,7 +292,7 @@ test("a generation failure still observes the user's message", async () => {
   try {
     model.respond(new Error("generation failed"));
     await assert.rejects(() => layer.respond({ threadId, message: observedMessage("hello", 1),
-      hevroniaSender: { kind: "user", id: 999 } }));
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false }));
     await scheduler.fireAll();
     assert.deepEqual(store.rememberCalls.map(({ text }) => text), ["hello"]);
   } finally {
@@ -253,7 +310,7 @@ test("one incoming message is never ingested twice", async () => {
   try {
     model.respond(new AIMessage("reply"));
     const turn = await layer.respond({ threadId, message: observedMessage("single", 1),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     if (turn.outcome.action === "reply") turn.outcome.persistDelivery(500);
     await scheduler.fireAll();
     assert.equal(store.rememberCalls.length, 1);
@@ -273,10 +330,51 @@ test("chat senders receive no person-scoped memory work", async () => {
     decisionMaker: { decide: async () => ({ action: "silence" }) } });
   try {
     await layer.respond({ threadId, message: observedMessage("з каналу", 1, 0, "chat"),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
     assert.equal(store.searchCalls.length, 0);
     assert.equal(store.rememberCalls.length, 0);
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("bot-authored text is not person-memory evidence but still reaches canonical conversation", async () => {
+  const store = new FakeStore();
+  const scheduler = new FakeScheduler();
+  store.searchImpl = () => [];
+  const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
+  const { dir, layer } = fixture({ lazyMemory: memory,
+    decisionMaker: { decide: async () => ({ action: "silence" }) } });
+  try {
+    await layer.respond({ threadId, message: observedMessage("з бота", 1, 101),
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: true });
+    await scheduler.fireAll();
+    assert.equal(store.searchCalls.length, 0);
+    assert.equal(store.rememberCalls.length, 0);
+    const stored = await layer.getMessages(threadId);
+    assert.equal(stored.length, 1);
+    assert.match(String(stored[0]?.content), /з бота/);
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("human-authored text remains person-memory evidence at the boundary", async () => {
+  const store = new FakeStore();
+  const scheduler = new FakeScheduler();
+  store.searchImpl = () => [];
+  const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
+  const { dir, layer } = fixture({ lazyMemory: memory,
+    decisionMaker: { decide: async () => ({ action: "silence" }) } });
+  try {
+    await layer.respond({ threadId, message: observedMessage("з людини", 1, 101),
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    await scheduler.fireAll();
+    assert.equal(store.rememberCalls.length, 1);
+    assert.equal(store.rememberCalls[0]?.text, "з людини");
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
@@ -293,7 +391,7 @@ test("successful delivery still persists only the delivered event, not memory co
   try {
     model.respond(new AIMessage("Assistant recommendation: buy the purple one."));
     const turn = await layer.respond({ threadId, message: observedMessage("user text", 1),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
     if (turn.outcome.action === "silence") assert.fail("expected a reply");
     turn.outcome.persistDelivery(600);
@@ -318,7 +416,7 @@ test("search and ingestion failures degrade gracefully through the layer", async
   try {
     model.respond(new AIMessage("valid reply"));
     const reply = await layer.respond({ threadId, message: observedMessage("hello", 1),
-      hevroniaSender: { kind: "user", id: 999 } });
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     if (reply.outcome.action === "silence") assert.fail("expected a reply");
     assert.equal(reply.outcome.replyText, "valid reply");
     await scheduler.fireAll();
