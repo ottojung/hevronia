@@ -67,4 +67,4 @@ export const scenarios: readonly ConversationScenario[] = [
   ...metaExtraScenarios,
 ];
 
-export const smokeScenarioIds = ["normal-stranger", "playful-banter", "slow-friendship", "subtle-rudeness"] as const;
+export const smokeScenarioIds = ["normal-stranger", "programming-questions"] as const;
