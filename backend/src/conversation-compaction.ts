@@ -12,6 +12,7 @@ import { SUMMARY_PREFIX, SUMMARY_PROMPT } from "./summary.js";
  * Compacts the conversation when it exceeds the trigger budget. Older messages
  * are rendered through the dream renderer before the summary model sees them,
  * so internal canonical JSON and message IDs never reach a language model.
+ * A failed summary attempt is non-destructive: the existing messages stay.
  */
 export async function compactIfNeeded(
   state: { messages: BaseMessage[] },
@@ -27,10 +28,12 @@ export async function compactIfNeeded(
   if (cutoffIndex <= 0) return {};
   const messagesToSummarize = messages.slice(0, cutoffIndex);
   const preservedMessages = messages.slice(cutoffIndex);
+  const summary = await createSummary(
+    messagesToSummarize, summaryModel, trimTokensToSummarize, tokenCounter,
+  );
+  if (summary === undefined) return {};
   const summaryMessage = new HumanMessage({
-    content: `${SUMMARY_PREFIX}\n\n${await createSummary(
-      messagesToSummarize, summaryModel, trimTokensToSummarize, tokenCounter,
-    )}`,
+    content: `${SUMMARY_PREFIX}\n\n${summary}`,
     id: uuid(),
     additional_kwargs: { lc_source: "summarization" },
   });
@@ -39,27 +42,37 @@ export async function compactIfNeeded(
   };
 }
 
+/**
+ * Produces the summary text, or signals failure by returning undefined. A
+ * throwing, empty, whitespace-only, or unsupported model response never becomes
+ * summary content and never replaces the source history.
+ */
 async function createSummary(
   messages: BaseMessage[],
   model: BaseLanguageModel,
   trimTokensToSummarize: number,
   tokenCounter: TokenCounter,
-): Promise<string> {
+): Promise<string | undefined> {
   const trimmed = await trimForSummary(messages, trimTokensToSummarize, tokenCounter);
-  if (trimmed.length === 0) return "No previous conversation history.";
+  if (trimmed.length === 0) return undefined;
   const formattedPrompt = SUMMARY_PROMPT.replace("{messages}", renderDreamObservations(trimmed));
   try {
     const content = (await model.invoke(formattedPrompt)).content;
-    if (typeof content === "string") return content.trim();
+    if (typeof content === "string") return trimmedText(content);
     if (Array.isArray(content)) {
-      return content.map((item) => {
+      return trimmedText(content.map((item) => {
         if (typeof item === "string") return item;
         if (typeof item === "object" && item !== null && "text" in item) return item.text;
         return "";
-      }).join("").trim();
+      }).join(""));
     }
-    return "Error generating summary: Invalid response format";
-  } catch (error) {
-    return `Error generating summary: ${String(error)}`;
+    return undefined;
+  } catch {
+    return undefined;
   }
+}
+
+function trimmedText(text: string): string | undefined {
+  const trimmed = text.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
 }
