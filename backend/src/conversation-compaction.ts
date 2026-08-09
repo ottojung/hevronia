@@ -44,7 +44,7 @@ export async function compactIfNeeded(
 
 /**
  * Produces the summary text, or signals failure by returning undefined. A
- * throwing, empty, whitespace-only, or unsupported model response never becomes
+ * throwing, empty, whitespace-only, or unsupported response never becomes
  * summary content and never replaces the source history.
  */
 async function createSummary(
@@ -53,10 +53,10 @@ async function createSummary(
   trimTokensToSummarize: number,
   tokenCounter: TokenCounter,
 ): Promise<string | undefined> {
-  const trimmed = await trimForSummary(messages, trimTokensToSummarize, tokenCounter);
-  if (trimmed.length === 0) return undefined;
-  const formattedPrompt = SUMMARY_PROMPT.replace("{messages}", renderDreamObservations(trimmed));
   try {
+    const trimmed = await trimForSummary(messages, trimTokensToSummarize, tokenCounter);
+    if (trimmed.length === 0) return undefined;
+    const formattedPrompt = SUMMARY_PROMPT.replace("{messages}", renderDreamObservations(trimmed));
     const content = (await model.invoke(formattedPrompt)).content;
     if (typeof content === "string") return trimmedText(content);
     if (Array.isArray(content)) {
