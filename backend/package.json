@@ -11,7 +11,8 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "test-only": "node --import tsx --test tests/*.test.ts",
     "test:memory-integration": "node --import tsx scripts/memory-integration.ts",
-    "test:structured-output-integration": "node --import tsx scripts/structured-output-integration.ts"
+    "test:structured-output-integration": "node --import tsx scripts/structured-output-integration.ts",
+    "conversations": "tsx scripts/conversations/index.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.2.5",
