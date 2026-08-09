@@ -5,6 +5,7 @@ import type { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
 import { countTokensApproximately, type TokenCounter } from "langchain";
 
 import { compactIfNeeded } from "./conversation-compaction.js";
+import { renderDreamObservations } from "./dream-render.js";
 import type { ConversationThreadId } from "./identifiers.js";
 import type { CanonicalTelegramEvent } from "./telegram-event.js";
 import { serializeTelegramEvent } from "./telegram-event.js";
@@ -27,10 +28,14 @@ export function createConversationStore(
   options: ConversationStoreOptions,
 ): ConversationStore {
   const tokenCounter = options.tokenCounter ?? countTokensApproximately;
+  const countModelFacingTokens = async (messages: BaseMessage[]): Promise<number> => {
+    const rendered = renderDreamObservations(messages);
+    return tokenCounter([new HumanMessage({ content: rendered })]);
+  };
   const graph = new StateGraph(MessagesAnnotation)
     .addNode("compact", async (state) => compactIfNeeded(
       state, options.summaryModel, options.triggerTokens, options.keepTokens,
-      options.trimTokensToSummarize, tokenCounter,
+      options.trimTokensToSummarize, countModelFacingTokens,
     ))
     .addEdge(START, "compact")
     .compile({ checkpointer });
