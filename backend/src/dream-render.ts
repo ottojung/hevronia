@@ -2,21 +2,21 @@ import { type BaseMessage } from "@langchain/core/messages";
 
 import { SUMMARY_PREFIX } from "./summary.js";
 import { extractText } from "./text.js";
+import { renderOwnMessage, renderReplyRelationship } from "./dream-render-replies.js";
 import {
   deserializeTelegramEvent,
-  spreadsheetSubject,
+  notebookSubject,
   type CanonicalTelegramEvent,
-  type DeliveredHevroniaMessage,
   type ObservedTelegramMessage,
-  type ReplyRelationship,
   type TelegramSenderIdentity,
 } from "./telegram-event.js";
 
 /**
  * Renders canonical Telegram events as Хевронія experiences them inside the
- * dream: imagined characters produce visible Telegram messages, and she
- * herself chooses which Telegram messages to make appear. Internal sender
- * kinds and IDs are never shown; identities appear as spreadsheet labels.
+ * dream: imagined dream characters produce visible Telegram messages, and she
+ * herself chooses which Telegram messages to make appear. Person-like senders
+ * are labelled with the notebook identity "character N", chats and channels
+ * are sources labelled "channel N", and internal message IDs never appear.
  */
 export function renderDreamEvent(
   event: CanonicalTelegramEvent,
@@ -75,41 +75,27 @@ export function renderDreamChatKind(chatKind: "private" | "group" | "supergroup"
 
 function renderParticipantMessage(event: ObservedTelegramMessage, sameCharacter: boolean): string {
   const lines: string[] = [];
+  const subject = notebookSubject(event.sender);
   if (sameCharacter) {
-    lines.push(
-      `The same dream character, shown as “${event.senderDisplayName}” (your spreadsheet: ${spreadsheetSubject(event.sender)}), produced another visible Telegram message.`,
-    );
+    lines.push("Another Telegram message appeared through the same dream character.");
+    lines.push(event.sender.kind === "user"
+      ? `In your notebook this is “${subject}”.`
+      : `In your notebook this source is “${subject}”.`);
+    lines.push(`Telegram currently displays the name “${event.senderDisplayName}”.`);
   } else {
     lines.push("A Telegram message appeared through a dream character.");
-    lines.push(
-      `Telegram displays the name “${event.senderDisplayName}”; in your spreadsheet this character is ${spreadsheetSubject(event.sender)}.`,
-    );
+    lines.push(event.sender.kind === "user"
+      ? `In your notebook you labelled it as “${subject}”.`
+      : `In your notebook you labelled this source as “${subject}”.`);
+    lines.push(`Telegram displays the name “${event.senderDisplayName}”.`);
   }
   if (event.replyTo !== null) {
     lines.push(renderReplyRelationship(event.replyTo));
   }
   if (event.directlyAddressed) {
-    lines.push("The way it appeared makes it directly addressed to you.");
+    lines.push("The way this message appeared makes it directly addressed to you.");
   }
-  lines.push(`Visible message ${event.messageId}:`);
+  lines.push("Visible message:");
   lines.push(event.text);
   return lines.join("\n");
-}
-
-function renderOwnMessage(event: DeliveredHevroniaMessage): string {
-  if (event.replyTo === null) {
-    return `Earlier, you chose to make this Telegram message appear.\n\n${event.text}`;
-  }
-  return [
-    `Earlier, you chose to make this Telegram message appear as a reply to message ${event.replyTo.targetMessageId}, which came from the character displayed as “${event.replyTo.targetSenderDisplayName}”.`,
-    "",
-    event.text,
-  ].join("\n");
-}
-
-function renderReplyRelationship(relationship: ReplyRelationship): string {
-  const text = relationship.targetText === null
-    ? ""
-    : ` That earlier message showed: ${relationship.targetText}`;
-  return `Telegram visually connects this message as a reply to message ${relationship.targetMessageId}, which appeared from the character displayed as “${relationship.targetSenderDisplayName}”.${text}`;
 }
