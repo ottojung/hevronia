@@ -26,7 +26,9 @@ export function renderOwnMessage(event: DeliveredHevroniaMessage): string {
 }
 
 export function renderReplyRelationship(relationship: ReplyRelationship): string {
-  if (relationship.targetSenderDisplayName === "Хевронія") {
+  const targetIsHevronia = relationship.targetIsHevronia ??
+    relationship.targetSenderDisplayName === "Хевронія";
+  if (targetIsHevronia) {
     const head = "Telegram visually connects this message as a reply to one of your own earlier messages:";
     return relationship.targetText === null
       ? head.replace(/:$/, ".")
