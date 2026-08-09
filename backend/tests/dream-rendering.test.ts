@@ -360,6 +360,52 @@ test("a genuine reply to Хевронія is identified canonically, not by disp
   assert.match(rendered, /старе/);
 });
 
+test("a participant reply to a Telegram source uses source origin wording", () => {
+  const event = participant(912380, 42, "Оля", "та ні", {
+    replyTo: { targetMessageId: 912379, targetSender: { kind: "chat", id: -500 },
+      targetSenderDisplayName: "Новини", targetText: "оголошення", targetIsHevronia: false },
+  });
+  const rendered = renderDreamEvent(event);
+  assert.match(rendered, /appeared from the Telegram source “channel 500”, currently displayed as “Новини”/);
+  assert.match(rendered, /оголошення/);
+  assert.doesNotMatch(rendered, /through “channel 500”/);
+  assert.doesNotMatch(rendered, /dream character “channel 500”/);
+  assert.doesNotMatch(rendered, /channel -500/);
+});
+
+test("Хевронія's own reply to a Telegram source uses source wording", () => {
+  const rendered = renderDreamEvent(ownMessage(912381, "дякую", {
+    targetMessageId: 912380, targetSender: { kind: "chat", id: -500 },
+    targetSenderDisplayName: "Новини", targetText: "оголошення", targetIsHevronia: false,
+  }));
+  assert.match(rendered, /reply to an earlier message from the Telegram source displayed as “Новини”/);
+  assert.match(rendered, /оголошення/);
+  assert.doesNotMatch(rendered, /through/);
+  assert.doesNotMatch(rendered, /dream character/);
+  assert.doesNotMatch(rendered, /channel -500/);
+});
+
+test("Хевронія's own reply to a Telegram source without quoted text uses from semantics", () => {
+  const rendered = renderDreamEvent(ownMessage(912382, "дякую", {
+    targetMessageId: 912380, targetSender: { kind: "chat", id: -500 },
+    targetSenderDisplayName: "Новини", targetText: null, targetIsHevronia: false,
+  }));
+  assert.match(rendered, /reply to something that appeared from the Telegram source displayed as “Новини”/);
+  assert.doesNotMatch(rendered, /through/);
+  assert.doesNotMatch(rendered, /dream character/);
+  assert.doesNotMatch(rendered, /channel -500/);
+});
+
+test("Хевронія's own reply to a dream character without quoted text keeps through semantics", () => {
+  const rendered = renderDreamEvent(ownMessage(912383, "дякую", {
+    targetMessageId: 912380, targetSender: { kind: "user", id: 42 },
+    targetSenderDisplayName: "Оля", targetText: null, targetIsHevronia: false,
+  }));
+  assert.match(rendered, /reply to something that appeared through the character Telegram displayed as “Оля”/);
+  assert.doesNotMatch(rendered, /from the Telegram source/);
+  assert.doesNotMatch(rendered, /dream character/);
+});
+
 test("surfaced memories render with notebook labels and no store vocabulary", () => {
   const rendered = renderParticipantMemoryContexts([
     { participant: { kind: "user", id: 42 }, memories: [{ text: "Оля боїться павуків" }] },
