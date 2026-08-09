@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { openAiKeyFromEnv } from "../src/model.js";
+import { DEFAULT_MODEL, modelFromEnv, openAiKeyFromEnv } from "../src/model.js";
 import { extractText } from "../src/text.js";
 import {
   isMissingGroupMessageAccessError,
@@ -33,6 +33,29 @@ test("openAiKeyFromEnv error does not reveal any key value", () => {
     assert.ok(error instanceof Error);
     assert.ok(!error.message.includes(FAKE_KEY));
     assert.ok(!error.message.includes("sk-"));
+  }
+});
+
+test("modelFromEnv returns the default model when unset", () => {
+  delete process.env["HEVRONIA_MODEL"];
+  assert.equal(modelFromEnv(), DEFAULT_MODEL);
+});
+
+test("modelFromEnv returns the configured override", () => {
+  process.env["HEVRONIA_MODEL"] = "gpt-5.6-luna";
+  try {
+    assert.equal(modelFromEnv(), "gpt-5.6-luna");
+  } finally {
+    delete process.env["HEVRONIA_MODEL"];
+  }
+});
+
+test("modelFromEnv ignores a blank override and uses the default", () => {
+  process.env["HEVRONIA_MODEL"] = "   ";
+  try {
+    assert.equal(modelFromEnv(), DEFAULT_MODEL);
+  } finally {
+    delete process.env["HEVRONIA_MODEL"];
   }
 });
 

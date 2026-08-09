@@ -69,6 +69,22 @@ MY_OPENAI_API_KEY
   integration and to both Mem0's extraction LLM and OpenAI embedder.
   `OPENAI_API_KEY` is neither expected nor used.
 
+The response model is configurable and read from the environment:
+
+```text
+HEVRONIA_MODEL (optional)
+```
+
+`HEVRONIA_MODEL` defaults to `gpt-5.6`. For testing or cheaper runs, set it to
+a lighter model, for example `gpt-5.6-luna`:
+
+```bash
+HEVRONIA_MODEL=gpt-5.6-luna npm run conversations -- --smoke
+```
+
+The conversation simulator's participant model is separately selectable with
+`HEVRONIA_SIMULATOR_MODEL`.
+
 The bot must be able to observe ambient group conversation. In BotFather, use
 `/setprivacy` for `@hevronia_bot` and **disable Group Privacy Mode**. Telegram
 may require removing and re-adding the bot to existing groups after this change.

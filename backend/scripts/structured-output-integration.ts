@@ -4,7 +4,7 @@ import { AIMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 import { createAgent, providerStrategy } from "langchain";
 
-import { MODEL } from "../src/model.js";
+import { modelFromEnv } from "../src/model.js";
 import {
   socialDecisionResponseSchema,
 } from "../src/social-decision.js";
@@ -15,7 +15,7 @@ if (apiKey === undefined || apiKey === "") {
   process.exit(0);
 }
 
-const model = new ChatOpenAI({ apiKey, model: MODEL });
+const model = new ChatOpenAI({ apiKey, model: modelFromEnv() });
 const agent = createAgent({
   model,
   tools: [],

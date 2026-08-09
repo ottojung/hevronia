@@ -11,7 +11,7 @@ import { memoryUserIdForSender, scheduleRememberedMessage } from "./long-term-me
 import { PendingMemoryWrites } from "./long-term-memory/pending.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { memoriesForTarget, recallForCandidates } from "./participant-memory.js";
-import { MODEL, openAiKeyFromEnv } from "./model.js";
+import { modelFromEnv, openAiKeyFromEnv } from "./model.js";
 import { SYSTEM_PROMPT } from "./personality.js";
 import { createSocialDecisionMaker } from "./social-decision.js";
 import { COMPACTION, DEFAULT_DB_PATH } from "./summary.js";
@@ -25,9 +25,9 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
   const pending = options.pendingMemoryWrites ?? new PendingMemoryWrites();
   mkdirSync(dirname(dbPath), { recursive: true });
   const checkpointer = SqliteSaver.fromConnString(dbPath);
-  const model = options.model ?? new ChatOpenAI({ apiKey: openAiKeyFromEnv(), model: MODEL });
+  const model = options.model ?? new ChatOpenAI({ apiKey: openAiKeyFromEnv(), model: modelFromEnv() });
   const summaryModel = options.summaryModel ?? new ChatOpenAI({ apiKey: openAiKeyFromEnv(),
-    model: MODEL, temperature: 0 });
+    model: modelFromEnv(), temperature: 0 });
   const store = options.conversationStore ?? createConversationStore(checkpointer, {
     summaryModel,
     triggerTokens: options.triggerTokens ?? COMPACTION.triggerTokens,

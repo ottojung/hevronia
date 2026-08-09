@@ -1,4 +1,12 @@
-export const MODEL = "gpt-5.6";
+export const DEFAULT_MODEL = "gpt-5.6";
+
+export function modelFromEnv(): string {
+  const configured = process.env["HEVRONIA_MODEL"];
+  if (configured !== undefined && configured.trim().length > 0) {
+    return configured.trim();
+  }
+  return DEFAULT_MODEL;
+}
 
 export function openAiKeyFromEnv(): string {
   const apiKey = process.env["MY_OPENAI_API_KEY"];
