@@ -18,8 +18,9 @@ export function renderOwnMessage(event: DeliveredHevroniaMessage): string {
       event.text,
     ].join("\n");
   }
+  const appeared = appearedReference(target.targetSender, target.targetSenderDisplayName);
   return [
-    `Earlier, you chose to make this Telegram message appear as a reply to something that appeared through ${reference}.`,
+    `Earlier, you chose to make this Telegram message appear as a reply to something that appeared ${appeared}.`,
     "",
     event.text,
   ].join("\n");
@@ -33,7 +34,10 @@ export function renderReplyRelationship(relationship: ReplyRelationship): string
       : `${head}\n${relationship.targetText}`;
   }
   const subject = notebookSubject(relationship.targetSender);
-  const head = `Telegram visually connects this message as a reply to an earlier message that appeared through “${subject}”, currently displayed as “${relationship.targetSenderDisplayName}”:`;
+  const origin = relationship.targetSender.kind === "user"
+    ? `appeared through “${subject}”`
+    : `appeared from the Telegram source “${subject}”`;
+  const head = `Telegram visually connects this message as a reply to an earlier message that ${origin}, currently displayed as “${relationship.targetSenderDisplayName}”:`;
   return relationship.targetText === null
     ? head.replace(/:$/, ".")
     : `${head}\n${relationship.targetText}`;
@@ -42,5 +46,11 @@ export function renderReplyRelationship(relationship: ReplyRelationship): string
 function displayReference(sender: TelegramSenderIdentity, displayName: string): string {
   return sender.kind === "user"
     ? `the character Telegram displayed as “${displayName}”`
-    : `the source Telegram displayed as “${displayName}”`;
+    : `the Telegram source displayed as “${displayName}”`;
+}
+
+function appearedReference(sender: TelegramSenderIdentity, displayName: string): string {
+  return sender.kind === "user"
+    ? `through the character Telegram displayed as “${displayName}”`
+    : `from the Telegram source displayed as “${displayName}”`;
 }
