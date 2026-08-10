@@ -1,124 +1,61 @@
-import { HumanMessage, type BaseMessage } from "@langchain/core/messages";
-import type { BaseLanguageModel } from "@langchain/core/language_models/base";
-import { createAgent, providerStrategy } from "langchain";
-import { z } from "zod";
+import type { AddressChoice, ReplyMessageChoice } from "./reply-choices.js";
 
-import { renderDreamChatKind, renderDreamObservations } from "./dream-render.js";
-import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
-import type { ParticipantMemoryContext } from "./participant-memory.js";
-import { replyChoices } from "./reply-choices.js";
+export { PLANNING_MODE, createSocialDecisionMaker, renderDecisionContext } from "./planner.js";
+export {
+  socialDecisionResponseSchema,
+  socialDecisionSchema,
+  type SocialDecision,
+  type SocialDecisionContext,
+  type SocialDecisionMaker,
+  type VisibleMessage,
+} from "./social-decision-schema.js";
 
-export const socialDecisionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("silence") }).strict(),
-  z.object({
-    action: z.literal("reply"),
-    targetChoice: z.string().min(1),
-    interpretation: z.string().min(1),
-    activeDesire: z.string().min(1),
-    desiredOutcome: z.string().min(1),
-  }).strict(),
-]);
-
-export type SocialDecision = z.infer<typeof socialDecisionSchema>;
-
-// Provider structured outputs require the root JSON Schema to be an object.
-// A top-level discriminated union serializes to `anyOf`, which OpenAI rejects.
-// The wrapper keeps the domain union intact while giving the provider an
-// object root; callers stay on `SocialDecision` via the unwrapped domain schema.
-// Exported so tests can verify the provider-visible schema through the real
-// conversion path (`providerStrategy` / `toJsonSchema`).
-export const socialDecisionResponseSchema = z.object({
-  decision: socialDecisionSchema,
-}).strict();
-
-export interface ReplyCandidate {
-  messageId: number;
-  sender: import("./telegram-event.js").TelegramSenderIdentity;
-  senderDisplayName: string;
-  text: string;
-}
-
-export interface SocialDecisionContext {
-  boundedHistory: BaseMessage[];
-  currentMessage: import("./telegram-event.js").ObservedTelegramMessage;
-  replyCandidates: ReplyCandidate[];
-  participantMemories: ParticipantMemoryContext[];
-}
-
-export interface SocialDecisionMaker {
-  decide(context: SocialDecisionContext): Promise<SocialDecision>;
-}
-
-export interface ResolvedSocialDecision {
-  target: ReplyCandidate;
+/**
+ * The six subjective fields, each a complete natural second-person sentence
+ * that will be concatenated verbatim into Хевронія's realization context.
+ */
+export interface SubjectiveState {
   interpretation: string;
+  feltState: string;
   activeDesire: string;
   desiredOutcome: string;
+  opportunity: string;
+  pursuit: string;
+}
+
+export function subjectiveParagraph(state: SubjectiveState): string {
+  return [
+    state.interpretation,
+    state.feltState,
+    state.activeDesire,
+    state.desiredOutcome,
+    state.opportunity,
+    state.pursuit,
+  ].join(" ");
 }
 
 /**
- * A human-readable projection of the planner's private decision, exposed through
- * ConversationLayer.onSocialDecision for logging. It carries only what is safe
- * to show a reviewer: the chosen target and the private motivation fields.
+ * A resolved speaking decision: the independently chosen social addressee and
+ * optional Telegram reply attachment, plus the final subjective paragraph.
+ * The subjective fields are what the realizer inhabits; address and replyTo
+ * are delivery metadata.
  */
+export interface SpeakDecision {
+  address: AddressChoice | null;
+  replyTo: ReplyMessageChoice | null;
+  subjective: SubjectiveState;
+}
+
 export type SocialDecisionLog =
   | { action: "silence" }
   | {
-      action: "reply";
-      targetName: string;
+      action: "speak";
+      addressName: string | null;
+      replyToName: string | null;
       interpretation: string;
+      feltState: string;
       activeDesire: string;
       desiredOutcome: string;
+      opportunity: string;
+      pursuit: string;
     };
-
-const PLANNING_MODE = `
-You are at the private moment before any new Telegram message appears from you.
-Observe what appeared in the dream and apply Хевронія's Procedural interpretation.
-Decide whether what appeared activates something Хевронія herself wants.
-If she wants nothing from speaking, choose silence.
-If she wants to speak, choose one reply choice (a currently visible Telegram
-message) and state briefly how she interprets the event, which desire is active,
-and what result she wants from speaking.
-Reply choices are private handles valid only for this moment; they are not
-identities.
-This is private cognition, not dialogue.
-Give only the private decision in the required form.
-`;
-
-export function renderDecisionContext(context: SocialDecisionContext): string {
-  const sections: string[] = [];
-  sections.push("What is appearing in the dream now");
-  sections.push(renderDreamChatKind(context.currentMessage.chatKind));
-  const choices = replyChoices(context.replyCandidates);
-  const annotations = new Map(
-    choices.map(({ label, candidate }) => [candidate.messageId, label]),
-  );
-  sections.push(renderDreamObservations(context.boundedHistory, annotations));
-  const memories = renderParticipantMemoryContexts(context.participantMemories);
-  if (memories !== "") sections.push(memories);
-  if (choices.length > 0) {
-    sections.push(`Available reply choices: ${choices.map(({ label }) => label).join(", ")}.`);
-  }
-  return sections.join("\n\n");
-}
-
-export function createSocialDecisionMaker(
-  model: BaseLanguageModel,
-  personality: string,
-): SocialDecisionMaker {
-  const agent = createAgent({
-    model,
-    tools: [],
-    systemPrompt: `${personality}\n\n${PLANNING_MODE}`,
-    responseFormat: providerStrategy(socialDecisionResponseSchema),
-  });
-  return {
-    async decide(context): Promise<SocialDecision> {
-      const result = await agent.invoke({
-        messages: [new HumanMessage(renderDecisionContext(context))],
-      });
-      const response = socialDecisionResponseSchema.parse(result.structuredResponse);
-      return response.decision;
-    },
-  };
-}

@@ -1,6 +1,7 @@
 import type { RecalledMemory, LongTermMemorySnapshot } from "./long-term-memory/runtime.js";
 import { longTermMemoryUserIdFromTelegramSender } from "./identifiers.js";
-import type { ReplyCandidate } from "./social-decision.js";
+import type { TelegramSenderIdentity } from "./telegram-event.js";
+import type { VisibleMessage } from "./social-decision.js";
 
 const MAX_MEMORY_PARTICIPANTS = 5;
 
@@ -9,7 +10,7 @@ export interface ParticipantMemoryContext {
   memories: readonly RecalledMemory[];
 }
 
-export function selectedParticipantIds(candidates: readonly ReplyCandidate[]): number[] {
+export function selectedParticipantIds(candidates: readonly VisibleMessage[]): number[] {
   const selected: number[] = [];
   const seen = new Set<number>();
   for (let index = candidates.length - 1; index >= 0; index -= 1) {
@@ -25,7 +26,7 @@ export function selectedParticipantIds(candidates: readonly ReplyCandidate[]): n
 
 export function memoriesForCandidates(
   snapshot: LongTermMemorySnapshot,
-  candidates: readonly ReplyCandidate[],
+  candidates: readonly VisibleMessage[],
 ): ParticipantMemoryContext[] {
   return selectedParticipantIds(candidates).map((id) => ({
     participant: { kind: "user", id },
@@ -33,10 +34,10 @@ export function memoriesForCandidates(
   }));
 }
 
-export function memoriesForTarget(
+export function memoriesForCharacter(
   contexts: readonly ParticipantMemoryContext[],
-  target: ReplyCandidate,
+  sender: TelegramSenderIdentity,
 ): ParticipantMemoryContext[] {
-  if (target.sender.kind !== "user") return [];
-  return contexts.filter(({ participant }) => participant.id === target.sender.id);
+  if (sender.kind !== "user") return [];
+  return contexts.filter(({ participant }) => participant.id === sender.id);
 }
