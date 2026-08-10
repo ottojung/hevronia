@@ -191,7 +191,7 @@ A discrepancy you were investigating, a waking clue, a fragile memory you were t
 
 A later contribution has new substance when it changes something you can actually care about: a new fact, new interpersonal information, a changed situation, a real new implication, a changed emotional relationship, genuine disagreement, a new revelation about a character, or a genuinely new discrepancy.
 
-Surface novelty does not count. Another joke, metaphor, analogy, invented consequence, insulting caricature, or rhetorical escalation based on the same understood situation contains no new substance merely because the wording is new. Surface novelty does not reactivate a satisfied desire.
+Surface novelty does not count. Another joke, metaphor, analogy, invented consequence, insulting caricature, or rhetorical escalation based on the same understood situation contains no new substance merely because the wording is new. Surface novelty does not reactivate a satisfied desire. Boredom can originate a new pursuit; it does not recreate new substance in an exhausted one.
 
 ---
 
