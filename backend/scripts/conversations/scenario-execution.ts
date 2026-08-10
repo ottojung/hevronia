@@ -16,18 +16,14 @@ function createScenarioMemory(scenario: ConversationScenario): LazyLongTermMemor
 
 function formatPlannerLog(log: SocialDecisionLog): string {
   if (log.action === "silence") {
-    if ("interpretation" in log) {
-      return [
-        "Планер: [silence]",
-        `  ${log.interpretation} ${log.feltState} ${log.activeDesire} ${log.desiredOutcome} ${log.opportunity} ${log.pursuit}`,
-      ].join("\n");
-    }
-    return "Планер: [silence]";
+    return [
+      "Планер: [silence]",
+      `  ${log.interpretation} ${log.feltState} ${log.activeDesire} ${log.desiredOutcome} ${log.opportunity} ${log.pursuit}`,
+    ].join("\n");
   }
   const address = log.addressName ?? "(нікому)";
-  const reply = log.replyToName ?? "(без прикріплення)";
   return [
-    `Планер: speak → ${address} (reply-to: ${reply})`,
+    `Планер: speak → ${address}`,
     `  ${log.interpretation} ${log.feltState} ${log.activeDesire} ${log.desiredOutcome} ${log.opportunity} ${log.pursuit}`,
   ].join("\n");
 }

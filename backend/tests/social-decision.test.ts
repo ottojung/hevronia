@@ -201,9 +201,9 @@ test("onSocialDecision exposes the planner's private decision for logging", asyn
     assert.equal(first?.action, "speak");
     if (first !== undefined && first.action === "speak") {
       assert.equal(first.addressName, "character 88");
-      assert.equal(first.replyToName, null);
       assert.equal(first.interpretation, "The situation is clear to you.");
       assert.equal(first.feltState, "This leaves you quietly attentive.");
+      assert.equal("replyToName" in first, false);
     }
     const silence = silenceDecision();
     assert.deepEqual(logs[1], {

@@ -47,7 +47,6 @@ export interface SpeakDecision {
 }
 
 export type SocialDecisionLog =
-  | { action: "silence" }
   | {
       action: "silence";
       interpretation: string;
@@ -60,7 +59,6 @@ export type SocialDecisionLog =
   | {
       action: "speak";
       addressName: string | null;
-      replyToName: string | null;
       interpretation: string;
       feltState: string;
       activeDesire: string;
