@@ -118,8 +118,9 @@ Both connect to Telegram via long polling (no webhooks). On startup the bot:
 3. authenticates with Telegram;
 4. verifies the identity matches `Хевронія` / `@hevronia_bot`;
 5. starts long polling for message updates;
-6. observes each private/group text message, makes a structured social decision,
-   and either remains silent or sends a targeted reply to an eligible message.
+6. observes each private/group text message, makes a structured private social
+   decision, and either stays silent or speaks, optionally attaching the
+   message as a Telegram reply to a chosen earlier message.
 
 It shuts down gracefully on `SIGINT`/`SIGTERM`, including a bounded wait for
 pending long-term-memory writes. While generating a reply the bot sends a
@@ -147,10 +148,15 @@ chat/channel sources) instead of internal keys, and Telegram message IDs are
 never shown to a model. No Hevronia-facing model input labels a dream character
 as a user. Raw canonical JSON, `telegram-user:` / `telegram-chat:` prefixes,
 candidate indexes, message IDs, and memory-store vocabulary never reach the
-social-decision, realization, or summary models. The planner chooses an
-ephemeral per-turn reply choice (A, B, C) annotated in place on the matching
-dream observation, and describes her private interpretation, active desire, and
-desired outcome — not assistant speech-act metadata and not a message ID.
+social-decision, realization, or summary models. The planner is mechanical and
+structured: it decides `silence` or `speak`, independently selects an
+`addressCharacter` handle (P1, P2, ...) and an optional `replyToMessage` handle
+(M1, M2, ...) annotated in place on the matching dream observation, and fills
+six complete second-person subjective sentences (`interpretation`, `feltState`,
+`activeDesire`, `desiredOutcome`, `opportunity`, `pursuit`). The realizer
+receives the canonical system prompt, the dream character list and conversation,
+and those six sentences concatenated verbatim as one subjective paragraph — it
+never sees the planner JSON or its handles, and it does not re-plan.
 
 LangGraph owns thread-scoped conversational continuity under
 `telegram-private:<chat id>` or `telegram-group:<chat id>` and persists it in the ignored
@@ -295,8 +301,9 @@ memory, and transcript. During a run the terminal only shows short
 each complete transcript is printed as one uninterrupted block in catalog
 order, and the run index summarizes every scenario by category with its
 behavior tags. Each turn shows the participant's message, a `Планер:` line
-with Хевронія's private social decision (target, interpretation, active
-desire, and desired outcome), and then her realized Telegram reply.
+with Хевронія's private social decision (whom she speaks to, whether she
+attaches a Telegram reply, and the six subjective sentences), and then her
+realized Telegram reply.
 
 Scenarios may seed durable long-term memory about their participant via the
 scenario's `longTermMemory` field, so a conversation can begin with Хевронія

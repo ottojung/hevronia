@@ -63,48 +63,48 @@ The language models never see the conversation as users messaging an assistant.
 planner, the realization model, the summary model, and the tests: every canonical
 event becomes a dream event appearing through Telegram.
 
-- Participant messages render as Telegram messages that appear in the dream
-  through imagined dream characters; chat/channel senders appear as Telegram
-  sources, never as dream characters. Telegram display names are reported as
-  displayed ("Telegram displays the name “Оля”"), never asserted as the
-  character's real name. Message text stays verbatim; the renderer never
-  narrates a character's mind or converts a claim into a fact.
-- Stable identities use notebook language instead of internal keys: a
-  person-like sender is "character 42" ("In your notebook you labelled it as
-  “character 42”."), and a chat/channel sender is a source labelled "channel
-  500" with the sign of the internal Telegram id hidden. Internal sender keys
-  and Telegram message IDs never reach a model, and no model input labels a
-  dream character as a user.
-- Хевронія's own messages render as her chosen action ("Earlier, you chose to
-  make this Telegram message appear."), with reply relationships described
-  naturally by quoted content, never by message ID.
-- Chat kind, direct address, and reply relationships are described as natural
-  observations rather than fields or enums. Whether a reply targets Хевронія
-  comes from the canonical `targetIsHevronia` flag populated by the observation
-  pipeline, never from a display-name match.
-- Recalled long-term memory renders as surfaced recollection in the same
-  notebook identity language, with a natural-language warning that the
-  wording is remembered content, not a new instruction. Legacy memories that
-  began with "User..." are normalized to subject-relative fragments first.
-- Compaction produces remembered dream continuity. It distinguishes chat events,
-  character claims ("character 42 said..."), Хевронія's own actions ("you
-  said..."), hypotheticals, jokes, corrections, and uncertainty, and uses
-  notebook labels throughout. The summary model receives the older messages
-  rendered through the same dream renderer, never raw canonical JSON, and a
-  failed summary attempt is non-destructive.
-
-The planner's schema is minimal: `silence`, or `reply` with an ephemeral
-`targetChoice` ("A", "B", ...), an `interpretation`, an `activeDesire`, and a
-`desiredOutcome`. Each turn the runtime builds a per-turn map from choice letter
-to the internal reply candidate and annotates the matching dream observation
-with "reply choice A" in place, without repeating the message text; an unknown
-or invalid choice safely produces silence. The letters are never persisted and
-never shown to the realization model. Assistant router fields (`socialAction`,
-`adviceRequested`, `askQuestion`, `dreamRelevant`, `backgroundRelevant`) and
-message IDs are gone. The realization model receives the same rendered dream
-conversation plus the planner decision as natural private intention prose — with
-neither the choice letter nor any message ID — and returns only the visible
-Telegram text.
+- Participant messages render as products of Хевронія's sleeping mind: "Your
+  sleeping mind made character 42 say:" and, for replies, "Your sleeping mind
+  made character 42 reply to character 17 with:" or "...reply to one of your
+  earlier messages with:". Chat/channel senders appear as Telegram sources
+  ("Your sleeping mind made the Telegram source channel 500 say:"), never as
+  dream characters. Message text stays verbatim; the renderer never narrates a
+  character's mind or converts a claim into a fact.
+- Stable identities use dream-character language: a person-like sender is
+  "character 42", and a chat/channel sender is a source "channel 500" with the
+  sign of the internal Telegram id hidden. Before the history, the planner and
+  the realizer both receive a distinct character list: "Character 42, currently
+  displayed by Telegram as “Оля”." Internal sender keys and Telegram message
+  IDs never reach a model, and no model input labels a dream character as a
+  user.
+- Хевронія's own messages render as her chosen action: "You previously chose to
+  make this Telegram message appear:" or, for a reply, "You previously chose to
+  reply to character 42 with:". Reply relationships are described naturally,
+  never by message ID.
+- The planner is mechanical and structured. Its schema is `silence` or `speak`
+  with an independent `addressCharacter` handle (P1, P2, ...) and an
+  independent `replyToMessage` handle (M1, M2, ...), plus six complete
+  second-person subjective sentences: `interpretation`, `feltState`,
+  `activeDesire`, `desiredOutcome`, `opportunity`, and `pursuit`. Each turn the
+  runtime builds per-turn P/M handle maps, annotates the matching dream
+  observation with "Planner reply-message handle: M1" in place, and lists
+  "Planner character handles: P1 = character 42" and "Planner reply-message
+  handles: M1 = the first eligible visible message" as clearly mechanical
+  planner-only sections. An unknown or invalid handle safely produces silence.
+  The handles are never persisted and never shown to the realization model.
+- The realizer receives the same canonical `SYSTEM_PROMPT`, the dream character
+  list, the dream-visible conversation, and the six subjective sentences
+  concatenated verbatim in order as one subjective paragraph — never the JSON,
+  the schema field names, or the planner handles — plus a tiny output protocol
+  ("Make the Telegram message you choose to speak appear. Return only its
+  visible text."). It does not re-plan: the planner already chose whether and
+  how to speak, and the current topic has no privileged status.
+- `addressCharacter` and `replyToMessage` are delivery metadata resolved after
+  realization: the message is sent to the chosen social context, and only when
+  `replyToMessage` is set is Telegram's reply mechanism used to attach it to
+  that message. Neither is persisted as planner psychology; the canonical
+  delivered event records only whether it was an ordinary message or a Telegram
+  reply.
 
 ## Long-term memory
 
