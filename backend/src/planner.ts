@@ -6,7 +6,10 @@ import { renderDreamCharacterList, renderDreamObservations } from "./dream-rende
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
 import { isGeminiChatModel } from "./model.js";
 import { buildPlannerChoices } from "./reply-choices.js";
-import { buildSocialDecisionResponseSchema } from "./social-decision-schema.js";
+import {
+  buildGeminiSocialDecisionJsonSchema,
+  buildSocialDecisionResponseSchema,
+} from "./social-decision-schema.js";
 import type {
   SocialDecision,
   SocialDecisionContext,
@@ -92,7 +95,9 @@ export function createSocialDecisionMaker(
             model,
             tools: [],
             systemPrompt: `${personality}\n\n${PLANNING_MODE}`,
-            responseFormat: toolStrategy(schema),
+            responseFormat: toolStrategy(
+              buildGeminiSocialDecisionJsonSchema(context.visibleMessages),
+            ),
           })
         : createAgent({
             model,

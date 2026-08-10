@@ -2,6 +2,7 @@ import type { AddressChoice, ReplyMessageChoice } from "./reply-choices.js";
 
 export { PLANNING_MODE, createSocialDecisionMaker, renderDecisionContext } from "./planner.js";
 export {
+  buildGeminiSocialDecisionJsonSchema,
   buildSocialDecisionResponseSchema,
   socialDecisionResponseSchema,
   socialDecisionSchema,

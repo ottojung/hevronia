@@ -7,6 +7,7 @@ import { providerStrategy } from "langchain";
 
 import { SYSTEM_PROMPT } from "../src/personality.js";
 import {
+  buildGeminiSocialDecisionJsonSchema,
   buildSocialDecisionResponseSchema,
   createSocialDecisionMaker,
   socialDecisionResponseSchema,
@@ -83,6 +84,16 @@ test("the dynamic schema restricts addressCharacter and replyToMessage to visibl
     assert.equal(schema.safeParse({ decision: { ...speak, replyToMessage: bad } }).success,
       false, `replyToMessage=${bad}`);
   }
+});
+
+test("the Gemini schema uses enums instead of const and lists the visible handles", () => {
+  const schema = buildGeminiSocialDecisionJsonSchema(context.visibleMessages);
+  const serialized = JSON.stringify(schema);
+  assert.ok(!serialized.includes('"const"'));
+  assert.ok(!serialized.includes("additionalProperties"));
+  assert.ok(serialized.includes('"enum"'));
+  assert.ok(serialized.includes("P1"));
+  assert.ok(serialized.includes("M1"));
 });
 
 test("malformed provider responses are rejected", async () => {

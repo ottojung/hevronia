@@ -4,6 +4,11 @@ import { z } from "zod";
 import { buildPlannerChoices } from "./reply-choices.js";
 import type { ParticipantMemoryContext } from "./participant-memory.js";
 
+export {
+  buildGeminiSocialDecisionJsonSchema,
+  type ConstFreeJsonSchema,
+} from "./gemini-decision-schema.js";
+
 const silenceVariant = z.object({
   action: z.literal("silence"),
   interpretation: z.string().min(1),
