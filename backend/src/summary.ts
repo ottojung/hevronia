@@ -17,22 +17,25 @@ const DEFAULT_DB_PATH = fileURLToPath(
 export { DEFAULT_DB_PATH };
 
 export const SUMMARY_PREFIX =
-  "Earlier conversation summary. Newer verbatim messages take precedence if they conflict:";
+  "What you remember from an earlier part of this same Telegram dream conversation:";
 
-export const SUMMARY_PROMPT = `Create a compact continuity summary of the earlier portion of this Telegram conversation for use as context in future turns.
+export const SUMMARY_PROMPT = `Create a compact continuity summary of what Хевронія remembers from this earlier part of the Telegram dream conversation, for use as remembered context in future turns.
 
-Preserve information that may matter later:
+Write it as remembered dream continuity, not as a transcript.
 
-- concrete facts established by any participant, always attributed to that
-  participant's canonical stable Telegram sender identity;
-- display names and relationships, retaining stable identifiers when names collide;
+Preserve information that may matter later, always preserving what actually happened versus what a character only claimed:
+
+- events that actually occurred in the chat, summarized as events;
+- what a character said, claimed, recalled, or asserted — write it as such ("character 42 said...", "character 42 claimed...") and never turn a claim into an established fact;
+- what Хевронія herself said or did in the chat — write it as "you said..." / "you did...";
+- display names and relationships, using stable notebook labels when names collide;
 - preferences, dislikes, habits, and boundaries;
 - plans, promises, decisions, and intentions;
 - unresolved questions and unfinished topics;
 - important emotional context;
-- corrections a participant made to earlier assumptions, attributed by stable identifier;
+- corrections a character made to earlier assumptions, attributed by notebook label;
 - meaningful opinions or positions;
-- recurring jokes, references, or conversational context that would otherwise become confusing;
+- recurring jokes, references, or shared fiction, marked as such;
 - important facts established about Хевронія within the conversation.
 
 Compress aggressively:
@@ -42,18 +45,16 @@ Compress aggressively:
 - merge repeated information;
 - prefer concise factual bullets over narrative;
 - preserve uncertainty as uncertainty;
+- keep hypotheticals hypothetical and jokes as jokes;
+- mark corrections as corrections;
 - if newer information supersedes older information, retain the newer state;
 - never invent facts or infer facts that were not actually established;
-- distinguish hypothetical statements from actual facts;
+- never infer off-chat reality from a character's statement;
 - retain exact wording only when the wording itself matters.
 
-For every sender-specific preference, correction, plan, emotional context,
-relationship, unfinished thread, or opinion, retain the original canonical sender
-kind and ID exactly: telegram-user:<id> for a user or telegram-chat:<id> for a chat
-or channel sender. Never convert one kind into the other. Never merge senders
-because their display names match or because their statements conflict.
+Attribute character-specific information using the notebook labels already present in the dream observations, such as "character 42" or "channel 500". Preserve those labels exactly so recurring dream characters and Telegram sources remain distinct. Never merge two identities just because their display names match or because their statements conflict.
 
-The summary is internal memory, not a Telegram message. Do not imitate any participant's voice.
+The summary is remembered context, not a Telegram message. Do not imitate any character's voice.
 
 Conversation to compact:
 

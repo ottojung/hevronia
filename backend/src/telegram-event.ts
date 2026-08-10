@@ -10,6 +10,9 @@ export const replyRelationshipSchema = z.object({
   targetSender: telegramSenderIdentitySchema,
   targetSenderDisplayName: z.string().min(1),
   targetText: z.string().nullable(),
+  // Canonical flag from the observation pipeline: whether the reply targets
+  // Хевронія herself. Never inferred from the display name.
+  targetIsHevronia: z.boolean(),
 }).strict();
 
 export const observedTelegramMessageSchema = z.object({
@@ -54,13 +57,18 @@ export function deserializeTelegramEvent(serialized: string): CanonicalTelegramE
   return canonicalTelegramEventSchema.parse(JSON.parse(serialized));
 }
 
-export function renderTelegramEvent(event: CanonicalTelegramEvent): string {
-  const identity = `${event.senderDisplayName} [telegram-${event.sender.kind}:${event.sender.id}]`;
-  const reply = event.replyTo !== null
-    ? ` (reply to ${event.replyTo.targetSenderDisplayName} [telegram-${event.replyTo.targetSender.kind}:${event.replyTo.targetSender.id}], message ${event.replyTo.targetMessageId}: ${event.replyTo.targetText ?? "text unavailable"})`
-    : "";
-  const direct = event.kind === "participant" && event.directlyAddressed
-    ? " [directly addressing Хевронія]"
-    : "";
-  return `[message ${event.messageId}] ${identity}${reply}${direct}: ${event.text}`;
+/**
+ * Notebook label for a Telegram sender: the ordinary private bookkeeping
+ * Хевронія uses to tell recurring dream characters apart. Person-like
+ * characters are "character N"; chats and channels are sources named
+ * "channel N" with the sign of the internal Telegram id hidden.
+ */
+export function notebookSubject(sender: TelegramSenderIdentity): string {
+  return sender.kind === "user" ? `character ${sender.id}` : `channel ${Math.abs(sender.id)}`;
+}
+
+export function notebookLabel(sender: TelegramSenderIdentity): string {
+  return sender.kind === "user"
+    ? `the character your notebook calls “character ${sender.id}”`
+    : `the source your notebook calls “channel ${Math.abs(sender.id)}”`;
 }

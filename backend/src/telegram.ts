@@ -74,7 +74,7 @@ export async function startBot(): Promise<void> {
         chatKind: ctx.chat.type, messageThreadId: messageThreadId ?? null,
         replyTo: { targetMessageId: messageId, targetSender: fallbackTargetSender,
           targetSenderDisplayName: telegramDisplayName(ctx.from.first_name, ctx.from.last_name),
-          targetText: ctx.message.text } }, {
+          targetText: ctx.message.text, targetIsHevronia: false } }, {
         showTyping: async () => undefined,
         reply: async (text, targetMessageId) => (await ctx.reply(text, {
           reply_parameters: { message_id: targetMessageId },

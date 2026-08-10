@@ -129,6 +129,7 @@ test("runner alternates messages, persists increasing reply IDs, records silence
         ? GeneratedTurn.fromReply(`reply ${responseIndex}`, {
           targetMessageId: responseIndex, targetSender: { kind: "user", id: 7_001 },
           targetSenderDisplayName: "Олена", targetText: "participant",
+          targetIsHevronia: false,
         }, (id) => persisted.push(id))
         : GeneratedTurn.fromSilence());
     },
@@ -194,6 +195,7 @@ test("runner returns a failed result that keeps the partial transcript", async (
       return Promise.resolve(GeneratedTurn.fromReply(`reply ${respondCount}`, {
         targetMessageId: respondCount, targetSender: { kind: "user", id: 7_001 },
         targetSenderDisplayName: "Олена", targetText: "participant",
+        targetIsHevronia: false,
       }, () => undefined));
     },
     recordDeliveredMessage: () => undefined,
@@ -276,11 +278,11 @@ test("scenario header prints seeded long-term memory before the conversation", (
   const plain = scenarios.find(({ id }) => id === "normal-stranger");
   if (seeded === undefined || plain === undefined) assert.fail("catalog missing expected scenarios");
   const seededLines = scenarioHeaderLines(seeded);
-  assert.ok(seededLines.includes("Long-term memory about this participant:"));
+  assert.ok(seededLines.includes("Long-term memory about this character:"));
   assert.ok(seededLines.some((line) => line.startsWith("- ")));
-  assert.ok(seededLines.indexOf("Long-term memory about this participant:") >
+  assert.ok(seededLines.indexOf("Long-term memory about this character:") >
     seededLines.indexOf("Purpose:"));
-  assert.ok(!scenarioHeaderLines(plain).includes("Long-term memory about this participant:"));
+  assert.ok(!scenarioHeaderLines(plain).includes("Long-term memory about this character:"));
 });
 
 test("seeded long-term memory reaches the planner context", async () => {

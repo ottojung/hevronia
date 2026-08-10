@@ -72,7 +72,8 @@ export async function respondTurn(
     const response = await dependencies.model.invoke([
       new SystemMessage(dependencies.personality),
       new HumanMessage(realizationContext(
-        history, memoriesForTarget(participantMemories, resolved.target), resolved,
+        history, input.message.chatKind,
+        memoriesForTarget(participantMemories, resolved.target), resolved,
       )),
     ]);
     if (!isBaseMessage(response)) throw new InvalidRealizationResponseError();

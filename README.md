@@ -119,7 +119,7 @@ Both connect to Telegram via long polling (no webhooks). On startup the bot:
 4. verifies the identity matches `Хевронія` / `@hevronia_bot`;
 5. starts long polling for message updates;
 6. observes each private/group text message, makes a structured social decision,
-   and either remains silent or sends a targeted reply.
+   and either remains silent or sends a targeted reply to an eligible message.
 
 It shuts down gracefully on `SIGINT`/`SIGTERM`, including a bounded wait for
 pending long-term-memory writes. While generating a reply the bot sends a
@@ -129,10 +129,28 @@ Telegram `typing` chat action.
 
 The model receives three distinct context layers:
 
-1. recent thread messages verbatim;
-2. a rolling summary of older thread history;
+1. recent thread messages rendered as dream events;
+2. a rolling summary of older thread history, remembered as earlier dream conversation;
 3. up to eight semantically relevant long-term facts from an in-process cache
    snapshot, never added to the LangGraph checkpoint or summary.
+
+### Model-facing ontology
+
+Models never experience the conversation as users messaging an assistant. The
+dream renderer (`backend/src/dream-render.ts`) presents every canonical event
+as something that appeared inside Хевронія's dream through Telegram: Telegram
+messages appear in the dream through imagined dream characters, chat/channel
+senders appear as Telegram sources, and Хевронія herself chooses which Telegram
+messages to make appear. Stable identities use ordinary notebook language
+("In your notebook you labelled it as "character 42""; "channel 500" for
+chat/channel sources) instead of internal keys, and Telegram message IDs are
+never shown to a model. No Hevronia-facing model input labels a dream character
+as a user. Raw canonical JSON, `telegram-user:` / `telegram-chat:` prefixes,
+candidate indexes, message IDs, and memory-store vocabulary never reach the
+social-decision, realization, or summary models. The planner chooses an
+ephemeral per-turn reply choice (A, B, C) annotated in place on the matching
+dream observation, and describes her private interpretation, active desire, and
+desired outcome — not assistant speech-act metadata and not a message ID.
 
 LangGraph owns thread-scoped conversational continuity under
 `telegram-private:<chat id>` or `telegram-group:<chat id>` and persists it in the ignored

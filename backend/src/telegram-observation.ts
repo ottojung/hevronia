@@ -35,6 +35,7 @@ export function createObservedTelegramMessage(
       targetSender: input.replyTo.targetSender,
       targetSenderDisplayName: input.replyTo.targetSenderDisplayName,
       targetText: input.replyTo.targetText,
+      targetIsHevronia: input.replyTo.targetsHevronia,
     },
     directlyAddressed: input.chatKind === "private" || input.mentionsHevronia ||
       input.replyTo?.targetsHevronia === true,
@@ -46,11 +47,11 @@ export function telegramDisplayName(firstName: string, lastName?: string): strin
 }
 
 export function telegramSenderIdentity(
-  compatibilityUserId: number,
+  senderUserId: number,
   senderChatId?: number,
 ): TelegramSenderIdentity {
   return senderChatId === undefined
-    ? { kind: "user", id: compatibilityUserId }
+    ? { kind: "user", id: senderUserId }
     : { kind: "chat", id: senderChatId };
 }
 

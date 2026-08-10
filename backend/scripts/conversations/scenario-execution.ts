@@ -55,7 +55,7 @@ export function scenarioHeaderLines(scenario: ConversationScenario): string[] {
   ];
   const memories = scenario.longTermMemory;
   if (memories !== undefined && memories.length > 0) {
-    lines.push("Long-term memory about this participant:");
+    lines.push("Long-term memory about this character:");
     for (const fact of memories) {
       lines.push(`- ${fact}`);
     }

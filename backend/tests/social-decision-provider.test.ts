@@ -23,7 +23,7 @@ function message(overrides: Partial<ObservedTelegramMessage> = {}): ObservedTele
 const context: SocialDecisionContext = {
   boundedHistory: [],
   currentMessage: message(),
-  replyCandidates: [{ key: "candidate-0", messageId: 10, sender: { kind: "user", id: 88 },
+  replyCandidates: [{ messageId: 10, sender: { kind: "user", id: 88 },
     senderDisplayName: "Іра", text: "та ні" }],
   participantMemories: [],
 };
@@ -55,13 +55,10 @@ test("decide returns unwrapped silence decision", async () => {
 test("decide returns unwrapped reply decision", async () => {
   const decision = {
     action: "reply",
-    targetCandidateKey: "candidate-0",
-    motive: "motive",
-    socialAction: "reaction",
-    adviceRequested: false,
-    askQuestion: false,
-    dreamRelevant: false,
-    backgroundRelevant: false,
+    targetChoice: "A",
+    interpretation: "this character is asking me for a favour",
+    activeDesire: "I want to help",
+    desiredOutcome: "learn what they need",
   };
   const planner = plannerWithResponse(JSON.stringify({ decision }));
   assert.deepEqual(await planner.decide(context), decision);
@@ -73,7 +70,14 @@ test("malformed provider responses are rejected", async () => {
     JSON.stringify({ decision: { action: "jump" } }),
     JSON.stringify({ decision: { action: "reply" } }),
     JSON.stringify({ decision: { action: "silence", extra: true } }),
-    JSON.stringify({ decision: { action: "reply", targetCandidateKey: "candidate-0" } }),
+    JSON.stringify({ decision: { action: "reply", targetChoice: "A" } }),
+    JSON.stringify({ decision: { action: "reply", targetChoice: "",
+      interpretation: "a", activeDesire: "a", desiredOutcome: "o" } }),
+    JSON.stringify({ decision: { action: "reply", targetChoice: "A",
+      interpretation: "a", activeDesire: "a", desiredOutcome: "o",
+      socialAction: "reaction" } }),
+    JSON.stringify({ decision: { action: "reply", targetMessageId: 10,
+      interpretation: "a", activeDesire: "a", desiredOutcome: "o" } }),
   ];
   for (const content of cases) {
     const planner = plannerWithResponse(content);

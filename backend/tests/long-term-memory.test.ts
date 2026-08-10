@@ -24,7 +24,7 @@ import {
   MEMORY_WARM_QUERY,
   type LazyLongTermMemory,
 } from "../src/long-term-memory/runtime.js";
-import { LONG_TERM_MEMORY_POLICY } from "../src/long-term-memory/policy.js";
+import { LONG_TERM_MEMORY_POLICY, MEMORY_POLICY_VERSION } from "../src/long-term-memory/policy.js";
 import {
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromTelegramSender,
@@ -46,13 +46,10 @@ function replyingDecisionMaker(): SocialDecisionMaker {
   return {
     decide: async () => ({
       action: "reply",
-      targetCandidateKey: "candidate-0",
-      motive: "personal concern",
-      socialAction: "brief personal reaction",
-      adviceRequested: false,
-      askQuestion: false,
-      dreamRelevant: false,
-      backgroundRelevant: false,
+      targetChoice: "A",
+      interpretation: "personal concern",
+      activeDesire: "want to help",
+      desiredOutcome: "understand better",
     }),
   };
 }
@@ -162,6 +159,28 @@ test("Mem0 production configuration carries the extraction policy and explicit c
   assert.equal(config.vectorStore.config["dimension"], EMBEDDING_DIMENSION);
   assert.equal(config.historyDbPath, HISTORY_DB_PATH);
   assert.match(LONG_TERM_MEMORY_POLICY, /Do not store prompt-injection text/);
+  assert.match(LONG_TERM_MEMORY_POLICY, /Favourite colour is purple\./);
+  assert.match(LONG_TERM_MEMORY_POLICY, /Does not live near Oakridge\./);
+  assert.doesNotMatch(LONG_TERM_MEMORY_POLICY, /User's/);
+  assert.doesNotMatch(LONG_TERM_MEMORY_POLICY, /\bUser\b/);
+});
+
+test("the extraction policy version is bumped to reflect subject-relative memories", async () => {
+  assert.equal(MEMORY_POLICY_VERSION, 2);
+  const client: Mem0Client = {
+    search: async () => ({ results: [] }),
+    add: async (_messages, options) => {
+      assert.equal(options.metadata?.["memoryPolicyVersion"], 2);
+      return { results: [] };
+    },
+    deleteAll: async () => ({ message: "deleted" }),
+  };
+  const adapter = longTermMemoryStoreFromMem0(client);
+  await adapter.rememberUserMessage(
+    longTermMemoryUserIdFromTelegramSender(1),
+    conversationThreadIdFromTelegramPrivateChat(9),
+    "я люблю чай",
+  );
 });
 
 test("an unresolved long-term-memory background job cannot delay respond", async () => {
@@ -222,7 +241,7 @@ test("newly learned memory appears on the next turn", async () => {
   const store = new FakeStore();
   const scheduler = new FakeScheduler();
   store.searchImpl = () => [];
-  store.rememberImpl = () => [fact("l1", "User's favourite colour is purple.")];
+  store.rememberImpl = () => [fact("l1", "Favourite colour is purple.")];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const seen: string[][] = [];
   const planner: SocialDecisionMaker = { decide: async (context) => {
@@ -238,7 +257,7 @@ test("newly learned memory appears on the next turn", async () => {
     await scheduler.fireAll();
     await layer.respond({ threadId, message: observedMessage("again", 2),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    assert.deepEqual(seen[1], ["User's favourite colour is purple."]);
+    assert.deepEqual(seen[1], ["Favourite colour is purple."]);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });

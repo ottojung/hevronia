@@ -2,13 +2,14 @@ import { HumanMessage, isBaseMessage, type BaseMessage } from "@langchain/core/m
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import { MessagesAnnotation, START, StateGraph } from "@langchain/langgraph";
 import type { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
-import { summarizationMiddleware } from "langchain";
-import type { TokenCounter } from "langchain";
+import { countTokensApproximately, type TokenCounter } from "langchain";
 
+import type { CountSlice } from "./compaction-window.js";
+import { compactIfNeeded } from "./conversation-compaction.js";
+import { renderDreamObservations } from "./dream-render.js";
 import type { ConversationThreadId } from "./identifiers.js";
 import type { CanonicalTelegramEvent } from "./telegram-event.js";
 import { serializeTelegramEvent } from "./telegram-event.js";
-import { SUMMARY_PREFIX, SUMMARY_PROMPT } from "./summary.js";
 
 export interface ConversationStoreOptions {
   summaryModel: BaseLanguageModel;
@@ -23,26 +24,29 @@ export interface ConversationStore {
   getMessages(threadId: ConversationThreadId): Promise<BaseMessage[]>;
 }
 
+/**
+ * Compaction cost function: measures a canonical slice by rendering it through
+ * the dream renderer and token-counting the resulting model-facing message, so
+ * token budgets reflect what the models consume rather than raw canonical JSON.
+ */
+function countRenderedConversation(tokenCounter: TokenCounter): CountSlice {
+  return async (messages: BaseMessage[]): Promise<number> => {
+    const rendered = renderDreamObservations(messages);
+    return tokenCounter([new HumanMessage({ content: rendered })]);
+  };
+}
+
 export function createConversationStore(
   checkpointer: SqliteSaver,
   options: ConversationStoreOptions,
 ): ConversationStore {
-  const middleware = summarizationMiddleware({
-    model: options.summaryModel,
-    trigger: { tokens: options.triggerTokens },
-    keep: { tokens: options.keepTokens },
-    trimTokensToSummarize: options.trimTokensToSummarize,
-    summaryPrefix: SUMMARY_PREFIX,
-    summaryPrompt: SUMMARY_PROMPT,
-    tokenCounter: options.tokenCounter,
-  });
+  const tokenCounter = options.tokenCounter ?? countTokensApproximately;
+  const countSlice = countRenderedConversation(tokenCounter);
   const graph = new StateGraph(MessagesAnnotation)
-    .addNode("compact", async (state) => {
-      if (!(middleware.beforeModel instanceof Function)) {
-        return {};
-      }
-      return await middleware.beforeModel(state, { context: { summaryPrompt: SUMMARY_PROMPT } });
-    })
+    .addNode("compact", async (state) => compactIfNeeded(
+      state, options.summaryModel, options.triggerTokens, options.keepTokens,
+      options.trimTokensToSummarize, countSlice,
+    ))
     .addEdge(START, "compact")
     .compile({ checkpointer });
 
