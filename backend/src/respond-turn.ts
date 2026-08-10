@@ -4,15 +4,20 @@ import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import type { ConversationStore } from "./conversation-store.js";
 import type { RespondInput } from "./conversation-types.js";
 import { GeneratedTurn } from "./generated-turn.js";
-import { longTermMemoryUserIdFromTelegramSender } from "./identifiers.js";
 import type { LazyLongTermMemory } from "./long-term-memory/runtime.js";
-import { memoryUserIdForSender } from "./long-term-memory/operations.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
-import { memoriesForCandidates, memoriesForTarget, selectedParticipantIds } from "./participant-memory.js";
-import type { SocialDecisionLog, SocialDecisionMaker } from "./social-decision.js";
+import { memoriesForCharacter } from "./participant-memory.js";
+import { notebookSubject } from "./telegram-event.js";
+import type {
+  SocialDecision,
+  SocialDecisionLog,
+  SocialDecisionMaker,
+  SpeakDecision,
+} from "./social-decision.js";
 import { extractText } from "./text.js";
-import { InvalidRealizationResponseError, deliveredEvent, realizationContext,
-  replyCandidates, replyRelationship, resolveDecision } from "./turn-context.js";
+import { InvalidRealizationResponseError, realizationContext } from "./turn-context.js";
+import { deliveredEvent, replyRelationshipFor, resolveSpeakDecision } from "./speak-resolution.js";
+import { acquireTurnContext } from "./turn-memory.js";
 
 export interface RespondTurnDependencies {
   store: ConversationStore;
@@ -24,6 +29,15 @@ export interface RespondTurnDependencies {
   onSocialDecision?: (log: SocialDecisionLog) => void;
 }
 
+function toSocialDecisionLog(speak: SpeakDecision): SocialDecisionLog {
+  return {
+    action: "speak",
+    addressName: speak.address?.character.subject ?? null,
+    replyToName: speak.replyTo === null ? null : notebookSubject(speak.replyTo.message.sender),
+    ...speak.subjective,
+  };
+}
+
 export async function respondTurn(
   dependencies: RespondTurnDependencies,
   input: RespondInput,
@@ -31,33 +45,15 @@ export async function respondTurn(
   const { lazyMemory } = dependencies;
   const memoryTurn = lazyMemory?.beginTurn();
   try {
-    const userId = memoryUserIdForSender(input.message.sender);
-    if (userId !== undefined && !input.senderIsBot) {
-      lazyMemory?.observeUserMessage(
-        userId, input.threadId, input.message.text,
-      );
-    }
-    await dependencies.canonicalWrites.submitAndWait(
-      input.threadId, () => dependencies.store.append(input.threadId, input.message),
+    const { history, candidates, participantMemories } = await acquireTurnContext(
+      dependencies.store, dependencies.canonicalWrites, lazyMemory,
+      memoryTurn?.snapshot, input,
     );
-    const history = await dependencies.store.getMessages(input.threadId);
-    const candidates = replyCandidates(history);
-    const currentSenderId = input.message.sender.kind === "user"
-      ? input.message.sender.id
-      : undefined;
-    for (const participantId of selectedParticipantIds(candidates)) {
-      if (input.senderIsBot && participantId === currentSenderId) continue;
-      lazyMemory?.warmUser(longTermMemoryUserIdFromTelegramSender(participantId));
-    }
-    const snapshot = memoryTurn?.snapshot;
-    const participantMemories = snapshot === undefined
-      ? []
-      : memoriesForCandidates(snapshot, candidates);
-    let decision: Awaited<ReturnType<typeof dependencies.planner.decide>>;
+    let decision: SocialDecision;
     try {
       decision = await dependencies.planner.decide({
         boundedHistory: history, currentMessage: input.message,
-        replyCandidates: candidates, participantMemories,
+        visibleMessages: candidates, participantMemories,
       });
     } catch (error) {
       console.warn(`Social decision failed safely to silence: ${String(error)}`);
@@ -67,30 +63,31 @@ export async function respondTurn(
       dependencies.onSocialDecision?.({ action: "silence" });
       return GeneratedTurn.fromSilence();
     }
-    const resolved = resolveDecision(decision, candidates);
-    dependencies.onSocialDecision?.({
-      action: "reply",
-      targetName: resolved?.target.senderDisplayName ?? decision.targetChoice,
-      interpretation: decision.interpretation,
-      activeDesire: decision.activeDesire,
-      desiredOutcome: decision.desiredOutcome,
-    });
-    if (resolved === undefined) {
+    const speak = resolveSpeakDecision(decision, candidates);
+    if (speak === undefined) {
+      dependencies.onSocialDecision?.({ action: "silence" });
       return GeneratedTurn.fromSilence();
     }
+    dependencies.onSocialDecision?.(toSocialDecisionLog(speak));
+    const focusSender = speak.address !== null
+      ? speak.address.character.sender
+      : speak.replyTo !== null ? speak.replyTo.message.sender : undefined;
+    const focusMemories = focusSender === undefined
+      ? []
+      : memoriesForCharacter(participantMemories, focusSender);
     const response = await dependencies.model.invoke([
       new SystemMessage(dependencies.personality),
       new HumanMessage(realizationContext(
-        history, input.message.chatKind,
-        memoriesForTarget(participantMemories, resolved.target), resolved,
+        history, focusMemories, speak.subjective, candidates,
       )),
     ]);
     if (!isBaseMessage(response)) throw new InvalidRealizationResponseError();
     const replyText = extractText(response.content).trim();
     if (!replyText) throw new InvalidRealizationResponseError();
-    return GeneratedTurn.fromReply(replyText, replyRelationship(resolved.target), (messageId) => {
+    const replyTo = replyRelationshipFor(speak.replyTo);
+    return GeneratedTurn.fromSpeak(replyText, replyTo, (messageId) => {
       const delivered = deliveredEvent(
-        messageId, input.hevroniaSender, replyText, input.message, resolved.target,
+        messageId, input.hevroniaSender, replyText, input.message, replyTo,
       );
       dependencies.canonicalWrites.enqueue(
         input.threadId, () => dependencies.store.append(input.threadId, delivered),

@@ -3,7 +3,7 @@ import type { DeliveredHevroniaMessage, ReplyRelationship, TelegramSenderIdentit
 
 export interface TelegramTurnDelivery {
   showTyping(): Promise<void>;
-  reply(text: string, replyToMessageId: number): Promise<number>;
+  reply(text: string, replyToMessageId: number | null): Promise<number>;
 }
 
 export type TelegramDeliveryResult =
@@ -25,13 +25,13 @@ export async function deliverGeneratedTurn(
   if (turn.outcome.action === "silence") {
     return { status: "silence" };
   }
-  const reply = turn.outcome;
+  const speak = turn.outcome;
   await delivery.showTyping();
   const deliveredMessageId = await delivery.reply(
-    reply.replyText,
-    reply.replyTo.targetMessageId,
+    speak.replyText,
+    speak.replyTo?.targetMessageId ?? null,
   );
-  reply.persistDelivery(deliveredMessageId);
+  speak.persistDelivery(deliveredMessageId);
   return { status: "delivered", persistence: "queued" };
 }
 

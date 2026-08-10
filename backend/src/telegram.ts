@@ -21,6 +21,10 @@ export async function startBot(): Promise<void> {
   installMembershipWarmup(bot);
 
   bot.on("message:text", async (ctx) => {
+    const sendReply = async (text: string, replyToMessageId: number | null): Promise<number> =>
+      (await ctx.reply(text, replyToMessageId === null
+        ? undefined
+        : { reply_parameters: { message_id: replyToMessageId } })).message_id;
     const updateId = ctx.update.update_id;
     const messageId = ctx.message.message_id;
     const messageThreadId = ctx.message.message_thread_id;
@@ -50,11 +54,7 @@ export async function startBot(): Promise<void> {
         senderIsBot: ctx.from.is_bot });
       const result = await deliverGeneratedTurn(turn, {
         showTyping: async () => { await ctx.replyWithChatAction("typing"); },
-        reply: async (text, replyToMessageId) => {
-          const delivered = await ctx.reply(text,
-            { reply_parameters: { message_id: replyToMessageId } });
-          return delivered.message_id;
-        },
+        reply: sendReply,
       });
       if (result.status === "silence") {
         console.log(`Observed message=${messageId}; chose silence`);
@@ -76,9 +76,7 @@ export async function startBot(): Promise<void> {
           targetSenderDisplayName: telegramDisplayName(ctx.from.first_name, ctx.from.last_name),
           targetText: ctx.message.text, targetIsHevronia: false } }, {
         showTyping: async () => undefined,
-        reply: async (text, targetMessageId) => (await ctx.reply(text, {
-          reply_parameters: { message_id: targetMessageId },
-        })).message_id,
+        reply: sendReply,
       }, (fallback) => recordDeliveredMessage(fallbackThreadId, fallback)).catch(
         (fallbackError) => console.error(`Failed to deliver fallback: ${String(fallbackError)}`),
       );
