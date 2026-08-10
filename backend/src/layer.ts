@@ -1,4 +1,3 @@
-import { ChatOpenAI } from "@langchain/openai";
 import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -8,7 +7,7 @@ import { createConversationStore } from "./conversation-store.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { respondTurn } from "./respond-turn.js";
 import { warmParticipant } from "./warm-participant.js";
-import { modelFromEnv, openAiKeyFromEnv } from "./model.js";
+import { createChatModel, modelFromEnv } from "./model.js";
 import { SYSTEM_PROMPT } from "./personality.js";
 import { createSocialDecisionMaker } from "./social-decision.js";
 import { COMPACTION, DEFAULT_DB_PATH } from "./summary.js";
@@ -19,9 +18,8 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
   const lazyMemory = options.lazyMemory;
   mkdirSync(dirname(dbPath), { recursive: true });
   const checkpointer = SqliteSaver.fromConnString(dbPath);
-  const model = options.model ?? new ChatOpenAI({ apiKey: openAiKeyFromEnv(), model: modelFromEnv() });
-  const summaryModel = options.summaryModel ?? new ChatOpenAI({ apiKey: openAiKeyFromEnv(),
-    model: modelFromEnv(), temperature: 0 });
+  const model = options.model ?? createChatModel(modelFromEnv());
+  const summaryModel = options.summaryModel ?? createChatModel(modelFromEnv(), { temperature: 0 });
   const store = options.conversationStore ?? createConversationStore(checkpointer, {
     summaryModel,
     triggerTokens: options.triggerTokens ?? COMPACTION.triggerTokens,

@@ -54,17 +54,20 @@ npm install
 
 ## Configuration
 
-The bot reads two secrets **only** from the environment:
+The bot reads secrets from the environment:
 
 ```text
 TELEGRAM_BOT_TOKEN
 MY_OPENAI_API_KEY
+MY_GEMINI_API_KEY
 ```
 
 - `TELEGRAM_BOT_TOKEN` is used for Telegram (grammY).
 - `MY_OPENAI_API_KEY` is passed explicitly to the LangChain `ChatOpenAI`
   integration and to both Mem0's extraction LLM and OpenAI embedder.
   `OPENAI_API_KEY` is neither expected nor used.
+- `MY_GEMINI_API_KEY` is used when the model name selects the Gemini provider.
+  It is only required when `HEVRONIA_MODEL` names a Gemini model.
 
 The response model is configurable and read from the environment:
 
@@ -72,15 +75,18 @@ The response model is configurable and read from the environment:
 HEVRONIA_MODEL (optional)
 ```
 
-`HEVRONIA_MODEL` defaults to `gpt-5.6`. For testing or cheaper runs, set it to
-a lighter model, for example `gpt-5.6-luna`:
+`HEVRONIA_MODEL` defaults to `gemini-3.5-flash`. A model name starting with
+`gemini` uses the Gemini provider (`MY_GEMINI_API_KEY`); any other name uses
+the OpenAI provider (`MY_OPENAI_API_KEY`). Both providers share the same
+character and planner pipeline:
 
 ```bash
 HEVRONIA_MODEL=gpt-5.6-luna npm run conversations -- --smoke
+HEVRONIA_MODEL=gemini-3.5-flash npm run conversations -- --smoke
 ```
 
 The conversation simulator's participant model is separately selectable with
-`HEVRONIA_SIMULATOR_MODEL`.
+`HEVRONIA_SIMULATOR_MODEL` and follows the same provider inference.
 
 The bot must be able to observe ambient group conversation. In BotFather, use
 `/setprivacy` for `@hevronia_bot` and **disable Group Privacy Mode**. Telegram

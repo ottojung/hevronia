@@ -1,9 +1,10 @@
 import { HumanMessage } from "@langchain/core/messages";
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
-import { createAgent, providerStrategy } from "langchain";
+import { createAgent, providerStrategy, toolStrategy } from "langchain";
 
 import { renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
+import { isGeminiChatModel } from "./model.js";
 import { buildPlannerChoices } from "./reply-choices.js";
 import { buildSocialDecisionResponseSchema } from "./social-decision-schema.js";
 import type {
@@ -86,12 +87,19 @@ export function createSocialDecisionMaker(
   return {
     async decide(context: SocialDecisionContext): Promise<SocialDecision> {
       const schema = buildSocialDecisionResponseSchema(context.visibleMessages);
-      const agent = createAgent({
-        model,
-        tools: [],
-        systemPrompt: `${personality}\n\n${PLANNING_MODE}`,
-        responseFormat: providerStrategy(schema),
-      });
+      const agent = isGeminiChatModel(model)
+        ? createAgent({
+            model,
+            tools: [],
+            systemPrompt: `${personality}\n\n${PLANNING_MODE}`,
+            responseFormat: toolStrategy(schema),
+          })
+        : createAgent({
+            model,
+            tools: [],
+            systemPrompt: `${personality}\n\n${PLANNING_MODE}`,
+            responseFormat: providerStrategy(schema),
+          });
       const result = await agent.invoke({
         messages: [new HumanMessage(renderDecisionContext(context))],
       });

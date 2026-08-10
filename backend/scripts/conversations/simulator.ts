@@ -1,7 +1,6 @@
 import { HumanMessage, SystemMessage, isBaseMessage } from "@langchain/core/messages";
-import { ChatOpenAI } from "@langchain/openai";
 
-import { openAiKeyFromEnv } from "../../src/model.js";
+import { createChatModel } from "../../src/model.js";
 import { extractText } from "../../src/text.js";
 import type { ConversationScenario, ParticipantGrammar, Simulator, TranscriptEntry } from "./types.js";
 
@@ -39,7 +38,7 @@ export function isEmptySimulatorMessageError(error: unknown): error is EmptySimu
 }
 
 export function createSimulator(modelName: string): Simulator {
-  const model = new ChatOpenAI({ apiKey: openAiKeyFromEnv(), model: modelName });
+  const model = createChatModel(modelName);
   return {
     async nextMessage(scenario, transcript) {
       const response = await model.invoke([
