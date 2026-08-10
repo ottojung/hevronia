@@ -9,7 +9,7 @@ import type { LazyLongTermMemory } from "./long-term-memory/runtime.js";
 import { memoryUserIdForSender } from "./long-term-memory/operations.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { memoriesForCandidates, memoriesForTarget, selectedParticipantIds } from "./participant-memory.js";
-import type { SocialDecisionMaker } from "./social-decision.js";
+import type { SocialDecisionLog, SocialDecisionMaker } from "./social-decision.js";
 import { extractText } from "./text.js";
 import { InvalidRealizationResponseError, deliveredEvent, realizationContext,
   replyCandidates, replyRelationship, resolveDecision } from "./turn-context.js";
@@ -21,6 +21,7 @@ export interface RespondTurnDependencies {
   personality: string;
   canonicalWrites: PendingConversationWrites;
   lazyMemory?: LazyLongTermMemory;
+  onSocialDecision?: (log: SocialDecisionLog) => void;
 }
 
 export async function respondTurn(
@@ -63,9 +64,17 @@ export async function respondTurn(
       decision = { action: "silence" };
     }
     if (decision.action === "silence") {
+      dependencies.onSocialDecision?.({ action: "silence" });
       return GeneratedTurn.fromSilence();
     }
     const resolved = resolveDecision(decision, candidates);
+    dependencies.onSocialDecision?.({
+      action: "reply",
+      targetName: resolved?.target.senderDisplayName ?? decision.targetChoice,
+      interpretation: decision.interpretation,
+      activeDesire: decision.activeDesire,
+      desiredOutcome: decision.desiredOutcome,
+    });
     if (resolved === undefined) {
       return GeneratedTurn.fromSilence();
     }
@@ -89,15 +98,5 @@ export async function respondTurn(
     });
   } finally {
     memoryTurn?.release();
-  }
-}
-
-export function warmParticipant(
-  lazyMemory: LazyLongTermMemory | undefined,
-  sender: import("./telegram-event.js").TelegramSenderIdentity,
-): void {
-  const userId = memoryUserIdForSender(sender);
-  if (userId !== undefined) {
-    lazyMemory?.warmUser(userId);
   }
 }

@@ -6,7 +6,8 @@ import { dirname } from "node:path";
 import type { ConversationLayer, ConversationLayerOptions } from "./conversation-types.js";
 import { createConversationStore } from "./conversation-store.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
-import { respondTurn, warmParticipant } from "./respond-turn.js";
+import { respondTurn } from "./respond-turn.js";
+import { warmParticipant } from "./warm-participant.js";
 import { modelFromEnv, openAiKeyFromEnv } from "./model.js";
 import { SYSTEM_PROMPT } from "./personality.js";
 import { createSocialDecisionMaker } from "./social-decision.js";
@@ -30,7 +31,8 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
   });
   const planner = options.decisionMaker ?? createSocialDecisionMaker(model, personality);
   const canonicalWrites = options.pendingConversationWrites ?? new PendingConversationWrites();
-  const respondDependencies = { store, planner, model, personality, canonicalWrites, lazyMemory };
+  const respondDependencies = { store, planner, model, personality, canonicalWrites,
+    lazyMemory, onSocialDecision: options.onSocialDecision };
 
   return {
     respond: (input) => respondTurn(respondDependencies, input),

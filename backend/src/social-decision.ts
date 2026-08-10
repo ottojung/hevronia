@@ -56,6 +56,21 @@ export interface ResolvedSocialDecision {
   desiredOutcome: string;
 }
 
+/**
+ * A human-readable projection of the planner's private decision, exposed through
+ * ConversationLayer.onSocialDecision for logging. It carries only what is safe
+ * to show a reviewer: the chosen target and the private motivation fields.
+ */
+export type SocialDecisionLog =
+  | { action: "silence" }
+  | {
+      action: "reply";
+      targetName: string;
+      interpretation: string;
+      activeDesire: string;
+      desiredOutcome: string;
+    };
+
 const PLANNING_MODE = `
 You are at the private moment before any new Telegram message appears from you.
 Observe what appeared in the dream and apply Хевронія's Procedural interpretation.
