@@ -4,7 +4,7 @@ import { ChatOpenAI } from "@langchain/openai";
 
 export type ModelProvider = "openai" | "gemini";
 
-export const DEFAULT_MODEL = "gemini-3.5-flash";
+export const DEFAULT_MODEL = "gemini-3.5-flash-lite";
 
 export function modelFromEnv(): string {
   const configured = process.env["HEVRONIA_MODEL"];
