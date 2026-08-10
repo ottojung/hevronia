@@ -302,9 +302,12 @@ concurrency limit. `--smoke` is an explicit synonym for the default, and
 `gpt-5-mini`. Transcripts are saved under
 `backend/.data/conversation-runs/<run-id>/`.
 
-During a run the terminal only shows short `[start]`/`[done]`/`[failed]`
-progress lines; once every scenario has finished, each complete transcript is
-printed as one uninterrupted block in catalog order, and the run index
+During a run the terminal only shows a short `[start]` line when a scenario
+begins and, as each scenario finishes, a cumulative progress line reporting
+how many of how many scenarios are done (for example `[2/3] normal-stranger
+done (7/7 rounds)`) plus an ETA extrapolated linearly from the elapsed time
+per expected round. Once every scenario has finished, each complete transcript
+is printed as one uninterrupted block in catalog order, and the run index
 summarizes every scenario by category with its behavior tags. Each turn shows
 the participant's message, a `Планер:` line with Хевронія's private social
 decision (whom she speaks to, whether she attaches a Telegram reply, and the

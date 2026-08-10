@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { parseCli, HELP, renderScenarioList, isConversationCliError } from "./cli.js";
 import { runScenariosConcurrently, runScenariosSequentially } from "./orchestrator.js";
+import { ConversationProgress } from "./progress.js";
 import { completionLine, runScenarioEntry, scenarioHeaderLines } from "./scenario-execution.js";
 import { createSimulator, DEFAULT_SIMULATOR_MODEL } from "./simulator.js";
 import { createRunId, saveRun, type RunRecord } from "./transcript.js";
@@ -29,20 +30,17 @@ async function main(): Promise<void> {
   const buffers = new Map<string, string[]>();
   for (const scenario of command.scenarios) {
     buffers.set(scenario.id, scenarioHeaderLines(scenario));
-    console.log(`[start] ${scenario.id}`);
   }
+  const progress = new ConversationProgress(command.scenarios);
   const runScenarios = command.parallel
     ? runScenariosConcurrently
     : runScenariosSequentially;
   const results = await runScenarios(command.scenarios, async (scenario) => {
+    console.log(`[start] ${scenario.id}`);
     const lines = buffers.get(scenario.id) ?? [];
     const result = await runScenarioEntry(scenario, simulator, lines);
     lines.push(completionLine(scenario, result));
-    if (result.status === "completed") {
-      console.log(`[done] ${scenario.id}`);
-    } else {
-      console.log(`[failed] ${scenario.id}: ${result.failure}`);
-    }
+    console.log(progress.finish(scenario, result));
     return result;
   });
   const records: RunRecord[] = command.scenarios.map((scenario, index) => {
