@@ -43,6 +43,11 @@ export async function runScenarioEntry(
         dbPath: join(directory, "checkpoints.sqlite"),
         lazyMemory: createScenarioMemory(scenario),
         onSocialDecision: (log) => lines.push(formatPlannerLog(log)),
+        onPlannerError: (rendered) => {
+          const [first, ...rest] = rendered.split("\n");
+          lines.push(`Планер: [error] ${first}`);
+          for (const line of rest) lines.push(`  ${line}`);
+        },
       }),
       print: (line) => lines.push(line),
     });

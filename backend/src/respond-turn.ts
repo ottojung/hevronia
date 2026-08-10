@@ -9,11 +9,13 @@ import type { LazyLongTermMemory } from "./long-term-memory/runtime.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { memoriesForCharacter } from "./participant-memory.js";
 import type {
+  SocialDecision,
   SocialDecisionLog,
   SocialDecisionMaker,
 } from "./social-decision.js";
 import { extractText } from "./text.js";
 import { InvalidRealizationResponseError, realizationContext } from "./turn-context.js";
+import { reportPlannerFailure } from "./planner-failure.js";
 import {
   UnresolvableSpeakDecisionError,
   deliveredEvent,
@@ -30,6 +32,7 @@ export interface RespondTurnDependencies {
   canonicalWrites: PendingConversationWrites;
   lazyMemory?: LazyLongTermMemory;
   onSocialDecision?: (log: SocialDecisionLog) => void;
+  onPlannerError?: (rendered: string) => void;
 }
 
 export async function respondTurn(
@@ -43,17 +46,28 @@ export async function respondTurn(
       dependencies.store, dependencies.canonicalWrites, lazyMemory,
       memoryTurn?.snapshot, input,
     );
-    const decision = await dependencies.planner.decide({
-      boundedHistory: history, currentMessage: input.message,
-      visibleMessages: candidates, participantMemories,
-    });
+    let decision: SocialDecision;
+    try {
+      decision = await dependencies.planner.decide({
+        boundedHistory: history, currentMessage: input.message,
+        visibleMessages: candidates, participantMemories,
+      });
+    } catch (error) {
+      reportPlannerFailure(dependencies.onPlannerError, error, input.message.text, candidates,
+        { addressCharacter: null, replyToMessage: null });
+      return GeneratedTurn.fromSilence();
+    }
     if (decision.action === "silence") {
       dependencies.onSocialDecision?.(toSilenceLog(decision));
       return GeneratedTurn.fromSilence();
     }
     const speak = resolveSpeakDecision(decision, candidates);
     if (speak === undefined) {
-      throw new UnresolvableSpeakDecisionError(decision.addressCharacter, decision.replyToMessage);
+      reportPlannerFailure(dependencies.onPlannerError,
+        new UnresolvableSpeakDecisionError(decision.addressCharacter, decision.replyToMessage),
+        input.message.text, candidates,
+        { addressCharacter: decision.addressCharacter, replyToMessage: decision.replyToMessage });
+      return GeneratedTurn.fromSilence();
     }
     dependencies.onSocialDecision?.(toSpeakLog(speak));
     const focusSender = speak.address !== null

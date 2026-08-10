@@ -26,6 +26,7 @@ export interface ConversationLayerOptions {
   lazyMemory?: LazyLongTermMemory;
   decisionMaker?: import("./social-decision.js").SocialDecisionMaker;
   onSocialDecision?: (log: import("./social-decision.js").SocialDecisionLog) => void;
+  onPlannerError?: (rendered: string) => void;
   conversationStore?: import("./conversation-store.js").ConversationStore;
   pendingConversationWrites?: import("./pending-conversation-writes.js").PendingConversationWrites;
 }

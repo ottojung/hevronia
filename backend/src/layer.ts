@@ -32,7 +32,8 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
   const planner = options.decisionMaker ?? createSocialDecisionMaker(model, personality);
   const canonicalWrites = options.pendingConversationWrites ?? new PendingConversationWrites();
   const respondDependencies = { store, planner, model, personality, canonicalWrites,
-    lazyMemory, onSocialDecision: options.onSocialDecision };
+    lazyMemory, onSocialDecision: options.onSocialDecision,
+    onPlannerError: options.onPlannerError };
 
   return {
     respond: (input) => respondTurn(respondDependencies, input),

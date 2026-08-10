@@ -22,12 +22,6 @@ export class UnresolvableSpeakDecisionError extends Error {
   }
 }
 
-export function isUnresolvableSpeakDecisionError(
-  error: unknown,
-): error is UnresolvableSpeakDecisionError {
-  return error instanceof UnresolvableSpeakDecisionError;
-}
-
 export function resolveSpeakDecision(
   decision: Exclude<SocialDecision, { action: "silence" }>,
   candidates: VisibleMessage[],

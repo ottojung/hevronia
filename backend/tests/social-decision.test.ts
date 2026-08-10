@@ -115,18 +115,26 @@ test("real planner receives canonical personality, background, and recalled memo
       }] });
 });
 
-test("a non-candidate planner target propagates instead of reaching Telegram delivery", async () => {
+test("a non-candidate planner target falls to silence and reports the failure", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-target-"));
+  const reports: string[] = [];
   const planner: SocialDecisionMaker = { decide: async () => speakDecision({
     addressCharacter: "P9", replyToMessage: null }) };
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
-    model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner });
+    model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner,
+    onPlannerError: (rendered) => reports.push(rendered) });
   try {
-    await assert.rejects(
-      () => layer.respond({ threadId, message: message(),
-        hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false }),
-      /addressCharacter=P9/,
-    );
+    const turn = await layer.respond({ threadId, message: message(),
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    let delivered = false;
+    const sent = await deliverGeneratedTurn(turn, { showTyping: async () => undefined,
+      reply: async () => { delivered = true; return 100; } });
+    assert.deepEqual(sent, { status: "silence" });
+    assert.equal(delivered, false);
+    assert.equal(reports.length, 1);
+    const report = reports[0] ?? "";
+    assert.match(report, /addressCharacter=P9/);
+    assert.match(report, /P1 = character 88/);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
@@ -251,17 +259,25 @@ test("silence and delivered speech persist the same canonical incoming represent
   }
 });
 
-test("a planner exception propagates instead of degrading to silence", async () => {
+test("a planner exception falls to silence and reports the failure", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-planner-crash-"));
+  const reports: string[] = [];
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(),
+    onPlannerError: (rendered) => reports.push(rendered),
     decisionMaker: { decide: async () => { throw new Error("planner boom"); } } });
   try {
-    await assert.rejects(
-      () => layer.respond({ threadId, message: message(),
-        hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false }),
-      /planner boom/,
-    );
+    const turn = await layer.respond({ threadId, message: message(),
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    let delivered = false;
+    const sent = await deliverGeneratedTurn(turn, { showTyping: async () => undefined,
+      reply: async () => { delivered = true; return 100; } });
+    assert.deepEqual(sent, { status: "silence" });
+    assert.equal(delivered, false);
+    assert.equal(reports.length, 1);
+    const report = reports[0] ?? "";
+    assert.match(report, /planner boom/);
+    assert.match(report, /valid character handles:/);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
