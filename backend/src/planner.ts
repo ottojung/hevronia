@@ -5,7 +5,7 @@ import { createAgent, providerStrategy } from "langchain";
 import { renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
 import { buildPlannerChoices } from "./reply-choices.js";
-import { socialDecisionResponseSchema } from "./social-decision-schema.js";
+import { buildSocialDecisionResponseSchema } from "./social-decision-schema.js";
 import type {
   SocialDecision,
   SocialDecisionContext,
@@ -25,7 +25,7 @@ Choose the pursuit that best advances the active desire that matters now. Allow 
 
 If no active desire has a worthwhile pursuit through the present interaction, output silence. Do not invent a desire for distance, quiet, disengagement, or ending the conversation to explain the absence of a pursuit; silence is already valid without one. Before settling on silence, consider whether an already-active desire could be advanced by acting to change the present situation.
 
-If she speaks, select an addressee if any, independently select an optional Telegram reply attachment.
+If she speaks, choose an addressee if any and independently an optional Telegram reply attachment. addressCharacter must be exactly one of the planner character handles listed under "Planner character handles" in the context. replyToMessage must be exactly one of the planner reply-message handles listed under "Planner reply-message handles" in the context, or null. Never write a name, an id, or a sentence into these fields.
 
 Fill every subjective field in both branches with a complete natural second-person sentence suitable for verbatim insertion into Хевронія's inner context. When she speaks, the six sentences are concatenated verbatim into her realization context. When she stays silent, they still describe her present private state and the state that led to silence, and they are kept for the record.
 
@@ -47,11 +47,11 @@ export function renderDecisionContext(context: SocialDecisionContext): string {
   sections.push("This is the conversation history currently visible to you:");
   sections.push(renderDreamObservations(context.boundedHistory, choices.messageAnnotations));
   sections.push("");
-  sections.push("Planner character handles:");
+  sections.push("Planner character handles (addressCharacter must be one of these):");
   sections.push(choices.characters.map(({ handle, character }) =>
     `${handle} = ${character.subject}`).join("\n"));
   sections.push("");
-  sections.push("Planner reply-message handles:");
+  sections.push("Planner reply-message handles (replyToMessage must be one of these, or null):");
   sections.push(choices.messages.map(({ handle }, index) =>
     `${handle} = ${ordinal(index + 1)} eligible visible message`).join("\n"));
   const memories = renderParticipantMemoryContexts(context.participantMemories);
@@ -73,18 +73,19 @@ export function createSocialDecisionMaker(
   model: BaseLanguageModel,
   personality: string,
 ): SocialDecisionMaker {
-  const agent = createAgent({
-    model,
-    tools: [],
-    systemPrompt: `${personality}\n\n${PLANNING_MODE}`,
-    responseFormat: providerStrategy(socialDecisionResponseSchema),
-  });
   return {
     async decide(context: SocialDecisionContext): Promise<SocialDecision> {
+      const schema = buildSocialDecisionResponseSchema(context.visibleMessages);
+      const agent = createAgent({
+        model,
+        tools: [],
+        systemPrompt: `${personality}\n\n${PLANNING_MODE}`,
+        responseFormat: providerStrategy(schema),
+      });
       const result = await agent.invoke({
         messages: [new HumanMessage(renderDecisionContext(context))],
       });
-      const response = socialDecisionResponseSchema.parse(result.structuredResponse);
+      const response = schema.parse(result.structuredResponse);
       return response.decision;
     },
   };

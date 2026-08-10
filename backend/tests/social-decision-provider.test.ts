@@ -7,6 +7,7 @@ import { providerStrategy } from "langchain";
 
 import { SYSTEM_PROMPT } from "../src/personality.js";
 import {
+  buildSocialDecisionResponseSchema,
   createSocialDecisionMaker,
   socialDecisionResponseSchema,
   socialDecisionSchema,
@@ -68,6 +69,20 @@ test("decide returns unwrapped speak decision", async () => {
   };
   const planner = plannerWithResponse(JSON.stringify({ decision }));
   assert.deepEqual(await planner.decide(context), decision);
+});
+
+test("the dynamic schema restricts addressCharacter and replyToMessage to visible handles", () => {
+  const schema = buildSocialDecisionResponseSchema(context.visibleMessages);
+  const speak = { action: "speak", addressCharacter: "P1", replyToMessage: "M1",
+    interpretation: "i", feltState: "f", activeDesire: "a", desiredOutcome: "o",
+    opportunity: "o", pursuit: "p" };
+  assert.equal(schema.safeParse({ decision: speak }).success, true);
+  for (const bad of ["7001", "Юхим", "character 7001", "P9", "M9", "я не братимусь розбирати це"]) {
+    assert.equal(schema.safeParse({ decision: { ...speak, addressCharacter: bad } }).success,
+      false, `addressCharacter=${bad}`);
+    assert.equal(schema.safeParse({ decision: { ...speak, replyToMessage: bad } }).success,
+      false, `replyToMessage=${bad}`);
+  }
 });
 
 test("malformed provider responses are rejected", async () => {

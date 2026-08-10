@@ -96,7 +96,7 @@ test("real planner receives canonical personality, background, and recalled memo
     assert.match(input, /Warcraft is part of the dream/);
     assert.match(input, /Character 88, currently displayed by Telegram as “Іра”/);
     assert.match(input, /Your sleeping mind made character 88 say:/);
-    assert.match(input, /Planner character handles:\n\nP1 = character 88/);
+    assert.match(input, /Planner character handles \(addressCharacter must be one of these\):\n\nP1 = character 88/);
     assert.match(input, /боїться павуків/);
     assert.doesNotMatch(input, /telegram-user:/);
     assert.doesNotMatch(input, /spreadsheet/);

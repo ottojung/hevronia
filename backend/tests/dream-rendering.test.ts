@@ -179,8 +179,8 @@ test("planner context lists characters, history, handles, then memories", () => 
   assert.match(rendered, /In your dream you currently see these characters:/);
   assert.match(rendered, /Character 42, currently displayed by Telegram as “Оля”/);
   assert.ok(rendered.indexOf("раніше") < rendered.indexOf("Оля боїться павуків"));
-  assert.match(rendered, /Planner character handles:\n\nP1 = character 42/);
-  assert.match(rendered, /Planner reply-message handles:\n\nM1 = the first eligible visible message/);
+  assert.match(rendered, /Planner character handles \(addressCharacter must be one of these\):\n\nP1 = character 42/);
+  assert.match(rendered, /Planner reply-message handles \(replyToMessage must be one of these, or null\):\n\nM1 = the first eligible visible message/);
   assert.match(rendered, /Planner reply-message handle: M1\./);
   assert.doesNotMatch(rendered, /912354/);
   assert.doesNotMatch(rendered, /912355/);
