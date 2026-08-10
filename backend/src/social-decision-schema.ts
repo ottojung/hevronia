@@ -4,7 +4,15 @@ import { z } from "zod";
 import type { ParticipantMemoryContext } from "./participant-memory.js";
 
 export const socialDecisionSchema = z.discriminatedUnion("action", [
-  z.object({ action: z.literal("silence") }).strict(),
+  z.object({
+    action: z.literal("silence"),
+    interpretation: z.string().min(1),
+    feltState: z.string().min(1),
+    activeDesire: z.string().min(1),
+    desiredOutcome: z.string().min(1),
+    opportunity: z.string().min(1),
+    pursuit: z.string().min(1),
+  }).strict(),
   z.object({
     action: z.literal("speak"),
     addressCharacter: z.string().nullable(),

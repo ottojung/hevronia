@@ -27,7 +27,9 @@ Decide whether speaking now provides a meaningful pursuit of something she herse
 
 If not, output silence.
 
-If yes, select an addressee if any, independently select an optional Telegram reply attachment, and fill every subjective field with a complete natural second-person sentence suitable for verbatim insertion into Хевронія's inner context.
+If yes, select an addressee if any, independently select an optional Telegram reply attachment.
+
+Fill every subjective field in both branches with a complete natural second-person sentence suitable for verbatim insertion into Хевронія's inner context. When she speaks, the six sentences are concatenated verbatim into her realization context. When she stays silent, they still describe her present private state and the state that led to silence, and they are kept for the record.
 
 desiredOutcome must be a state she personally wants, not a conversational tactic.
 

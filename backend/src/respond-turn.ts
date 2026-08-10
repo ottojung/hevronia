@@ -3,16 +3,15 @@ import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 
 import type { ConversationStore } from "./conversation-store.js";
 import type { RespondInput } from "./conversation-types.js";
+import { toSilenceLog, toSpeakLog } from "./decision-log.js";
 import { GeneratedTurn } from "./generated-turn.js";
 import type { LazyLongTermMemory } from "./long-term-memory/runtime.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { memoriesForCharacter } from "./participant-memory.js";
-import { notebookSubject } from "./telegram-event.js";
 import type {
   SocialDecision,
   SocialDecisionLog,
   SocialDecisionMaker,
-  SpeakDecision,
 } from "./social-decision.js";
 import { extractText } from "./text.js";
 import { InvalidRealizationResponseError, realizationContext } from "./turn-context.js";
@@ -29,15 +28,6 @@ export interface RespondTurnDependencies {
   onSocialDecision?: (log: SocialDecisionLog) => void;
 }
 
-function toSocialDecisionLog(speak: SpeakDecision): SocialDecisionLog {
-  return {
-    action: "speak",
-    addressName: speak.address?.character.subject ?? null,
-    replyToName: speak.replyTo === null ? null : notebookSubject(speak.replyTo.message.sender),
-    ...speak.subjective,
-  };
-}
-
 export async function respondTurn(
   dependencies: RespondTurnDependencies,
   input: RespondInput,
@@ -49,7 +39,7 @@ export async function respondTurn(
       dependencies.store, dependencies.canonicalWrites, lazyMemory,
       memoryTurn?.snapshot, input,
     );
-    let decision: SocialDecision;
+    let decision: SocialDecision | undefined;
     try {
       decision = await dependencies.planner.decide({
         boundedHistory: history, currentMessage: input.message,
@@ -57,10 +47,13 @@ export async function respondTurn(
       });
     } catch (error) {
       console.warn(`Social decision failed safely to silence: ${String(error)}`);
-      decision = { action: "silence" };
+    }
+    if (decision === undefined) {
+      dependencies.onSocialDecision?.({ action: "silence" });
+      return GeneratedTurn.fromSilence();
     }
     if (decision.action === "silence") {
-      dependencies.onSocialDecision?.({ action: "silence" });
+      dependencies.onSocialDecision?.(toSilenceLog(decision));
       return GeneratedTurn.fromSilence();
     }
     const speak = resolveSpeakDecision(decision, candidates);
@@ -68,7 +61,7 @@ export async function respondTurn(
       dependencies.onSocialDecision?.({ action: "silence" });
       return GeneratedTurn.fromSilence();
     }
-    dependencies.onSocialDecision?.(toSocialDecisionLog(speak));
+    dependencies.onSocialDecision?.(toSpeakLog(speak));
     const focusSender = speak.address !== null
       ? speak.address.character.sender
       : speak.replyTo !== null ? speak.replyTo.message.sender : undefined;
