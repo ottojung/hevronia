@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
 import { parseCli, HELP, renderScenarioList, isConversationCliError } from "./cli.js";
-import { runScenariosConcurrently } from "./orchestrator.js";
+import { runScenariosConcurrently, runScenariosSequentially } from "./orchestrator.js";
 import { completionLine, runScenarioEntry, scenarioHeaderLines } from "./scenario-execution.js";
 import { createSimulator, DEFAULT_SIMULATOR_MODEL } from "./simulator.js";
 import { createRunId, saveRun, type RunRecord } from "./transcript.js";
@@ -31,7 +31,10 @@ async function main(): Promise<void> {
     buffers.set(scenario.id, scenarioHeaderLines(scenario));
     console.log(`[start] ${scenario.id}`);
   }
-  const results = await runScenariosConcurrently(command.scenarios, async (scenario) => {
+  const runScenarios = command.parallel
+    ? runScenariosConcurrently
+    : runScenariosSequentially;
+  const results = await runScenarios(command.scenarios, async (scenario) => {
     const lines = buffers.get(scenario.id) ?? [];
     const result = await runScenarioEntry(scenario, simulator, lines);
     lines.push(completionLine(scenario, result));

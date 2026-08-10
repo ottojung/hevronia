@@ -8,7 +8,7 @@ import { fakeModel } from "@langchain/core/testing";
 
 import { parseCli, ConversationCliError } from "../scripts/conversations/cli.js";
 import { scenarios, smokeScenarioIds } from "../scripts/conversations/catalog.js";
-import { runScenariosConcurrently } from "../scripts/conversations/orchestrator.js";
+import { runScenariosConcurrently, runScenariosSequentially } from "../scripts/conversations/orchestrator.js";
 import { runScenario } from "../scripts/conversations/runner.js";
 import { scenarioHeaderLines } from "../scripts/conversations/scenario-execution.js";
 import { PreseededLazyMemory } from "../scripts/conversations/preseeded-lazy-memory.js";
@@ -75,17 +75,42 @@ test("CLI defaults to the smoke suite and supports --all and --smoke", () => {
   assert.equal(defaultRun.action, "run");
   if (defaultRun.action === "run") {
     assert.deepEqual(defaultRun.scenarios.map(({ id }) => id), smokeScenarioIds);
+    assert.equal(defaultRun.parallel, false);
   }
   const all = parseCli(["--all"]);
   assert.equal(all.action, "run");
   if (all.action === "run") {
     assert.equal(all.scenarios.length, scenarios.length);
     assert.deepEqual(all.scenarios.map(({ id }) => id), scenarios.map(({ id }) => id));
+    assert.equal(all.parallel, false);
   }
   const smoke = parseCli(["--smoke"]);
   assert.equal(smoke.action, "run");
   if (smoke.action === "run") {
     assert.deepEqual(smoke.scenarios.map(({ id }) => id), smokeScenarioIds);
+    assert.equal(smoke.parallel, false);
+  }
+});
+
+test("CLI parses --parallel alongside scenario selection", () => {
+  const parallel = parseCli(["--parallel"]);
+  assert.equal(parallel.action, "run");
+  if (parallel.action === "run") {
+    assert.equal(parallel.parallel, true);
+    assert.deepEqual(parallel.scenarios.map(({ id }) => id), smokeScenarioIds);
+  }
+  const allParallel = parseCli(["--all", "--parallel"]);
+  assert.equal(allParallel.action, "run");
+  if (allParallel.action === "run") {
+    assert.equal(allParallel.parallel, true);
+    assert.equal(allParallel.scenarios.length, scenarios.length);
+  }
+  const explicit = parseCli(["--parallel", "--rounds", "3", "normal-stranger"]);
+  assert.equal(explicit.action, "run");
+  if (explicit.action === "run") {
+    assert.equal(explicit.parallel, true);
+    assert.equal(explicit.rounds, 3);
+    assert.deepEqual(explicit.scenarios.map(({ id }) => id), ["normal-stranger"]);
   }
 });
 
@@ -251,6 +276,48 @@ test("scenario execution is concurrent: scenario B begins before scenario A fini
   const results = await pending;
   assert.equal(results.length, 2);
   assert.equal(results[0]?.status, "completed");
+  assert.equal(results[1]?.status, "completed");
+});
+
+test("sequential execution waits: scenario B begins only after scenario A finishes", async () => {
+  const scenarioA = scenarios[0];
+  const scenarioB = scenarios[1];
+  if (scenarioA === undefined || scenarioB === undefined) assert.fail("catalog is too small");
+  const started: string[] = [];
+  const finished: string[] = [];
+  let releaseA: (() => void) | undefined;
+  const gateA = new Promise<void>((resolve) => { releaseA = resolve; });
+  const pending = runScenariosSequentially([scenarioA, scenarioB], (scenario) => {
+    started.push(scenario.id);
+    if (scenario.id === scenarioA.id) {
+      return gateA.then(() => {
+        finished.push(scenarioA.id);
+        return completedScenarioResult(scenarioA, [], 0, "round limit reached");
+      });
+    }
+    finished.push(scenarioB.id);
+    return Promise.resolve(completedScenarioResult(scenarioB, [], 0, "round limit reached"));
+  });
+  assert.deepEqual(started, [scenarioA.id]);
+  releaseA?.();
+  const results = await pending;
+  assert.deepEqual(finished, [scenarioA.id, scenarioB.id]);
+  assert.deepEqual(started, [scenarioA.id, scenarioB.id]);
+  assert.equal(results.length, 2);
+  assert.equal(results[0]?.status, "completed");
+  assert.equal(results[1]?.status, "completed");
+});
+
+test("sequential execution continues past a throwing scenario", async () => {
+  const scenarioA = scenarios[0];
+  const scenarioB = scenarios[1];
+  if (scenarioA === undefined || scenarioB === undefined) assert.fail("catalog is too small");
+  const results = await runScenariosSequentially([scenarioA, scenarioB], (scenario) => {
+    if (scenario.id === scenarioA.id) throw new Error("boom");
+    return Promise.resolve(completedScenarioResult(scenarioB, [], 0, "round limit reached"));
+  });
+  assert.equal(results[0]?.status, "failed");
+  if (results[0]?.status === "failed") assert.equal(results[0].failure, "boom");
   assert.equal(results[1]?.status, "completed");
 });
 

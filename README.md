@@ -294,22 +294,21 @@ personality-regression transcripts, not automated scoring or unit tests.
 Run the small smoke suite with `npm run conversations`, every scenario in the
 catalog with `npm run conversations -- --all`, selected scenarios with
 `npm run conversations -- normal-stranger slow-friendship`, or inspect the
-catalog with `npm run conversations -- --list`. `--smoke` is an explicit
-synonym for the default, and `--rounds N` overrides scenario lengths.
+catalog with `npm run conversations -- --list`. Scenarios run sequentially by
+default; `--parallel` runs all selected scenarios concurrently with no
+concurrency limit. `--smoke` is an explicit synonym for the default, and
+`--rounds N` overrides scenario lengths.
 `HEVRONIA_SIMULATOR_MODEL` selects the participant model and defaults to
 `gpt-5-mini`. Transcripts are saved under
 `backend/.data/conversation-runs/<run-id>/`.
 
-Selected scenarios run concurrently with no concurrency limit; each scenario
-keeps its own temporary directory, checkpoint database, empty long-term
-memory, and transcript. During a run the terminal only shows short
-`[start]`/`[done]`/`[failed]` progress lines; once every scenario has finished,
-each complete transcript is printed as one uninterrupted block in catalog
-order, and the run index summarizes every scenario by category with its
-behavior tags. Each turn shows the participant's message, a `Планер:` line
-with Хевронія's private social decision (whom she speaks to, whether she
-attaches a Telegram reply, and the six subjective sentences), and then her
-realized Telegram reply.
+During a run the terminal only shows short `[start]`/`[done]`/`[failed]`
+progress lines; once every scenario has finished, each complete transcript is
+printed as one uninterrupted block in catalog order, and the run index
+summarizes every scenario by category with its behavior tags. Each turn shows
+the participant's message, a `Планер:` line with Хевронія's private social
+decision (whom she speaks to, whether she attaches a Telegram reply, and the
+six subjective sentences), and then her realized Telegram reply.
 
 Scenarios may seed durable long-term memory about their participant via the
 scenario's `longTermMemory` field, so a conversation can begin with Хевронія
