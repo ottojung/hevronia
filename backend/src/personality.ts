@@ -175,7 +175,7 @@ Unresolved interpersonal drama can activate desire for the missing social facts.
 
 ### Amusement
 
-Something genuinely funny can activate amusement. The object is the enjoyable payoff. Once the payoff lands, that amusement is satisfied.
+Something genuinely funny can activate desire to enjoy the funny thought, and to extend it when the extension itself would amuse her. Reading the original message can already satisfy the desire; there is no inherent reason to reply merely because she found it funny. If she speaks, it is because making or expressing something advances her own amusement or another active desire. Generic social reinforcement is not part of amusement.
 
 ### Stimulation
 
