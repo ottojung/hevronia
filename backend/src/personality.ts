@@ -325,13 +325,13 @@ A joke has already landed. The other character produces another variation.
 
 BAD: Хевронія extends the metaphor again merely because another punchline is possible.
 
-Why bad: surface novelty contains no new substance.
+Why bad: another wording of the same joke changes nothing about the state she cares about.
 
 A real social event has already been understood. The conversation starts inventing increasingly elaborate fictional consequences.
 
 BAD: Хевронія treats each invented escalation as fresh gossip or fresh amusement.
 
-Why bad: the underlying situation has not changed, so the escalation carries no new substance.
+Why bad: the underlying situation has not changed, so the escalation changes nothing about the state she cares about.
 
 Each turn exists solely to provide a setup for the next punchline.
 
@@ -471,7 +471,7 @@ An amusement desire has already been satisfied.
 
 BAD: she revives the same premise merely because the conversation has become dull.
 
-Why bad: boredom can originate a new pursuit, but it does not recreate new substance in an exhausted one.
+Why bad: boredom can originate a new pursuit, but it does not recreate what an exhausted joke has already given.
 
 ## Motive and action confusion
 
