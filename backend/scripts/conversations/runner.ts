@@ -45,6 +45,7 @@ export async function runScenario(
       const turn = await layer.respond({ threadId, message, hevroniaSender,
         senderIsBot: false });
       roundsCompleted += 1;
+      dependencies.onRound?.(roundsCompleted);
       if (turn.outcome.action === "silence") {
         consecutiveSilences += 1;
         transcript.push({ speaker: "hevronia", silence: true });

@@ -13,6 +13,8 @@ const CONVERSATION_RUNS_DIR = fileURLToPath(
   new URL("../../.data/conversation-runs", import.meta.url),
 );
 
+const LIVE_REFRESH_MS = 1_000;
+
 async function main(): Promise<void> {
   let command;
   try {
@@ -32,30 +34,56 @@ async function main(): Promise<void> {
     buffers.set(scenario.id, scenarioHeaderLines(scenario));
   }
   const progress = new ConversationProgress(command.scenarios);
+  const isTty = process.stdout.isTTY === true;
+  const writeLine = (line: string): void => {
+    if (isTty) {
+      process.stdout.write(`\r\x1b[K${line}`);
+    } else {
+      console.log(line);
+    }
+  };
+  const commitLine = (line: string): void => {
+    if (isTty) {
+      process.stdout.write(`\r\x1b[K${line}\n`);
+    } else {
+      console.log(line);
+    }
+  };
+  const liveTimer = isTty
+    ? setInterval(() => writeLine(progress.line()), LIVE_REFRESH_MS)
+    : undefined;
   const runScenarios = command.parallel
     ? runScenariosConcurrently
     : runScenariosSequentially;
-  const results = await runScenarios(command.scenarios, async (scenario) => {
-    console.log(`[start] ${scenario.id}`);
-    const lines = buffers.get(scenario.id) ?? [];
-    const result = await runScenarioEntry(scenario, simulator, lines);
-    lines.push(completionLine(scenario, result));
-    console.log(progress.finish(scenario, result));
-    return result;
-  });
-  const records: RunRecord[] = command.scenarios.map((scenario, index) => {
-    const result = results[index] ??
-      failedScenarioResult(scenario, [], 0, "scenario produced no outcome");
-    if (result.status === "failed") process.exitCode = 1;
-    return { scenario, result };
-  });
-  for (const record of records) {
-    const lines = buffers.get(record.scenario.id) ?? [];
-    console.log(lines.join("\n"));
+  try {
+    const results = await runScenarios(command.scenarios, async (scenario) => {
+      progress.begin(scenario);
+      console.log(`[start] ${scenario.id}`);
+      const lines = buffers.get(scenario.id) ?? [];
+      const result = await runScenarioEntry(scenario, simulator, lines, (roundsCompleted) => {
+        progress.advance(scenario.id, roundsCompleted);
+        writeLine(progress.line());
+      });
+      lines.push(completionLine(scenario, result));
+      commitLine(progress.finish(scenario, result));
+      return result;
+    });
+    const records: RunRecord[] = command.scenarios.map((scenario, index) => {
+      const result = results[index] ??
+        failedScenarioResult(scenario, [], 0, "scenario produced no outcome");
+      if (result.status === "failed") process.exitCode = 1;
+      return { scenario, result };
+    });
+    for (const record of records) {
+      const lines = buffers.get(record.scenario.id) ?? [];
+      console.log(lines.join("\n"));
+    }
+    const runDirectory = join(CONVERSATION_RUNS_DIR, createRunId());
+    await saveRun(runDirectory, records, simulatorModel);
+    console.log(`Transcripts saved to ${runDirectory}`);
+  } finally {
+    if (liveTimer !== undefined) clearInterval(liveTimer);
   }
-  const runDirectory = join(CONVERSATION_RUNS_DIR, createRunId());
-  await saveRun(runDirectory, records, simulatorModel);
-  console.log(`Transcripts saved to ${runDirectory}`);
 }
 
 await main();

@@ -45,6 +45,7 @@ export interface ScenarioDependencies {
   simulator: Simulator;
   createLayer(): Promise<ConversationLayer> | ConversationLayer;
   print(line: string): void;
+  onRound?: (roundsCompleted: number) => void;
 }
 
 export type ScenarioStoppingReason =

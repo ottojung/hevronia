@@ -303,15 +303,17 @@ concurrency limit. `--smoke` is an explicit synonym for the default, and
 `backend/.data/conversation-runs/<run-id>/`.
 
 During a run the terminal only shows a short `[start]` line when a scenario
-begins and, as each scenario finishes, a cumulative progress line reporting
-how many of how many scenarios are done (for example `[2/3] normal-stranger
-done (7/7 rounds)`) plus an ETA extrapolated linearly from the elapsed time
-per expected round. Once every scenario has finished, each complete transcript
-is printed as one uninterrupted block in catalog order, and the run index
-summarizes every scenario by category with its behavior tags. Each turn shows
-the participant's message, a `Планер:` line with Хевронія's private social
-decision (whom she speaks to, whether she attaches a Telegram reply, and the
-six subjective sentences), and then her realized Telegram reply.
+begins and, while scenarios run, a single cumulative progress line that stays
+live on a TTY: it reports how many of how many scenarios are done, the running
+scenario and its completed rounds (for example `[2/3] normal-stranger done
+(7/7 rounds)`), and an ETA extrapolated linearly from the elapsed time per
+completed round, refreshed every second and on every round. Once every
+scenario has finished, each complete transcript is printed as one
+uninterrupted block in catalog order, and the run index summarizes every
+scenario by category with its behavior tags. Each turn shows the participant's
+message, a `Планер:` line with Хевронія's private social decision (whom she
+speaks to, whether she attaches a Telegram reply, and the six subjective
+sentences), and then her realized Telegram reply.
 
 Scenarios may seed durable long-term memory about their participant via the
 scenario's `longTermMemory` field, so a conversation can begin with Хевронія

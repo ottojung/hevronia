@@ -32,6 +32,7 @@ export async function runScenarioEntry(
   scenario: ConversationScenario,
   simulator: Simulator,
   lines: string[],
+  onRound?: (roundsCompleted: number) => void,
 ): Promise<ScenarioResult> {
   let temporaryDirectory: string | undefined;
   try {
@@ -39,6 +40,7 @@ export async function runScenarioEntry(
     temporaryDirectory = directory;
     const result = await runScenario(scenario, scenario.rounds, {
       simulator,
+      onRound,
       createLayer: () => createConversationLayer({
         dbPath: join(directory, "checkpoints.sqlite"),
         lazyMemory: createScenarioMemory(scenario),
