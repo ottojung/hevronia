@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 
 import { createConversationLayer } from "../../src/layer.js";
 import type { LazyLongTermMemory } from "../../src/long-term-memory/runtime.js";
+import type { SocialDecisionLog } from "../../src/social-decision.js";
 import { PreseededLazyMemory } from "./preseeded-lazy-memory.js";
 import { errorDetail, runScenario } from "./runner.js";
 import { failedScenarioResult } from "./types.js";
@@ -11,6 +12,11 @@ import type { ConversationScenario, ScenarioResult, Simulator } from "./types.js
 
 function createScenarioMemory(scenario: ConversationScenario): LazyLongTermMemory {
   return new PreseededLazyMemory(scenario.longTermMemory ?? []);
+}
+
+function formatPlannerLog(log: SocialDecisionLog): string {
+  if (log.action === "silence") return "Планер: [silence]";
+  return `Планер: репліка → ${log.targetName} | інтерпретація: "${log.interpretation}" | бажання: "${log.activeDesire}" | бажаний результат: "${log.desiredOutcome}"`;
 }
 
 export async function runScenarioEntry(
@@ -27,6 +33,7 @@ export async function runScenarioEntry(
       createLayer: () => createConversationLayer({
         dbPath: join(directory, "checkpoints.sqlite"),
         lazyMemory: createScenarioMemory(scenario),
+        onSocialDecision: (log) => lines.push(formatPlannerLog(log)),
       }),
       print: (line) => lines.push(line),
     });

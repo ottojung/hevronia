@@ -13,7 +13,7 @@ import {
   conversationThreadIdFromTelegramPrivateChat,
 } from "../src/identifiers.js";
 import { SYSTEM_PROMPT } from "../src/personality.js";
-import { createSocialDecisionMaker, type SocialDecisionMaker } from "../src/social-decision.js";
+import { createSocialDecisionMaker, type SocialDecisionLog, type SocialDecisionMaker } from "../src/social-decision.js";
 import { createObservedTelegramMessage, hasDirectMention } from "../src/telegram-observation.js";
 import { deliverGeneratedTurn } from "../src/telegram-delivery.js";
 import { serializeTelegramEvent, type ObservedTelegramMessage } from "../src/telegram-event.js";
@@ -141,6 +141,35 @@ test("reply metadata is ephemeral and undelivered text never enters history", as
     assert.ok(!history.includes("Private structured social decision"));
     assert.ok(!history.includes("private motive"));
     assert.ok(!history.includes("Realize that decision"));
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("onSocialDecision exposes the planner's private decision for logging", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-decision-log-"));
+  const logs: SocialDecisionLog[] = [];
+  let call = 0;
+  const planner: SocialDecisionMaker = { decide: async () => ++call === 1
+    ? { action: "reply", targetChoice: "A", interpretation: "private motive",
+      activeDesire: "want", desiredOutcome: "outcome" }
+    : { action: "silence" } };
+  const model = fakeModel();
+  model.respond(new AIMessage("ага"));
+  const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"), model,
+    summaryModel: fakeModel(), decisionMaker: planner,
+    onSocialDecision: (log) => logs.push(log) });
+  try {
+    await layer.respond({ threadId, message: message({ messageId: 1 }),
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    await layer.respond({ threadId, message: message({ messageId: 2 }),
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    assert.deepEqual(logs, [
+      { action: "reply", targetName: "Іра", interpretation: "private motive",
+        activeDesire: "want", desiredOutcome: "outcome" },
+      { action: "silence" },
+    ]);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });

@@ -294,7 +294,9 @@ memory, and transcript. During a run the terminal only shows short
 `[start]`/`[done]`/`[failed]` progress lines; once every scenario has finished,
 each complete transcript is printed as one uninterrupted block in catalog
 order, and the run index summarizes every scenario by category with its
-behavior tags.
+behavior tags. Each turn shows the participant's message, a `Планер:` line
+with Хевронія's private social decision (target, interpretation, active
+desire, and desired outcome), and then her realized Telegram reply.
 
 Scenarios may seed durable long-term memory about their participant via the
 scenario's `longTermMemory` field, so a conversation can begin with Хевронія
