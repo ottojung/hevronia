@@ -49,7 +49,6 @@ export async function respondTurn(
       console.warn(`Social decision failed safely to silence: ${String(error)}`);
     }
     if (decision === undefined) {
-      dependencies.onSocialDecision?.({ action: "silence" });
       return GeneratedTurn.fromSilence();
     }
     if (decision.action === "silence") {
@@ -58,7 +57,6 @@ export async function respondTurn(
     }
     const speak = resolveSpeakDecision(decision, candidates);
     if (speak === undefined) {
-      dependencies.onSocialDecision?.({ action: "silence" });
       return GeneratedTurn.fromSilence();
     }
     dependencies.onSocialDecision?.(toSpeakLog(speak));
@@ -71,7 +69,7 @@ export async function respondTurn(
     const response = await dependencies.model.invoke([
       new SystemMessage(dependencies.personality),
       new HumanMessage(realizationContext(
-        history, focusMemories, speak.subjective, candidates,
+        history, focusMemories, speak.address, speak.subjective, candidates,
       )),
     ]);
     if (!isBaseMessage(response)) throw new InvalidRealizationResponseError();

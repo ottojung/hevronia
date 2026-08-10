@@ -61,3 +61,15 @@ export function renderDreamCharacterList(characters: readonly AddressChoice[]): 
     return `${label}, currently displayed by Telegram as “${character.displayName}”.`;
   }).join("\n");
 }
+
+/**
+ * The deterministic second-person sentence stating whom Хевронія's upcoming
+ * message is socially directed toward. A resolved character uses its stable
+ * dream label; a null address means ambient, broadcast speech to everyone
+ * present, not an unspecified addressee.
+ */
+export function addressingSentence(address: AddressChoice | null): string {
+  return address === null
+    ? "You direct what you say to everyone present."
+    : `You direct what you say toward ${address.character.subject}.`;
+}

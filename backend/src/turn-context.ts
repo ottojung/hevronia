@@ -1,13 +1,16 @@
 import { type BaseMessage } from "@langchain/core/messages";
 
-import { renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
+import {
+  addressingSentence,
+  renderDreamCharacterList,
+  renderDreamObservations,
+} from "./dream-render.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
 import type { ParticipantMemoryContext } from "./participant-memory.js";
-import { buildPlannerChoices } from "./reply-choices.js";
+import { buildPlannerChoices, type AddressChoice } from "./reply-choices.js";
 import { deserializeTelegramEvent } from "./telegram-event.js";
 import { extractText } from "./text.js";
 import type { SubjectiveState, VisibleMessage } from "./social-decision.js";
-import { subjectiveParagraph } from "./social-decision.js";
 
 export { deliveredEvent, replyRelationshipFor, resolveSpeakDecision } from "./speak-resolution.js";
 
@@ -42,6 +45,7 @@ export function visibleMessages(messages: BaseMessage[]): VisibleMessage[] {
 export function realizationContext(
   history: BaseMessage[],
   memories: ParticipantMemoryContext[],
+  address: AddressChoice | null,
   subjective: SubjectiveState,
   candidates: VisibleMessage[],
 ): string {
@@ -55,7 +59,15 @@ export function realizationContext(
   const memoryText = renderParticipantMemoryContexts(memories);
   if (memoryText !== "") parts.push(memoryText);
   parts.push("");
-  parts.push(subjectiveParagraph(subjective));
+  parts.push([
+    addressingSentence(address),
+    subjective.interpretation,
+    subjective.feltState,
+    subjective.activeDesire,
+    subjective.desiredOutcome,
+    subjective.opportunity,
+    subjective.pursuit,
+  ].join(" "));
   parts.push("");
   parts.push("Make the Telegram message you choose to speak appear. Return only its visible text.");
   return parts.join("\n\n");

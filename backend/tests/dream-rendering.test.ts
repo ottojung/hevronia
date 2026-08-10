@@ -4,11 +4,12 @@ import { test } from "node:test";
 import { HumanMessage } from "@langchain/core/messages";
 
 import {
+  addressingSentence,
   renderDreamEvent,
   renderDreamObservations,
 } from "../src/dream-render.js";
 import { renderParticipantMemoryContexts } from "../src/long-term-memory/render-context.js";
-import { buildPlannerChoices } from "../src/reply-choices.js";
+import { buildPlannerChoices, type AddressChoice } from "../src/reply-choices.js";
 import {
   renderDecisionContext,
   socialDecisionSchema,
@@ -267,18 +268,26 @@ test("speak decisions resolve to internal choices and invalid handles fall to si
 
 test("realization context keeps the subjective paragraph phenomenological and id-free", () => {
   const state = subjective();
+  const address: AddressChoice = {
+    handle: "P1",
+    character: { sender: { kind: "user", id: 42 }, subject: "character 42", displayName: "Оля" },
+  };
   const rendered = realizationContext(
     [new HumanMessage({ content: serializeTelegramEvent(participant(912345, 42, "Оля", "привіт")) })],
     [],
+    address,
     state,
     [{ messageId: 912345, sender: { kind: "user", id: 42 }, senderDisplayName: "Оля", text: "привіт" }],
   );
   assert.match(rendered, /Character 42, currently displayed by Telegram as “Оля”/);
   assert.match(rendered, /Your sleeping mind made character 42 say:/);
   assert.ok(rendered.includes([
+    "You direct what you say toward character 42.",
     state.interpretation, state.feltState, state.activeDesire,
     state.desiredOutcome, state.opportunity, state.pursuit,
   ].join(" ")));
+  assert.ok(rendered.indexOf("You direct what you say toward character 42.") <
+    rendered.indexOf(state.interpretation));
   assert.match(rendered, /Make the Telegram message you choose to speak appear\. Return only its visible text\./);
   assert.doesNotMatch(rendered, /912345/);
   assert.doesNotMatch(rendered, /P1/);
@@ -289,6 +298,26 @@ test("realization context keeps the subjective paragraph phenomenological and id
   assert.doesNotMatch(rendered, /"interpretation"/);
   assert.doesNotMatch(rendered, /"activeDesire"/);
   assert.doesNotMatch(rendered, /spreadsheet/);
+});
+
+test("addressingSentence is deterministic for a character and for broadcast", () => {
+  const address: AddressChoice = {
+    handle: "P1",
+    character: { sender: { kind: "user", id: 42 }, subject: "character 42", displayName: "Оля" },
+  };
+  assert.equal(addressingSentence(address), "You direct what you say toward character 42.");
+  assert.equal(addressingSentence(null), "You direct what you say to everyone present.");
+});
+
+test("a null address becomes the broadcast addressing sentence before the subjective paragraph", () => {
+  const state = subjective();
+  const rendered = realizationContext([], [], null, state, []);
+  assert.match(rendered, /You direct what you say to everyone present\./);
+  assert.ok(rendered.indexOf("You direct what you say to everyone present.") <
+    rendered.indexOf(state.interpretation));
+  assert.doesNotMatch(rendered, /character \d/);
+  assert.doesNotMatch(rendered, /P1/);
+  assert.doesNotMatch(rendered, /M1/);
 });
 
 test("a chat source renders as a Telegram source, never a dream character", () => {
