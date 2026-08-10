@@ -23,7 +23,7 @@ function message(overrides: Partial<ObservedTelegramMessage> = {}): ObservedTele
 const context: SocialDecisionContext = {
   boundedHistory: [],
   currentMessage: message(),
-  replyCandidates: [{ messageId: 10, sender: { kind: "user", id: 88 },
+  visibleMessages: [{ messageId: 10, sender: { kind: "user", id: 88 },
     senderDisplayName: "Іра", text: "та ні" }],
   participantMemories: [],
 };
@@ -52,13 +52,17 @@ test("decide returns unwrapped silence decision", async () => {
   assert.deepEqual(await planner.decide(context), { action: "silence" });
 });
 
-test("decide returns unwrapped reply decision", async () => {
+test("decide returns unwrapped speak decision", async () => {
   const decision = {
-    action: "reply",
-    targetChoice: "A",
-    interpretation: "this character is asking me for a favour",
-    activeDesire: "I want to help",
-    desiredOutcome: "learn what they need",
+    action: "speak",
+    addressCharacter: "P1",
+    replyToMessage: null,
+    interpretation: "This character is asking me for a favour.",
+    feltState: "This leaves you mildly interested in what they need.",
+    activeDesire: "You want to understand what they actually want.",
+    desiredOutcome: "You want to know enough to decide whether it matters to you.",
+    opportunity: "You notice the present interaction gives you room to ask.",
+    pursuit: "You decide to ask a direct question.",
   };
   const planner = plannerWithResponse(JSON.stringify({ decision }));
   assert.deepEqual(await planner.decide(context), decision);
@@ -68,16 +72,18 @@ test("malformed provider responses are rejected", async () => {
   const cases: string[] = [
     JSON.stringify({}),
     JSON.stringify({ decision: { action: "jump" } }),
-    JSON.stringify({ decision: { action: "reply" } }),
+    JSON.stringify({ decision: { action: "speak" } }),
     JSON.stringify({ decision: { action: "silence", extra: true } }),
-    JSON.stringify({ decision: { action: "reply", targetChoice: "A" } }),
-    JSON.stringify({ decision: { action: "reply", targetChoice: "",
-      interpretation: "a", activeDesire: "a", desiredOutcome: "o" } }),
-    JSON.stringify({ decision: { action: "reply", targetChoice: "A",
-      interpretation: "a", activeDesire: "a", desiredOutcome: "o",
-      socialAction: "reaction" } }),
-    JSON.stringify({ decision: { action: "reply", targetMessageId: 10,
-      interpretation: "a", activeDesire: "a", desiredOutcome: "o" } }),
+    JSON.stringify({ decision: { action: "speak", addressCharacter: "P1" } }),
+    JSON.stringify({ decision: { action: "speak", addressCharacter: null,
+      replyToMessage: null, interpretation: "", feltState: "f", activeDesire: "a",
+      desiredOutcome: "o", opportunity: "o", pursuit: "p" } }),
+    JSON.stringify({ decision: { action: "speak", addressCharacter: "P1",
+      replyToMessage: null, interpretation: "i", feltState: "f", activeDesire: "a",
+      desiredOutcome: "o", opportunity: "o", pursuit: "p", targetChoice: "A" } }),
+    JSON.stringify({ decision: { action: "speak", addressCharacter: "P1",
+      targetMessageId: 10, interpretation: "i", feltState: "f", activeDesire: "a",
+      desiredOutcome: "o", opportunity: "o", pursuit: "p" } }),
   ];
   for (const content of cases) {
     const planner = plannerWithResponse(content);

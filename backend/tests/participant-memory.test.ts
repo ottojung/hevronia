@@ -12,7 +12,7 @@ import {
   longTermMemoryUserIdFromTelegramSender,
   conversationThreadIdFromTelegramPrivateChat,
 } from "../src/identifiers.js";
-import type { SocialDecisionMaker, ReplyCandidate } from "../src/social-decision.js";
+import type { SocialDecisionMaker, VisibleMessage } from "../src/social-decision.js";
 import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../src/telegram-event.js";
 import { memoriesForCandidates, selectedParticipantIds } from "../src/participant-memory.js";
 import { staticMemory } from "./memory-fixtures.js";
@@ -23,7 +23,7 @@ function message(id: number, sender: TelegramSenderIdentity, name: string, text:
     directlyAddressed: false };
 }
 
-const candidates: ReplyCandidate[] = [
+const candidates: VisibleMessage[] = [
   { messageId: 1, sender: { kind: "user", id: 101 },
     senderDisplayName: "Іра", text: "я нарешті це зробила" },
   { messageId: 2, sender: { kind: "user", id: 202 },
@@ -68,8 +68,13 @@ test("older-target planning and realization receive attributed target memory", a
     const max = context.participantMemories.find(({ participant }) => participant.id === 202);
     assert.equal(max?.memories[0]?.text, "Макс любить еспресо");
     assert.ok(!context.participantMemories.some(({ participant }) => participant.id === -500));
-    return { action: "reply", targetChoice: "A", interpretation: "pride",
-      activeDesire: "recognize the effort", desiredOutcome: "share the joy" };
+    return { action: "speak", addressCharacter: "P1", replyToMessage: null,
+      interpretation: "This is a moment of personal accomplishment.",
+      feltState: "This leaves you feeling pleased for her.",
+      activeDesire: "You want to acknowledge the effort.",
+      desiredOutcome: "You want her to feel recognised.",
+      opportunity: "You notice she is still here to hear you.",
+      pursuit: "You decide to say something warm." };
   } };
   const model = fakeModel();
   model.respond((messages) => {
@@ -92,7 +97,7 @@ test("older-target planning and realization receive attributed target memory", a
     const turn = await layer.respond({ threadId,
       message: message(3, { kind: "user", id: 202 }, "Макс", "хтось буде каву?"),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    assert.equal(turn.outcome.action, "reply");
+    assert.equal(turn.outcome.action, "speak");
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });

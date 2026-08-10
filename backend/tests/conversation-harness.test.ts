@@ -114,8 +114,8 @@ test("runner alternates messages, persists increasing reply IDs, records silence
   const firstScenario = scenarios[0];
   if (firstScenario === undefined) assert.fail("catalog is empty");
   const persisted: number[] = [];
-  const outcomes: readonly ("reply" | "silence")[] = [
-    "reply", "silence", "reply",
+  const outcomes: readonly ("speak" | "silence")[] = [
+    "speak", "silence", "speak",
     "silence", "silence", "silence", "silence", "silence",
     "silence", "silence", "silence", "silence", "silence",
   ];
@@ -125,8 +125,8 @@ test("runner alternates messages, persists increasing reply IDs, records silence
     respond: () => {
       const outcome = outcomes[responseIndex];
       responseIndex += 1;
-      return Promise.resolve(outcome === "reply"
-        ? GeneratedTurn.fromReply(`reply ${responseIndex}`, {
+      return Promise.resolve(outcome === "speak"
+        ? GeneratedTurn.fromSpeak(`speak ${responseIndex}`, {
           targetMessageId: responseIndex, targetSender: { kind: "user", id: 7_001 },
           targetSenderDisplayName: "Олена", targetText: "participant",
           targetIsHevronia: false,
@@ -192,7 +192,7 @@ test("runner returns a failed result that keeps the partial transcript", async (
     respond: () => {
       respondCount += 1;
       if (respondCount === 2) return Promise.reject(new Error("boom"));
-      return Promise.resolve(GeneratedTurn.fromReply(`reply ${respondCount}`, {
+      return Promise.resolve(GeneratedTurn.fromSpeak(`speak ${respondCount}`, {
         targetMessageId: respondCount, targetSender: { kind: "user", id: 7_001 },
         targetSenderDisplayName: "Олена", targetText: "participant",
         targetIsHevronia: false,

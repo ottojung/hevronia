@@ -25,7 +25,7 @@ test("intentional delivered fallback is persisted as a canonical Hevronia event"
 
 test("failed Telegram reply never invokes outgoing persistence", async () => {
   let persisted = false;
-  const turn = GeneratedTurn.fromReply("недоставлена", { targetMessageId: 10, targetSender: { kind: "user", id: 101 }, targetSenderDisplayName: "Іра", targetText: "текст", targetIsHevronia: false }, async () => {
+  const turn = GeneratedTurn.fromSpeak("недоставлена", { targetMessageId: 10, targetSender: { kind: "user", id: 101 }, targetSenderDisplayName: "Іра", targetText: "текст", targetIsHevronia: false }, async () => {
     persisted = true;
   });
   await assert.rejects(() => deliverGeneratedTurn(turn, {

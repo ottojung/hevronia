@@ -105,12 +105,12 @@ test("canonical observed state survives layer recreation", async () => {
   }
 });
 
-test("forum topics in one group have isolated histories and reply candidates", async () => {
+test("forum topics in one group have isolated histories and visible messages", async () => {
   const { dir, db } = tempPath();
   const seen = new Map<string, string[]>();
   const planner: SocialDecisionMaker = { decide: async (context) => {
     const topic = String(context.currentMessage.messageThreadId);
-    seen.set(topic, context.replyCandidates.map(({ text }) => text));
+    seen.set(topic, context.visibleMessages.map(({ text }) => text));
     return { action: "silence" };
   } };
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(),

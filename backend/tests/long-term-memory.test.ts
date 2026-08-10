@@ -45,11 +45,15 @@ function observedMessage(text: string, messageId: number, senderId = 1,
 function replyingDecisionMaker(): SocialDecisionMaker {
   return {
     decide: async () => ({
-      action: "reply",
-      targetChoice: "A",
-      interpretation: "personal concern",
-      activeDesire: "want to help",
-      desiredOutcome: "understand better",
+      action: "speak",
+      addressCharacter: "P1",
+      replyToMessage: null,
+      interpretation: "This person is sharing a personal concern.",
+      feltState: "This leaves you mildly attentive.",
+      activeDesire: "You want to understand better.",
+      desiredOutcome: "You want to know what is actually going on.",
+      opportunity: "You notice they are still here to talk.",
+      pursuit: "You decide to ask a direct question.",
     }),
   };
 }
@@ -195,7 +199,7 @@ test("an unresolved long-term-memory background job cannot delay respond", async
     model.respond(new AIMessage("valid reply"));
     const turn = await layer.respond({ threadId,
       message: observedMessage("hello", 1), hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    if (turn.outcome.action === "silence") assert.fail("expected a reply");
+    if (turn.outcome.action === "silence") assert.fail("expected a speak");
     assert.equal(turn.outcome.replyText, "valid reply");
     assert.equal(store.searchCalls.length, 0);
     hanging.resolve([fact("m1", "fact")]);
@@ -293,7 +297,7 @@ test("an undelivered reply still observes the user's message", async () => {
     model.respond(new AIMessage("delivered reply"));
     const turn = await layer.respond({ threadId, message: observedMessage("hello", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    if (turn.outcome.action === "silence") assert.fail("expected a reply");
+    if (turn.outcome.action === "silence") assert.fail("expected a speak");
     await scheduler.fireAll();
     assert.deepEqual(store.rememberCalls.map(({ text }) => text), ["hello"]);
   } finally {
@@ -330,7 +334,7 @@ test("one incoming message is never ingested twice", async () => {
     model.respond(new AIMessage("reply"));
     const turn = await layer.respond({ threadId, message: observedMessage("single", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    if (turn.outcome.action === "reply") turn.outcome.persistDelivery(500);
+    if (turn.outcome.action === "speak") turn.outcome.persistDelivery(500);
     await scheduler.fireAll();
     assert.equal(store.rememberCalls.length, 1);
     assert.equal(store.rememberCalls[0]?.text, "single");
@@ -412,7 +416,7 @@ test("successful delivery still persists only the delivered event, not memory co
     const turn = await layer.respond({ threadId, message: observedMessage("user text", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
-    if (turn.outcome.action === "silence") assert.fail("expected a reply");
+    if (turn.outcome.action === "silence") assert.fail("expected a speak");
     turn.outcome.persistDelivery(600);
     assert.equal(store.rememberCalls.length, 1);
     assert.equal(store.rememberCalls[0]?.text, "user text");
@@ -436,7 +440,7 @@ test("search and ingestion failures degrade gracefully through the layer", async
     model.respond(new AIMessage("valid reply"));
     const reply = await layer.respond({ threadId, message: observedMessage("hello", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    if (reply.outcome.action === "silence") assert.fail("expected a reply");
+    if (reply.outcome.action === "silence") assert.fail("expected a speak");
     assert.equal(reply.outcome.replyText, "valid reply");
     await scheduler.fireAll();
     assert.equal(store.rememberCalls.length, 1);
