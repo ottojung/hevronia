@@ -9,6 +9,7 @@ import type { SocialDecisionMaker } from "../src/social-decision.js";
 import { deliverGeneratedTurn } from "../src/telegram-delivery.js";
 import { serializeTelegramEvent, type CanonicalTelegramEvent, type ObservedTelegramMessage } from "../src/telegram-event.js";
 import { conversationThreadIdFromTelegramPrivateChat } from "../src/identifiers.js";
+import { silenceDecision } from "./memory-fixtures.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(55);
 
@@ -44,7 +45,7 @@ test("confirmed outgoing persistence retries before the next planner context", a
       opportunity: "o", pursuit: "p" };
     laterSawReply = context.boundedHistory.some(({ content }) =>
       String(content).includes("доставлена відповідь"));
-    return { action: "silence" };
+    return silenceDecision();
   } };
   const model = fakeModel();
   model.respond(new AIMessage("доставлена відповідь"));
@@ -87,7 +88,7 @@ test("incoming canonical persistence recovers before planning", async () => {
   const planner: SocialDecisionMaker = { decide: async () => {
     planned = true;
     assert.equal(events.length, 1);
-    return { action: "silence" };
+    return silenceDecision();
   } };
   const layer = createConversationLayer({ model: fakeModel(), summaryModel: fakeModel(),
     conversationStore: store, decisionMaker: planner });

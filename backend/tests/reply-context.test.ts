@@ -12,6 +12,7 @@ import type { SocialDecision, SocialDecisionMaker } from "../src/social-decision
 import { renderDreamEvent } from "../src/dream-render.js";
 import type { DeliveredHevroniaMessage, ObservedTelegramMessage } from "../src/telegram-event.js";
 import { conversationThreadIdFromTelegramPrivateChat } from "../src/identifiers.js";
+import { silenceDecision } from "./memory-fixtures.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(71);
 
@@ -41,7 +42,7 @@ test("realization receives the dream character framing and the verbatim subjecti
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-target-context-"));
   let planningCall = 0;
   const planner: SocialDecisionMaker = { decide: async () => ++planningCall === 1
-    ? { action: "silence" }
+    ? silenceDecision()
     : speak() };
   const model = fakeModel();
   model.respond((messages) => {

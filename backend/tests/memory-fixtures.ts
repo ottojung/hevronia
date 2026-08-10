@@ -4,6 +4,19 @@ import type {
   LazyLongTermMemory,
   Scheduler,
 } from "../src/long-term-memory/runtime.js";
+import type { SocialDecision } from "../src/social-decision.js";
+
+export function silenceDecision(): SocialDecision {
+  return {
+    action: "silence",
+    interpretation: "You read this as an ordinary moment with nothing at stake for you.",
+    feltState: "This leaves you quietly indifferent.",
+    activeDesire: "You want nothing from speaking right now.",
+    desiredOutcome: "You want the present calm to remain undisturbed.",
+    opportunity: "You notice no opportunity here that advances anything you want.",
+    pursuit: "You decide that staying silent serves you best.",
+  };
+}
 
 export interface SearchCall {
   userId: string;

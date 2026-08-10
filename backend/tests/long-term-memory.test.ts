@@ -29,7 +29,7 @@ import {
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromTelegramSender,
 } from "../src/identifiers.js";
-import { FakeScheduler, FakeStore, deferred, fact } from "./memory-fixtures.js";
+import { FakeScheduler, FakeStore, deferred, fact, silenceDecision } from "./memory-fixtures.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(1);
@@ -223,7 +223,7 @@ test("the current turn uses only the snapshot captured at turn start", async () 
   const seen: string[][] = [];
   const planner: SocialDecisionMaker = { decide: async (context) => {
     seen.push(context.participantMemories.flatMap(({ memories }) => memories.map(({ text }) => text)));
-    return { action: "silence" };
+    return silenceDecision();
   } };
   const { dir, layer } = fixture({ lazyMemory: memory, decisionMaker: planner });
   try {
@@ -250,7 +250,7 @@ test("newly learned memory appears on the next turn", async () => {
   const seen: string[][] = [];
   const planner: SocialDecisionMaker = { decide: async (context) => {
     seen.push(context.participantMemories.flatMap(({ memories }) => memories.map(({ text }) => text)));
-    return { action: "silence" };
+    return silenceDecision();
   } };
   const { dir, layer } = fixture({ lazyMemory: memory, decisionMaker: planner });
   try {
@@ -274,7 +274,7 @@ test("a silent turn still observes the user's message for future memory", async 
   store.searchImpl = () => [];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, layer } = fixture({ lazyMemory: memory,
-    decisionMaker: { decide: async () => ({ action: "silence" }) } });
+    decisionMaker: { decide: async () => silenceDecision() } });
   try {
     const turn = await layer.respond({ threadId, message: observedMessage("ambient", 1, 111),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
@@ -350,7 +350,7 @@ test("chat senders receive no person-scoped memory work", async () => {
   store.searchImpl = () => [];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, layer } = fixture({ lazyMemory: memory,
-    decisionMaker: { decide: async () => ({ action: "silence" }) } });
+    decisionMaker: { decide: async () => silenceDecision() } });
   try {
     await layer.respond({ threadId, message: observedMessage("з каналу", 1, 0, "chat"),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
@@ -369,7 +369,7 @@ test("bot-authored text is not person-memory evidence but still reaches canonica
   store.searchImpl = () => [];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, layer } = fixture({ lazyMemory: memory,
-    decisionMaker: { decide: async () => ({ action: "silence" }) } });
+    decisionMaker: { decide: async () => silenceDecision() } });
   try {
     await layer.respond({ threadId, message: observedMessage("з бота", 1, 101),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: true });
@@ -391,7 +391,7 @@ test("human-authored text remains person-memory evidence at the boundary", async
   store.searchImpl = () => [];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, layer } = fixture({ lazyMemory: memory,
-    decisionMaker: { decide: async () => ({ action: "silence" }) } });
+    decisionMaker: { decide: async () => silenceDecision() } });
   try {
     await layer.respond({ threadId, message: observedMessage("з людини", 1, 101),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });

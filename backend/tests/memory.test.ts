@@ -11,6 +11,7 @@ import { createConversationLayer } from "../src/layer.js";
 import type { SocialDecisionContext, SocialDecisionMaker } from "../src/social-decision.js";
 import { SUMMARY_PREFIX } from "../src/summary.js";
 import { extractText } from "../src/text.js";
+import { silenceDecision } from "./memory-fixtures.js";
 import {
   deserializeTelegramEvent,
   type ObservedTelegramMessage,
@@ -49,7 +50,7 @@ test("many consecutive silent observations compact bounded multi-participant sta
   const contexts: SocialDecisionContext[] = [];
   const planner: SocialDecisionMaker = { decide: async (context) => {
     contexts.push(context);
-    return { action: "silence" };
+    return silenceDecision();
   } };
   const summary = fakeModel();
   for (let index = 0; index < 20; index += 1) {
@@ -87,7 +88,7 @@ test("many consecutive silent observations compact bounded multi-participant sta
 
 test("canonical observed state survives layer recreation", async () => {
   const { dir, db } = tempPath();
-  const silence: SocialDecisionMaker = { decide: async () => ({ action: "silence" }) };
+  const silence: SocialDecisionMaker = { decide: async () => silenceDecision() };
   try {
     const first = createConversationLayer({ dbPath: db, model: fakeModel(),
       summaryModel: fakeModel(), decisionMaker: silence });
@@ -111,7 +112,7 @@ test("forum topics in one group have isolated histories and visible messages", a
   const planner: SocialDecisionMaker = { decide: async (context) => {
     const topic = String(context.currentMessage.messageThreadId);
     seen.set(topic, context.visibleMessages.map(({ text }) => text));
-    return { action: "silence" };
+    return silenceDecision();
   } };
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(),
     summaryModel: fakeModel(), decisionMaker: planner });
@@ -141,7 +142,7 @@ test("compaction preserves user and chat sender kinds with duplicate names", asy
     ));
   }
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
-    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    decisionMaker: { decide: async () => silenceDecision() },
     triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 1000,
     tokenCounter: contentLengthTokens });
   try {
@@ -180,7 +181,7 @@ test("the summary model receives rendered dream input with no internal message i
     });
   }
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
-    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    decisionMaker: { decide: async () => silenceDecision() },
     triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 1000,
     tokenCounter: contentLengthTokens });
   try {
@@ -208,7 +209,7 @@ test("a throwing summary model aborts compaction without destroying history", as
   const { dir, db } = tempPath();
   const summary = fakeModel().alwaysThrow(new Error("summary offline"));
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
-    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    decisionMaker: { decide: async () => silenceDecision() },
     triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 1000,
     tokenCounter: contentLengthTokens });
   try {
@@ -238,7 +239,7 @@ test("an empty summary response aborts compaction without destroying history", a
     summary.respond(new AIMessage("   "));
   }
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
-    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    decisionMaker: { decide: async () => silenceDecision() },
     triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 1000,
     tokenCounter: contentLengthTokens });
   try {
@@ -276,7 +277,7 @@ test("compaction measures dream-rendered slices and never canonical JSON", async
     return text.length;
   };
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
-    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    decisionMaker: { decide: async () => silenceDecision() },
     triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 1000,
     tokenCounter: dreamOnlyCounter });
   try {
@@ -307,7 +308,7 @@ test("visible dollar sequences reach the summary model exactly", async () => {
     });
   }
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
-    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    decisionMaker: { decide: async () => silenceDecision() },
     triggerTokens: 20, keepTokens: 10, trimTokensToSummarize: 1000,
     tokenCounter: contentLengthTokens });
   try {
@@ -334,7 +335,7 @@ test("compaction removes only messages represented in the summary input", async 
     });
   }
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
-    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    decisionMaker: { decide: async () => silenceDecision() },
     triggerTokens: 50, keepTokens: 20, trimTokensToSummarize: 20,
     tokenCounter: budgetCounter });
   try {
@@ -365,7 +366,7 @@ test("an oversized oldest message aborts compaction without dropping history", a
   const { dir, db } = tempPath();
   const summary = fakeModel();
   const layer = createConversationLayer({ dbPath: db, model: fakeModel(), summaryModel: summary,
-    decisionMaker: { decide: async () => ({ action: "silence" }) },
+    decisionMaker: { decide: async () => silenceDecision() },
     triggerTokens: 30, keepTokens: 10, trimTokensToSummarize: 5,
     tokenCounter: budgetCounter });
   try {

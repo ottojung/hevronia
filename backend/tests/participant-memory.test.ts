@@ -15,7 +15,7 @@ import {
 import type { SocialDecisionMaker, VisibleMessage } from "../src/social-decision.js";
 import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../src/telegram-event.js";
 import { memoriesForCandidates, selectedParticipantIds } from "../src/participant-memory.js";
-import { staticMemory } from "./memory-fixtures.js";
+import { staticMemory, silenceDecision } from "./memory-fixtures.js";
 
 function message(id: number, sender: TelegramSenderIdentity, name: string, text: string): ObservedTelegramMessage {
   return { kind: "participant", messageId: id, sender, senderDisplayName: name,
@@ -62,7 +62,7 @@ test("older-target planning and realization receive attributed target memory", a
   let plannerCall = 0;
   const planner: SocialDecisionMaker = { decide: async (context) => {
     plannerCall += 1;
-    if (plannerCall < 3) return { action: "silence" };
+    if (plannerCall < 3) return silenceDecision();
     const ira = context.participantMemories.find(({ participant }) => participant.id === 101);
     assert.equal(ira?.memories[0]?.text, "Іра працювала над цим тижнями");
     const max = context.participantMemories.find(({ participant }) => participant.id === 202);

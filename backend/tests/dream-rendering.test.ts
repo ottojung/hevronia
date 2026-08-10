@@ -34,6 +34,7 @@ import {
   resolveSpeakDecision,
   visibleMessages,
 } from "../src/turn-context.js";
+import { silenceDecision } from "./memory-fixtures.js";
 
 function participant(
   messageId: number,
@@ -225,7 +226,7 @@ test("the character list lists recurring participants once", () => {
 });
 
 test("planner schema selects an address and a reply message, never a message id", () => {
-  assert.ok(socialDecisionSchema.safeParse({ action: "silence" }).success);
+  assert.ok(socialDecisionSchema.safeParse(silenceDecision()).success);
   const speak = socialDecisionSchema.safeParse({
     action: "speak", addressCharacter: "P1", replyToMessage: "M1",
     interpretation: "i", feltState: "f", activeDesire: "a",

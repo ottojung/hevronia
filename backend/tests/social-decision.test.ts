@@ -25,7 +25,7 @@ import {
 import { createObservedTelegramMessage, hasDirectMention } from "../src/telegram-observation.js";
 import { deliverGeneratedTurn } from "../src/telegram-delivery.js";
 import { serializeTelegramEvent, type ObservedTelegramMessage } from "../src/telegram-event.js";
-import { staticMemory } from "./memory-fixtures.js";
+import { staticMemory, silenceDecision } from "./memory-fixtures.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(77);
 
@@ -102,7 +102,7 @@ test("real planner receives canonical personality, background, and recalled memo
     assert.doesNotMatch(input, /spreadsheet/);
     assert.doesNotMatch(input, /user 88/);
     assert.doesNotMatch(input, /reply choice/);
-    return new AIMessage(JSON.stringify({ decision: { action: "silence" } }));
+    return new AIMessage(JSON.stringify({ decision: silenceDecision() }));
   });
   const planner = createSocialDecisionMaker(model, SYSTEM_PROMPT);
   const current = message();
@@ -140,7 +140,7 @@ test("duplicate display names retain distinct stable identities", async () => {
   const seen: number[][] = [];
   const planner: SocialDecisionMaker = { decide: async (context) => {
     seen.push(context.visibleMessages.map(({ sender }) => sender.id));
-    return { action: "silence" };
+    return silenceDecision();
   } };
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner });
@@ -186,7 +186,7 @@ test("onSocialDecision exposes the planner's private decision for logging", asyn
   let call = 0;
   const planner: SocialDecisionMaker = { decide: async () => ++call === 1
     ? speakDecision()
-    : { action: "silence" } };
+    : silenceDecision() };
   const model = fakeModel();
   model.respond(new AIMessage("ага"));
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"), model,
@@ -205,7 +205,16 @@ test("onSocialDecision exposes the planner's private decision for logging", asyn
       assert.equal(first.interpretation, "The situation is clear to you.");
       assert.equal(first.feltState, "This leaves you quietly attentive.");
     }
-    assert.deepEqual(logs[1], { action: "silence" });
+    const silence = silenceDecision();
+    assert.deepEqual(logs[1], {
+      action: "silence",
+      interpretation: silence.interpretation,
+      feltState: silence.feltState,
+      activeDesire: silence.activeDesire,
+      desiredOutcome: silence.desiredOutcome,
+      opportunity: silence.opportunity,
+      pursuit: silence.pursuit,
+    });
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
@@ -216,7 +225,7 @@ test("silence and delivered speech persist the same canonical incoming represent
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-canonical-"));
   let call = 0;
   const planner: SocialDecisionMaker = { decide: async () => ++call === 1
-    ? { action: "silence" }
+    ? silenceDecision()
     : speakDecision({ replyToMessage: "M1" }) };
   const model = fakeModel();
   model.respond(new AIMessage("ага"));
@@ -273,7 +282,7 @@ test("recalled memory reaches the planner before silence decision", async () => 
   const planner: SocialDecisionMaker = { decide: async (context) => {
     recalled = context.participantMemories.flatMap(({ memories }) =>
       memories.map(({ text }) => text)).join();
-    return { action: "silence" };
+    return silenceDecision();
   } };
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner,
@@ -355,7 +364,7 @@ test("silence produces no realization call", async () => {
   model.respond(() => { invoked = true; return new AIMessage("ніколи"); });
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model, summaryModel: fakeModel(),
-    decisionMaker: { decide: async () => ({ action: "silence" }) } });
+    decisionMaker: { decide: async () => silenceDecision() } });
   try {
     const turn = await layer.respond({ threadId, message: message(),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });

@@ -13,6 +13,7 @@ import {
   type SocialDecisionContext,
 } from "../src/social-decision.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
+import { silenceDecision } from "./memory-fixtures.js";
 
 function message(overrides: Partial<ObservedTelegramMessage> = {}): ObservedTelegramMessage {
   return { kind: "participant", messageId: 10, sender: { kind: "user", id: 88 },
@@ -47,9 +48,10 @@ test("provider schema root is an object, not a top-level union", () => {
   assert.ok(domainSchema["anyOf"]);
 });
 
-test("decide returns unwrapped silence decision", async () => {
-  const planner = plannerWithResponse(JSON.stringify({ decision: { action: "silence" } }));
-  assert.deepEqual(await planner.decide(context), { action: "silence" });
+test("decide returns unwrapped silence decision with the full private state", async () => {
+  const silence = silenceDecision();
+  const planner = plannerWithResponse(JSON.stringify({ decision: silence }));
+  assert.deepEqual(await planner.decide(context), silence);
 });
 
 test("decide returns unwrapped speak decision", async () => {
@@ -72,6 +74,7 @@ test("malformed provider responses are rejected", async () => {
   const cases: string[] = [
     JSON.stringify({}),
     JSON.stringify({ decision: { action: "jump" } }),
+    JSON.stringify({ decision: { action: "silence" } }),
     JSON.stringify({ decision: { action: "speak" } }),
     JSON.stringify({ decision: { action: "silence", extra: true } }),
     JSON.stringify({ decision: { action: "speak", addressCharacter: "P1" } }),

@@ -22,6 +22,7 @@ import {
 import { createConversationLayer } from "../src/layer.js";
 import type { SocialDecisionMaker } from "../src/social-decision.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
+import { silenceDecision } from "./memory-fixtures.js";
 
 const representativeIds = [
   "normal-stranger", "low-effort-stranger", "playful-banter", "absurd-humor",
@@ -292,7 +293,7 @@ test("seeded long-term memory reaches the planner context", async () => {
   const planner: SocialDecisionMaker = { decide: async (context) => {
     recalled = context.participantMemories.flatMap(({ memories }) =>
       memories.map(({ text }) => text)).join();
-    return { action: "silence" };
+    return silenceDecision();
   } };
   const threadId = conversationThreadIdFromTelegramPrivateChat(7_003);
   const message: ObservedTelegramMessage = {
