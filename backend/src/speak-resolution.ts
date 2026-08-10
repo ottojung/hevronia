@@ -12,6 +12,22 @@ import type {
   TelegramSenderIdentity,
 } from "./telegram-event.js";
 
+export class UnresolvableSpeakDecisionError extends Error {
+  constructor(addressCharacter: string | null, replyToMessage: string | null) {
+    super(
+      "Planner speak decision references planner handles not present in the visible context " +
+      `(addressCharacter=${addressCharacter}, replyToMessage=${replyToMessage})`,
+    );
+    this.name = "UnresolvableSpeakDecisionError";
+  }
+}
+
+export function isUnresolvableSpeakDecisionError(
+  error: unknown,
+): error is UnresolvableSpeakDecisionError {
+  return error instanceof UnresolvableSpeakDecisionError;
+}
+
 export function resolveSpeakDecision(
   decision: Exclude<SocialDecision, { action: "silence" }>,
   candidates: VisibleMessage[],

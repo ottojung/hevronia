@@ -115,20 +115,18 @@ test("real planner receives canonical personality, background, and recalled memo
       }] });
 });
 
-test("a non-candidate planner target cannot reach Telegram delivery", async () => {
+test("a non-candidate planner target propagates instead of reaching Telegram delivery", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-target-"));
   const planner: SocialDecisionMaker = { decide: async () => speakDecision({
     addressCharacter: "P9", replyToMessage: null }) };
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner });
   try {
-    const turn = await layer.respond({ threadId, message: message(),
-      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    let delivered = false;
-    const sent = await deliverGeneratedTurn(turn, { showTyping: async () => undefined,
-      reply: async () => { delivered = true; return 100; } });
-    assert.deepEqual(sent, { status: "silence" });
-    assert.equal(delivered, false);
+    await assert.rejects(
+      () => layer.respond({ threadId, message: message(),
+        hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false }),
+      /addressCharacter=P9/,
+    );
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
@@ -253,19 +251,17 @@ test("silence and delivered speech persist the same canonical incoming represent
   }
 });
 
-test("a planner exception fails safely to silence instead of crashing", async () => {
+test("a planner exception propagates instead of degrading to silence", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-planner-crash-"));
   const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
     model: fakeModel(), summaryModel: fakeModel(),
     decisionMaker: { decide: async () => { throw new Error("planner boom"); } } });
   try {
-    const turn = await layer.respond({ threadId, message: message(),
-      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    let delivered = false;
-    const sent = await deliverGeneratedTurn(turn, { showTyping: async () => undefined,
-      reply: async () => { delivered = true; return 100; } });
-    assert.deepEqual(sent, { status: "silence" });
-    assert.equal(delivered, false);
+    await assert.rejects(
+      () => layer.respond({ threadId, message: message(),
+        hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false }),
+      /planner boom/,
+    );
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });

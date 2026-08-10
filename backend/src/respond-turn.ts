@@ -9,13 +9,17 @@ import type { LazyLongTermMemory } from "./long-term-memory/runtime.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { memoriesForCharacter } from "./participant-memory.js";
 import type {
-  SocialDecision,
   SocialDecisionLog,
   SocialDecisionMaker,
 } from "./social-decision.js";
 import { extractText } from "./text.js";
 import { InvalidRealizationResponseError, realizationContext } from "./turn-context.js";
-import { deliveredEvent, replyRelationshipFor, resolveSpeakDecision } from "./speak-resolution.js";
+import {
+  UnresolvableSpeakDecisionError,
+  deliveredEvent,
+  replyRelationshipFor,
+  resolveSpeakDecision,
+} from "./speak-resolution.js";
 import { acquireTurnContext } from "./turn-memory.js";
 
 export interface RespondTurnDependencies {
@@ -39,25 +43,17 @@ export async function respondTurn(
       dependencies.store, dependencies.canonicalWrites, lazyMemory,
       memoryTurn?.snapshot, input,
     );
-    let decision: SocialDecision | undefined;
-    try {
-      decision = await dependencies.planner.decide({
-        boundedHistory: history, currentMessage: input.message,
-        visibleMessages: candidates, participantMemories,
-      });
-    } catch (error) {
-      console.warn(`Social decision failed safely to silence: ${String(error)}`);
-    }
-    if (decision === undefined) {
-      return GeneratedTurn.fromSilence();
-    }
+    const decision = await dependencies.planner.decide({
+      boundedHistory: history, currentMessage: input.message,
+      visibleMessages: candidates, participantMemories,
+    });
     if (decision.action === "silence") {
       dependencies.onSocialDecision?.(toSilenceLog(decision));
       return GeneratedTurn.fromSilence();
     }
     const speak = resolveSpeakDecision(decision, candidates);
     if (speak === undefined) {
-      return GeneratedTurn.fromSilence();
+      throw new UnresolvableSpeakDecisionError(decision.addressCharacter, decision.replyToMessage);
     }
     dependencies.onSocialDecision?.(toSpeakLog(speak));
     const focusSender = speak.address !== null
