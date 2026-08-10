@@ -27,7 +27,7 @@ const result = await agent.invoke({
   messages: [new AIMessage("test")],
 });
 const parsed = socialDecisionResponseSchema.parse(result.structuredResponse);
-assert.ok(parsed.decision.action === "silence" || parsed.decision.action === "reply");
+assert.ok(parsed.decision.action === "silence" || parsed.decision.action === "speak");
 console.log(
   `OpenAI accepted the provider schema and returned decision ${JSON.stringify(parsed.decision)}`,
 );
