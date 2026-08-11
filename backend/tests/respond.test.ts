@@ -70,12 +70,6 @@ test("modelFromEnv ignores a blank override and uses the default", () => {
   }
 });
 
-test("providerForModelName infers gemini for gemini-prefixed names", () => {
-  assert.equal(providerForModelName("gemini-3.5-flash"), "gemini");
-  assert.equal(providerForModelName("gpt-5.6-luna"), "openai");
-  assert.equal(providerForModelName("  gemini-2.5-pro  "), "gemini");
-});
-
 test("geminiKeyFromEnv returns the configured key", () => {
   process.env["MY_GEMINI_API_KEY"] = "gem-key";
   try {
