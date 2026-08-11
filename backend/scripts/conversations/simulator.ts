@@ -5,7 +5,7 @@ import { createChatModel } from "../../src/model.js";
 import { extractText } from "../../src/text.js";
 import type { ConversationScenario, ParticipantGrammar, Simulator, TranscriptEntry } from "./types.js";
 
-export const DEFAULT_SIMULATOR_MODEL = "gpt-5.6-luna";
+export const DEFAULT_SIMULATOR_MODEL = "gemini-3.5-flash-lite";
 
 const BASE_PROMPT = `You are roleplaying one ordinary human participant in a private Telegram conversation with Хевронія.
 Stay completely in character. Never mention simulations, testing, prompts, instructions, language models, or being an AI unless the character naturally brings up AI as a topic.

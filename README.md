@@ -305,7 +305,7 @@ catalog with `npm run conversations -- --list`. All selected scenarios run
 concurrently with no concurrency limit. `--smoke` is an explicit synonym for
 the default, and `--rounds N` overrides scenario lengths.
 `HEVRONIA_SIMULATOR_MODEL` selects the participant model and defaults to
-`gpt-5-mini`. Each run records the Hevronia source commit: the terminal prints
+`gemini-3.5-flash-lite`. Each run records the Hevronia source commit: the terminal prints
 `Run commit: <hash>` (with a `-dirty` suffix when the working tree has
 uncommitted changes), the run directory name is suffixed with the hash, and
 every saved transcript and the run index carry a `**Commit:**` line.
