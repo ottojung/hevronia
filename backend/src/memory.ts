@@ -5,7 +5,7 @@ import {
   type LongTermMemoryStore,
 } from "./long-term-memory/index.js";
 import { createLazyLongTermMemory, type LazyLongTermMemory } from "./long-term-memory/runtime.js";
-import { openAiKeyFromEnv } from "./model.js";
+import { geminiKeyFromEnv, openAiKeyFromEnv } from "./model.js";
 
 export class ConversationLayerNotInitializedError extends Error {
   constructor() {
@@ -21,7 +21,7 @@ export function isConversationLayerNotInitializedError(
 }
 
 export interface ConversationLayerInitializationDependencies {
-  createStore(apiKey: string): LongTermMemoryStore;
+  createStore(openAiApiKey: string, geminiApiKey: string): LongTermMemoryStore;
   createLayer(lazyMemory: LazyLongTermMemory): ConversationLayerType;
 }
 
@@ -37,8 +37,7 @@ export function initializeConversationLayer(
   if (sharedLayer !== undefined) {
     return;
   }
-  const apiKey = openAiKeyFromEnv();
-  const store = dependencies.createStore(apiKey);
+  const store = dependencies.createStore(openAiKeyFromEnv(), geminiKeyFromEnv());
   const lazyMemory = createLazyLongTermMemory({ store });
   sharedLayer = dependencies.createLayer(lazyMemory);
   console.log("Conversation layer initialized");

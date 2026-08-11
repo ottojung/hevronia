@@ -1,17 +1,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ChatOpenAI } from "@langchain/openai";
-
 import {
   DEFAULT_MODEL,
-  createChatModel,
   geminiKeyFromEnv,
-  isGeminiChatModel,
   modelFromEnv,
   openAiKeyFromEnv,
-  providerForModelName,
 } from "../src/model.js";
 import { extractText } from "../src/text.js";
 import {

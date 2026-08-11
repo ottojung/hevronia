@@ -64,10 +64,11 @@ MY_GEMINI_API_KEY
 
 - `TELEGRAM_BOT_TOKEN` is used for Telegram (grammY).
 - `MY_OPENAI_API_KEY` is passed explicitly to the LangChain `ChatOpenAI`
-  integration and to both Mem0's extraction LLM and OpenAI embedder.
-  `OPENAI_API_KEY` is neither expected nor used.
-- `MY_GEMINI_API_KEY` is used when the model name selects the Gemini provider.
-  It is only required when `HEVRONIA_MODEL` names a Gemini model.
+  integration and to Mem0's OpenAI embedder. `OPENAI_API_KEY` is neither
+  expected nor used.
+- `MY_GEMINI_API_KEY` is used whenever a Gemini model is selected — for the
+  chat model and for Mem0's extraction LLM (`gemini-3.5-flash-lite`) — so it is
+  required at startup regardless of which model `HEVRONIA_MODEL` names.
 
 The response model is configurable and read from the environment:
 

@@ -11,7 +11,7 @@ import { memoryRecordsFromItems, type MemoryRecord } from "./store-mapping.js";
 export { memoryRecordsFromItems } from "./store-mapping.js";
 export type { MemoryRecord } from "./store-mapping.js";
 
-export const MEMORY_MODEL = "gpt-4o-mini-2024-07-18";
+export const MEMORY_MODEL = "gemini-3.5-flash-lite";
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSION = 1536;
 export const HISTORY_DB_PATH = fileURLToPath(
@@ -37,15 +37,16 @@ export interface LongTermMemoryStore {
   deleteAll(userId: LongTermMemoryUserId): Promise<void>;
 }
 
-export function createMem0Config(apiKey: string): MemoryConfig {
+export function createMem0Config(openAiApiKey: string, geminiApiKey: string): MemoryConfig {
   return {
     llm: {
-      provider: "openai",
-      config: { apiKey, model: MEMORY_MODEL, temperature: 0 },
+      // Extraction runs on the Gemini provider; embeddings stay on OpenAI.
+      provider: "google",
+      config: { apiKey: geminiApiKey, model: MEMORY_MODEL, temperature: 0 },
     },
     embedder: {
       provider: "openai",
-      config: { apiKey, model: EMBEDDING_MODEL, embeddingDims: EMBEDDING_DIMENSION },
+      config: { apiKey: openAiApiKey, model: EMBEDDING_MODEL, embeddingDims: EMBEDDING_DIMENSION },
     },
     vectorStore: {
       // Mem0's "memory" vector-store provider is backed by persistent SQLite
@@ -68,7 +69,7 @@ export function longTermMemoryStoreFromMem0(memory: Mem0Client): LongTermMemoryS
     async search(userId, query, topK) {
       const result = await memory.search(query, {
         topK,
-        filters: { userId: userId.toPersistenceKey() },
+        filters: { user_id: userId.toPersistenceKey() },
       });
       return memoryRecordsFromItems(result.results);
     },
@@ -92,9 +93,9 @@ export function longTermMemoryStoreFromMem0(memory: Mem0Client): LongTermMemoryS
   };
 }
 
-export function createMem0Store(apiKey: string): LongTermMemoryStore {
+export function createMem0Store(openAiApiKey: string, geminiApiKey: string): LongTermMemoryStore {
   mkdirSync(dirname(HISTORY_DB_PATH), { recursive: true });
-  const memory = new Memory(createMem0Config(apiKey));
+  const memory = new Memory(createMem0Config(openAiApiKey, geminiApiKey));
   console.log("Long-term memory configured using local SQLite storage");
   return longTermMemoryStoreFromMem0(memory);
 }

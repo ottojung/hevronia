@@ -6,7 +6,7 @@ import {
   createMem0Store,
   VECTOR_DB_PATH,
 } from "../src/long-term-memory/index.js";
-import { openAiKeyFromEnv } from "../src/model.js";
+import { geminiKeyFromEnv, openAiKeyFromEnv } from "../src/model.js";
 import {
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromIntegrationTest,
@@ -15,9 +15,10 @@ import {
 const userId = longTermMemoryUserIdFromIntegrationTest(randomUUID());
 const threadId = conversationThreadIdFromTelegramPrivateChat(1);
 const query = "улюблений фрукт";
-const apiKey = openAiKeyFromEnv();
+const openAiApiKey = openAiKeyFromEnv();
+const geminiApiKey = geminiKeyFromEnv();
 
-const firstMemory = createMem0Store(apiKey);
+const firstMemory = createMem0Store(openAiApiKey, geminiApiKey);
 try {
   await firstMemory.rememberUserMessage(
     userId,
@@ -35,7 +36,7 @@ try {
   assert.ok(initialResults.every(({ text }) => typeof text === "string" && text.length > 0),
     "search results should retain memory text");
 
-  const recreatedMemory = createMem0Store(apiKey);
+  const recreatedMemory = createMem0Store(openAiApiKey, geminiApiKey);
   const persistedResults = await recreatedMemory.search(userId, query, 5);
   assert.ok(persistedResults.length > 0, "memory should survive Memory instance recreation");
   console.log(`Mem0 recreation search returned ${persistedResults.length} result(s)`);

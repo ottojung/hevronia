@@ -15,6 +15,7 @@
     "conversations": "tsx scripts/conversations/index.ts"
   },
   "dependencies": {
+    "@google/genai": "^1.52.0",
     "@grammyjs/chat-members": "^1.2.0",
     "@langchain/core": "^1.2.5",
     "@langchain/google-genai": "^2.2.0",

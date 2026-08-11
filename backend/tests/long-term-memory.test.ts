@@ -13,6 +13,7 @@ import {
   createMem0Config,
   EMBEDDING_DIMENSION,
   HISTORY_DB_PATH,
+  MEMORY_MODEL,
   VECTOR_DB_PATH,
   longTermMemoryStoreFromMem0,
   memoryRecordsFromItems,
@@ -98,7 +99,7 @@ test("memoryRecordsFromItems maps an empty result set to no records", () => {
   assert.deepEqual(memoryRecordsFromItems([]), []);
 });
 
-test("the Mem0 adapter searches with TypeScript userId filters, preserving topK", async () => {
+test("the Mem0 adapter searches with a user_id filter, preserving topK", async () => {
   const captured: Parameters<Mem0Client["search"]>[] = [];
   const client: Mem0Client = {
     search: async (query, options) => {
@@ -116,8 +117,8 @@ test("the Mem0 adapter searches with TypeScript userId filters, preserving topK"
   assert.equal(query, "питання");
   assert.equal(options.topK, 5);
   assert.ok(options.filters !== undefined);
-  assert.equal(options.filters["userId"], "telegram-user:777");
-  assert.equal("user_id" in options.filters, false);
+  assert.equal(options.filters["user_id"], "telegram-user:777");
+  assert.equal("userId" in options.filters, false);
 });
 
 test("the Mem0 adapter passes add metadata, maps extraction results, and scopes deleteAll", async () => {
@@ -154,10 +155,12 @@ test("the Mem0 adapter passes add metadata, maps extraction results, and scopes 
 });
 
 test("Mem0 production configuration carries the extraction policy and explicit credentials", () => {
-  const config = createMem0Config("test-key");
+  const config = createMem0Config("openai-key", "gemini-key");
   assert.equal(config.customInstructions, LONG_TERM_MEMORY_POLICY);
-  assert.equal(config.llm.config.apiKey, "test-key");
-  assert.equal(config.embedder.config.apiKey, "test-key");
+  assert.equal(config.llm.provider, "google");
+  assert.equal(config.llm.config.apiKey, "gemini-key");
+  assert.equal(config.llm.config.model, MEMORY_MODEL);
+  assert.equal(config.embedder.config.apiKey, "openai-key");
   assert.equal(config.vectorStore.provider, "memory");
   assert.equal(config.vectorStore.config["dbPath"], VECTOR_DB_PATH);
   assert.equal(config.vectorStore.config["dimension"], EMBEDDING_DIMENSION);
