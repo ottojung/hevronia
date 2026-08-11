@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
+import type { ModelSelections } from "./models.js";
 import { renderIndex, renderScenario } from "./transcript-render.js";
 import type { ConversationScenario, ScenarioResult } from "./types.js";
 
@@ -19,7 +20,7 @@ export function createRunId(date = new Date(), revision?: string): string {
 export async function saveRun(
   directory: string,
   records: readonly RunRecord[],
-  simulatorModel: string,
+  selections: ModelSelections,
   revision: string,
   durationMs: number,
 ): Promise<void> {
@@ -27,14 +28,14 @@ export async function saveRun(
   for (const record of records) {
     try {
       await writeFile(join(directory, `${record.scenario.id}.md`),
-        renderScenario(record, simulatorModel, revision));
+        renderScenario(record, selections, revision));
     } catch (error) {
       console.warn(`Failed to save transcript for ${record.scenario.id}: ${String(error)}`);
     }
   }
   try {
     await writeFile(join(directory, "index.md"),
-      renderIndex(records, simulatorModel, revision, durationMs));
+      renderIndex(records, selections, revision, durationMs));
   } catch (error) {
     console.warn(`Failed to save the run index: ${String(error)}`);
   }

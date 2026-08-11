@@ -1,7 +1,9 @@
+import type { ModelSelections } from "./models.js";
+import { renderModelSelections } from "./models.js";
 import { formatElapsed } from "./progress.js";
 import type { RunRecord } from "./transcript.js";
 
-export function renderScenario(record: RunRecord, simulatorModel: string, revision: string): string {
+export function renderScenario(record: RunRecord, selections: ModelSelections, revision: string): string {
   const result = record.result;
   const meta = [
     `# ${record.scenario.title}`,
@@ -20,7 +22,7 @@ export function renderScenario(record: RunRecord, simulatorModel: string, revisi
     `- **Configured rounds:** ${result.scenario.rounds}`,
     `- **Actual rounds:** ${result.roundsCompleted}`,
     `- **Stopping reason:** ${result.status === "completed" ? result.stoppingReason : `failed: ${singleLine(result.failure)}`}`,
-    `- **Simulator model:** ${simulatorModel}`,
+    ...renderModelSelections(selections),
     `- **Commit:** ${revision}`,
     "",
     "## Transcript",
@@ -54,7 +56,7 @@ function singleLine(text: string): string {
 
 export function renderIndex(
   records: readonly RunRecord[],
-  simulatorModel: string,
+  selections: ModelSelections,
   revision: string,
   durationMs: number,
 ): string {
@@ -70,5 +72,5 @@ export function renderIndex(
     }).join("\n");
     return `## ${category}\n\n| Scenario | ID | Status | Rounds | Behavior tags |\n|---|---|---|---|---|\n${rows}\n`;
   });
-  return `# Conversation simulation run\n\n- **Commit:** ${revision}\n- **Simulator model:** ${simulatorModel}\n- **Duration:** ${formatElapsed(durationMs)}\n\n${sections.join("\n")}\n`;
+  return `# Conversation simulation run\n\n- **Commit:** ${revision}\n${renderModelSelections(selections).join("\n")}\n- **Duration:** ${formatElapsed(durationMs)}\n\n${sections.join("\n")}\n`;
 }

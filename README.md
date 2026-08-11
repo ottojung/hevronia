@@ -314,7 +314,11 @@ the default, and `--rounds N` overrides scenario lengths.
 cheap tier (`HEVRONIA_CHEAP_MODEL`). Each run records the Hevronia source commit: the terminal prints
 `Run commit: <hash>` (with a `-dirty` suffix when the working tree has
 uncommitted changes), the run directory name is suffixed with the hash, and
-every saved transcript and the run index carry a `**Commit:**` line.
+every saved transcript and the run index carry a `**Commit:**` line. The
+terminal also prints the full set of model selections — response, simulator,
+memory extraction, embedding, and the cheap/smart tiers — even when none of
+them were overridden, and the same lines are saved into every transcript and
+the run index.
 Transcripts are saved under `backend/.data/conversation-runs/<run-id>/`.
 
 During a run the terminal only shows a short `[start]` line when a scenario

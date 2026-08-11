@@ -6,6 +6,7 @@ import { test } from "node:test";
 
 import { scenarios } from "../scripts/conversations/catalog.js";
 import { formatGitRevision } from "../scripts/conversations/git.js";
+import type { ModelSelections } from "../scripts/conversations/models.js";
 import { createRunId, saveRun } from "../scripts/conversations/transcript.js";
 import { completedScenarioResult } from "../scripts/conversations/types.js";
 
@@ -37,19 +38,36 @@ test("saveRun embeds the commit, planner decisions, and duration in markdown", a
     "  The situation is clear to you.",
     "Хевронія: [conversation ended]",
   ];
+  const selections: ModelSelections = {
+    responseModel: "fake-model2",
+    simulatorModel: "fake-model2",
+    memoryModel: "fake-model2",
+    embeddingModel: "text-embedding-3-small",
+    cheapModel: "fake-model2",
+    smartModel: "fake-model2",
+  };
   try {
-    await saveRun(dir, [{ scenario: firstScenario, result, lines }], "fake-model2",
+    await saveRun(dir, [{ scenario: firstScenario, result, lines }], selections,
       "abc1234-dirty", 123_000);
     const scenarioMarkdown = readFileSync(path.join(dir, `${firstScenario.id}.md`), "utf8");
     assert.ok(scenarioMarkdown.includes("- **Commit:** abc1234-dirty"));
+    assert.ok(scenarioMarkdown.includes("- **Response model:** fake-model2"));
     assert.ok(scenarioMarkdown.includes("- **Simulator model:** fake-model2"));
+    assert.ok(scenarioMarkdown.includes("- **Memory extraction model:** fake-model2"));
+    assert.ok(scenarioMarkdown.includes("- **Embedding model:** text-embedding-3-small"));
+    assert.ok(scenarioMarkdown.includes("- **Cheap tier:** fake-model2"));
+    assert.ok(scenarioMarkdown.includes("- **Smart tier:** fake-model2"));
     assert.ok(scenarioMarkdown.includes("**Participant:** привіт"));
     assert.ok(scenarioMarkdown.includes("**Планер:** speak → character 7001"));
     assert.ok(scenarioMarkdown.includes("  The situation is clear to you."));
     assert.ok(scenarioMarkdown.includes("**Хевронія:** [conversation ended]"));
     const indexMarkdown = readFileSync(path.join(dir, "index.md"), "utf8");
     assert.ok(indexMarkdown.includes("- **Commit:** abc1234-dirty"));
+    assert.ok(indexMarkdown.includes("- **Response model:** fake-model2"));
     assert.ok(indexMarkdown.includes("- **Simulator model:** fake-model2"));
+    assert.ok(indexMarkdown.includes("- **Embedding model:** text-embedding-3-small"));
+    assert.ok(indexMarkdown.includes("- **Cheap tier:** fake-model2"));
+    assert.ok(indexMarkdown.includes("- **Smart tier:** fake-model2"));
     assert.ok(indexMarkdown.includes("- **Duration:** 2m 3s"));
   } finally {
     rmSync(dir, { recursive: true, force: true });

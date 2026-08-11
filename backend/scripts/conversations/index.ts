@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { parseCli, HELP, renderScenarioList, isConversationCliError } from "./cli.js";
 import { formatGitRevision, gitRevision } from "./git.js";
+import { collectModelSelections, renderModelSelections } from "./models.js";
 import { runScenariosConcurrently } from "./orchestrator.js";
 import { LiveProgressRenderer } from "./progress-output.js";
 import { ConversationProgress, formatElapsed } from "./progress.js";
@@ -30,7 +31,9 @@ async function main(): Promise<void> {
   const simulatorModel = process.env["HEVRONIA_SIMULATOR_MODEL"] ?? DEFAULT_SIMULATOR_MODEL;
   const simulator = createSimulator(simulatorModel);
   const revision = formatGitRevision(gitRevision());
+  const modelSelections = collectModelSelections(simulatorModel);
   console.log(`Run commit: ${revision}`);
+  for (const line of renderModelSelections(modelSelections)) console.log(line);
   const runStartedAt = Date.now();
   const buffers = new Map<string, string[]>();
   const headerLengths = new Map<string, number>();
@@ -70,7 +73,7 @@ async function main(): Promise<void> {
     }
     const durationMs = Date.now() - runStartedAt;
     const runDirectory = join(CONVERSATION_RUNS_DIR, createRunId(new Date(), revision));
-    await saveRun(runDirectory, records, simulatorModel, revision, durationMs);
+    await saveRun(runDirectory, records, modelSelections, revision, durationMs);
     console.log(`Transcripts saved to ${runDirectory}`);
     console.log(`Total run time: ${formatElapsed(durationMs)}`);
   } finally {
