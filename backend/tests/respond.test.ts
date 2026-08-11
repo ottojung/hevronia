@@ -53,9 +53,9 @@ test("modelFromEnv returns the default model when unset", () => {
 });
 
 test("modelFromEnv returns the configured override", () => {
-  process.env["HEVRONIA_MODEL"] = "gpt-5.6-luna";
+  process.env["HEVRONIA_MODEL"] = "fake-model1";
   try {
-    assert.equal(modelFromEnv(), "gpt-5.6-luna");
+    assert.equal(modelFromEnv(), "fake-model1");
   } finally {
     delete process.env["HEVRONIA_MODEL"];
   }
