@@ -67,27 +67,32 @@ MY_GEMINI_API_KEY
   integration and to Mem0's OpenAI embedder. `OPENAI_API_KEY` is neither
   expected nor used.
 - `MY_GEMINI_API_KEY` is used whenever a Gemini model is selected — for the
-  chat model and for Mem0's extraction LLM (`gemini-3.5-flash-lite`) — so it is
-  required at startup regardless of which model `HEVRONIA_MODEL` names.
+  chat model and for Mem0's extraction LLM — so it is required at startup
+  regardless of which model `HEVRONIA_MODEL` names.
 
-The response model is configurable and read from the environment:
+Models are selected through two tiers, read from the environment:
 
 ```text
-HEVRONIA_MODEL (optional)
+HEVRONIA_CHEAP_MODEL (optional, defaults to gemini-3.5-flash-lite)
+HEVRONIA_SMART_MODEL (optional, defaults to gemini-3.5-flash-lite)
 ```
 
-`HEVRONIA_MODEL` defaults to `gemini-3.5-flash`. A model name starting with
-`gemini` uses the Gemini provider (`MY_GEMINI_API_KEY`); any other name uses
-the OpenAI provider (`MY_OPENAI_API_KEY`). Both providers share the same
-character and planner pipeline:
+- `HEVRONIA_SMART_MODEL` is the default response model (the fallback used when
+  `HEVRONIA_MODEL` is unset).
+- `HEVRONIA_CHEAP_MODEL` is the default for the participant simulator and for
+  Mem0's long-term-memory extraction.
+
+`HEVRONIA_MODEL` (optional) overrides the response model directly, and
+`HEVRONIA_SIMULATOR_MODEL` (optional) overrides the simulator's participant
+model. A model name starting with `gemini` uses the Gemini provider
+(`MY_GEMINI_API_KEY`); any other name uses the OpenAI provider
+(`MY_OPENAI_API_KEY`). Both providers share the same character and planner
+pipeline:
 
 ```bash
 HEVRONIA_MODEL=gpt-5.6-luna npm run conversations -- --smoke
 HEVRONIA_MODEL=gemini-3.5-flash npm run conversations -- --smoke
 ```
-
-The conversation simulator's participant model is separately selectable with
-`HEVRONIA_SIMULATOR_MODEL` and follows the same provider inference.
 
 Every model call (planner, realizer, summarizer, and simulator) is retried when
 the provider rate-limits us or a transient transport failure occurs. The
@@ -305,8 +310,8 @@ catalog with `npm run conversations -- --all`, selected scenarios with
 catalog with `npm run conversations -- --list`. All selected scenarios run
 concurrently with no concurrency limit. `--smoke` is an explicit synonym for
 the default, and `--rounds N` overrides scenario lengths.
-`HEVRONIA_SIMULATOR_MODEL` selects the participant model and defaults to
-`gemini-3.5-flash-lite`. Each run records the Hevronia source commit: the terminal prints
+`HEVRONIA_SIMULATOR_MODEL` selects the participant model and defaults to the
+cheap tier (`HEVRONIA_CHEAP_MODEL`). Each run records the Hevronia source commit: the terminal prints
 `Run commit: <hash>` (with a `-dirty` suffix when the working tree has
 uncommitted changes), the run directory name is suffixed with the hash, and
 every saved transcript and the run index carry a `**Commit:**` line.

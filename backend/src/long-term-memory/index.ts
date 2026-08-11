@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 
 import { Memory, type MemoryConfig } from "mem0ai/oss";
 
+import { cheapModelFromEnv } from "../model.js";
 import { LONG_TERM_MEMORY_POLICY, MEMORY_POLICY_VERSION } from "./policy.js";
 import type { ConversationThreadId, LongTermMemoryUserId } from "../identifiers.js";
 import { memoryRecordsFromItems, type MemoryRecord } from "./store-mapping.js";
@@ -11,7 +12,7 @@ import { memoryRecordsFromItems, type MemoryRecord } from "./store-mapping.js";
 export { memoryRecordsFromItems } from "./store-mapping.js";
 export type { MemoryRecord } from "./store-mapping.js";
 
-export const MEMORY_MODEL = "gemini-3.5-flash-lite";
+export const MEMORY_MODEL = cheapModelFromEnv();
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSION = 1536;
 export const HISTORY_DB_PATH = fileURLToPath(

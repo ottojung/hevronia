@@ -4,14 +4,27 @@ import { ChatOpenAI } from "@langchain/openai";
 
 export type ModelProvider = "openai" | "gemini";
 
-export const DEFAULT_MODEL = "gemini-3.5-flash-lite";
+export const DEFAULT_CHEAP_MODEL = "gemini-3.5-flash-lite";
+export const DEFAULT_SMART_MODEL = "gemini-3.5-flash-lite";
+
+function configuredModelEnv(name: string): string | undefined {
+  const value = process.env[name];
+  if (value === undefined || value.trim().length === 0) return undefined;
+  return value.trim();
+}
+
+export function cheapModelFromEnv(): string {
+  return configuredModelEnv("HEVRONIA_CHEAP_MODEL") ?? DEFAULT_CHEAP_MODEL;
+}
+
+export function smartModelFromEnv(): string {
+  return configuredModelEnv("HEVRONIA_SMART_MODEL") ?? DEFAULT_SMART_MODEL;
+}
+
+export const DEFAULT_MODEL = smartModelFromEnv();
 
 export function modelFromEnv(): string {
-  const configured = process.env["HEVRONIA_MODEL"];
-  if (configured !== undefined && configured.trim().length > 0) {
-    return configured.trim();
-  }
-  return DEFAULT_MODEL;
+  return configuredModelEnv("HEVRONIA_MODEL") ?? DEFAULT_MODEL;
 }
 
 export function providerForModelName(model: string): ModelProvider {

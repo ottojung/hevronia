@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  DEFAULT_CHEAP_MODEL,
   DEFAULT_MODEL,
+  DEFAULT_SMART_MODEL,
+  cheapModelFromEnv,
   geminiKeyFromEnv,
   modelFromEnv,
   openAiKeyFromEnv,
+  smartModelFromEnv,
 } from "../src/model.js";
 import { extractText } from "../src/text.js";
 import {
@@ -62,6 +66,52 @@ test("modelFromEnv ignores a blank override and uses the default", () => {
   } finally {
     delete process.env["HEVRONIA_MODEL"];
   }
+});
+
+test("cheapModelFromEnv returns the cheap default when unset", () => {
+  delete process.env["HEVRONIA_CHEAP_MODEL"];
+  assert.equal(cheapModelFromEnv(), DEFAULT_CHEAP_MODEL);
+});
+
+test("cheapModelFromEnv returns the configured override", () => {
+  process.env["HEVRONIA_CHEAP_MODEL"] = "cheap-model";
+  try {
+    assert.equal(cheapModelFromEnv(), "cheap-model");
+  } finally {
+    delete process.env["HEVRONIA_CHEAP_MODEL"];
+  }
+});
+
+test("cheapModelFromEnv ignores a blank override", () => {
+  process.env["HEVRONIA_CHEAP_MODEL"] = "   ";
+  try {
+    assert.equal(cheapModelFromEnv(), DEFAULT_CHEAP_MODEL);
+  } finally {
+    delete process.env["HEVRONIA_CHEAP_MODEL"];
+  }
+});
+
+test("smartModelFromEnv returns the smart default when unset", () => {
+  delete process.env["HEVRONIA_SMART_MODEL"];
+  assert.equal(smartModelFromEnv(), DEFAULT_SMART_MODEL);
+});
+
+test("smartModelFromEnv returns the configured override", () => {
+  process.env["HEVRONIA_SMART_MODEL"] = "smart-model";
+  try {
+    assert.equal(smartModelFromEnv(), "smart-model");
+  } finally {
+    delete process.env["HEVRONIA_SMART_MODEL"];
+  }
+});
+
+test("the cheap and smart tiers and the response model share the default model", () => {
+  delete process.env["HEVRONIA_CHEAP_MODEL"];
+  delete process.env["HEVRONIA_SMART_MODEL"];
+  delete process.env["HEVRONIA_MODEL"];
+  assert.equal(cheapModelFromEnv(), DEFAULT_MODEL);
+  assert.equal(smartModelFromEnv(), DEFAULT_MODEL);
+  assert.equal(modelFromEnv(), DEFAULT_MODEL);
 });
 
 test("geminiKeyFromEnv returns the configured key", () => {
