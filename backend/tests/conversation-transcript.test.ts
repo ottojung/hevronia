@@ -21,7 +21,7 @@ test("formatGitRevision renders the hash with a dirty marker", () => {
   assert.equal(formatGitRevision(undefined), "unknown");
 });
 
-test("saveRun embeds the commit and the ended transcript marker in markdown", async () => {
+test("saveRun embeds the commit, planner decisions, and duration in markdown", async () => {
   const firstScenario = scenarios[0];
   if (firstScenario === undefined) assert.fail("catalog is empty");
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-transcript-"));
@@ -31,15 +31,26 @@ test("saveRun embeds the commit and the ended transcript marker in markdown", as
       { speaker: "hevronia", ended: true },
     ],
     1, "generator produced no message");
+  const lines = [
+    `${firstScenario.participantName}: привіт`,
+    "Планер: speak → character 7001",
+    "  The situation is clear to you.",
+    "Хевронія: [conversation ended]",
+  ];
   try {
-    await saveRun(dir, [{ scenario: firstScenario, result }], "gpt-5.6-luna", "abc1234-dirty");
+    await saveRun(dir, [{ scenario: firstScenario, result, lines }], "gpt-5.6-luna",
+      "abc1234-dirty", 123_000);
     const scenarioMarkdown = readFileSync(path.join(dir, `${firstScenario.id}.md`), "utf8");
     assert.ok(scenarioMarkdown.includes("- **Commit:** abc1234-dirty"));
     assert.ok(scenarioMarkdown.includes("- **Simulator model:** gpt-5.6-luna"));
+    assert.ok(scenarioMarkdown.includes("**Participant:** привіт"));
+    assert.ok(scenarioMarkdown.includes("**Планер:** speak → character 7001"));
+    assert.ok(scenarioMarkdown.includes("  The situation is clear to you."));
     assert.ok(scenarioMarkdown.includes("**Хевронія:** [conversation ended]"));
     const indexMarkdown = readFileSync(path.join(dir, "index.md"), "utf8");
     assert.ok(indexMarkdown.includes("- **Commit:** abc1234-dirty"));
     assert.ok(indexMarkdown.includes("- **Simulator model:** gpt-5.6-luna"));
+    assert.ok(indexMarkdown.includes("- **Duration:** 2m 3s"));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

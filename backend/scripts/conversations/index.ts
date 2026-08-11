@@ -5,7 +5,7 @@ import { parseCli, HELP, renderScenarioList, isConversationCliError } from "./cl
 import { formatGitRevision, gitRevision } from "./git.js";
 import { runScenariosConcurrently } from "./orchestrator.js";
 import { LiveProgressRenderer } from "./progress-output.js";
-import { ConversationProgress } from "./progress.js";
+import { ConversationProgress, formatElapsed } from "./progress.js";
 import { completionLine, runScenarioEntry, scenarioHeaderLines } from "./scenario-execution.js";
 import { createSimulator, DEFAULT_SIMULATOR_MODEL } from "./simulator.js";
 import { createRunId, saveRun, type RunRecord } from "./transcript.js";
@@ -31,9 +31,14 @@ async function main(): Promise<void> {
   const simulator = createSimulator(simulatorModel);
   const revision = formatGitRevision(gitRevision());
   console.log(`Run commit: ${revision}`);
+  const runStartedAt = Date.now();
   const buffers = new Map<string, string[]>();
+  const headerLengths = new Map<string, number>();
+  const transcriptLines = new Map<string, string[]>();
   for (const scenario of command.scenarios) {
-    buffers.set(scenario.id, scenarioHeaderLines(scenario));
+    const header = scenarioHeaderLines(scenario);
+    buffers.set(scenario.id, header);
+    headerLengths.set(scenario.id, header.length);
   }
   const progress = new ConversationProgress(command.scenarios);
   const renderer = new LiveProgressRenderer(progress);
@@ -47,6 +52,7 @@ async function main(): Promise<void> {
         progress.advance(scenario.id, roundsCompleted);
         renderer.render();
       });
+      transcriptLines.set(scenario.id, lines.slice(headerLengths.get(scenario.id) ?? 0));
       lines.push(completionLine(scenario, result));
       renderer.commit(progress.finish(scenario, result));
       return result;
@@ -56,15 +62,17 @@ async function main(): Promise<void> {
       const result = results[index] ??
         failedScenarioResult(scenario, [], 0, "scenario produced no outcome");
       if (result.status === "failed") process.exitCode = 1;
-      return { scenario, result };
+      return { scenario, result, lines: transcriptLines.get(scenario.id) ?? [] };
     });
     for (const record of records) {
       const lines = buffers.get(record.scenario.id) ?? [];
       console.log(lines.join("\n"));
     }
+    const durationMs = Date.now() - runStartedAt;
     const runDirectory = join(CONVERSATION_RUNS_DIR, createRunId(new Date(), revision));
-    await saveRun(runDirectory, records, simulatorModel, revision);
+    await saveRun(runDirectory, records, simulatorModel, revision, durationMs);
     console.log(`Transcripts saved to ${runDirectory}`);
+    console.log(`Total run time: ${formatElapsed(durationMs)}`);
   } finally {
     renderer.stop();
   }

@@ -19,7 +19,7 @@ test("formatElapsed renders seconds and minute-second durations", () => {
   assert.equal(formatElapsed(125_000), "2m 5s");
 });
 
-test("live line reports overall rounds and refreshes its ETA", () => {
+test("live line reports overall rounds, elapsed time, and refreshes its ETA", () => {
   const first = scenarios[0];
   const second = scenarios[1];
   if (first === undefined || second === undefined) assert.fail("catalog is too small");
@@ -33,6 +33,7 @@ test("live line reports overall rounds and refreshes its ETA", () => {
   progress.advance(first.id, 2);
   const line = progress.line();
   assert.ok(line.includes(`[0/2] 2/${totalRounds} rounds`), line);
+  assert.ok(line.includes("elapsed 40s"), line);
   const expectedEta = formatElapsed((40_000 / 2) * (totalRounds - 2));
   assert.ok(line.includes(`ETA ~${expectedEta}`), line);
 });

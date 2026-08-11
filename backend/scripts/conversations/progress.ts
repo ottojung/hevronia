@@ -48,7 +48,7 @@ export class ConversationProgress {
 
   line(): string {
     const completedRounds = this.completedRounds + this.totalActiveRounds();
-    return `[${this.finished}/${this.totalScenarios}] ${completedRounds}/${this.totalRounds} rounds — ETA ${this.eta(this.finished, completedRounds)}`;
+    return `[${this.finished}/${this.totalScenarios}] ${completedRounds}/${this.totalRounds} rounds — elapsed ${this.elapsed()} — ETA ${this.eta(this.finished, completedRounds)}`;
   }
 
   finish(scenario: ConversationScenario, result: ScenarioResult): string {
@@ -65,6 +65,10 @@ export class ConversationProgress {
     let total = 0;
     for (const rounds of this.activeRounds.values()) total += rounds;
     return total;
+  }
+
+  private elapsed(): string {
+    return formatElapsed(Math.max(this.now() - this.startedAt, 0));
   }
 
   private eta(finished: number, completedRounds: number): string {
