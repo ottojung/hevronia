@@ -80,10 +80,15 @@ export function renderPlannerContext(context: TurnContext): string {
 export function createAttentionPlanner(model: BaseLanguageModel): AttentionPlanner {
   return {
     async consider(context: TurnContext): Promise<boolean> {
-      // Telegram computes direct address reliably (private chats, explicit
-      // mentions, replies to Хевронія), so a directly addressed event passes
-      // without consulting the cheap model: the gate must never turn that
-      // unambiguous signal into an irreversible false negative.
+      // A private chat is always a conversation with Хевронія alone, so the
+      // gate passes without consulting the cheap model: no private message is
+      // ever an irreversible false negative.
+      if (context.currentMessage.chatKind === "private") {
+        return true;
+      }
+      // Telegram computes direct address reliably (explicit mentions, replies
+      // to Хевронія), so a directly addressed group event also passes without
+      // the cheap model.
       if (context.currentMessage.directlyAddressed) {
         return true;
       }

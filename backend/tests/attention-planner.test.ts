@@ -12,10 +12,10 @@ import {
 import type { TurnContext } from "../src/realizer-schema.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 
-function message(): ObservedTelegramMessage {
+function message(overrides: Partial<ObservedTelegramMessage> = {}): ObservedTelegramMessage {
   return { kind: "participant", messageId: 10, sender: { kind: "user", id: 88 },
     senderDisplayName: "Іра", chatKind: "group", messageThreadId: null, text: "та ні", replyTo: null,
-    directlyAddressed: false };
+    directlyAddressed: false, ...overrides };
 }
 
 const context: TurnContext = {
@@ -63,6 +63,12 @@ test("a model error from the planner is a planner failure", async () => {
 
 test("a directly addressed event passes without consulting the model", async () => {
   const addressed = { ...context, currentMessage: { ...context.currentMessage, directlyAddressed: true } };
+  const model = fakeModel().alwaysThrow(new Error("must not be called"));
+  assert.equal(await createAttentionPlanner(model).consider(addressed), true);
+});
+
+test("a private chat event always passes without consulting the model", async () => {
+  const addressed = { ...context, currentMessage: message({ chatKind: "private" }) };
   const model = fakeModel().alwaysThrow(new Error("must not be called"));
   assert.equal(await createAttentionPlanner(model).consider(addressed), true);
 });
