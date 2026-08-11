@@ -1,6 +1,6 @@
 import { type BaseMessage } from "@langchain/core/messages";
 
-import { renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
+import { renderCurrentEventContext, renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
 import { buildHandleChoices } from "./handles.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
 import type { TurnContext, VisibleMessage } from "./realizer-schema.js";
@@ -47,6 +47,8 @@ export function renderRealizerContext(context: TurnContext): string {
     sections.push("");
     sections.push(memories);
   }
+  sections.push("");
+  sections.push(renderCurrentEventContext(context.currentMessage));
   return sections.join("\n\n");
 }
 

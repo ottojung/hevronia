@@ -3,7 +3,11 @@ import { type BaseMessage } from "@langchain/core/messages";
 import { SUMMARY_PREFIX } from "./summary.js";
 import { extractText } from "./text.js";
 import { renderOwnMessage, renderParticipantMessage } from "./dream-render-replies.js";
-import { deserializeTelegramEvent, type CanonicalTelegramEvent } from "./telegram-event.js";
+import {
+  deserializeTelegramEvent,
+  type CanonicalTelegramEvent,
+  type ObservedTelegramMessage,
+} from "./telegram-event.js";
 import type { CharacterHandle } from "./handles.js";
 
 /**
@@ -61,4 +65,21 @@ export function renderDreamCharacterList(characters: readonly CharacterHandle[])
     const label = character.subject.charAt(0).toUpperCase() + character.subject.slice(1);
     return `${label}, currently displayed by Telegram as “${character.displayName}”.`;
   }).join("\n");
+}
+
+/**
+ * Renders the conversational standing of the latest event: whether it was
+ * directed at Хевронія herself and in what kind of chat it appeared. Telegram
+ * computes `directlyAddressed` from private chats, explicit mentions, and
+ * replies to Хевронія; without this line a private "привіт" is
+ * indistinguishable from ambient group chatter.
+ */
+export function renderCurrentEventContext(message: ObservedTelegramMessage): string {
+  if (message.chatKind === "private") {
+    return "The latest message came to you in a private chat, so it is addressed to you directly.";
+  }
+  if (message.directlyAddressed) {
+    return "The latest message is addressed to you directly.";
+  }
+  return "The latest message appeared as ambient group conversation, not explicitly addressed to you.";
 }

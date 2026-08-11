@@ -1,7 +1,7 @@
 import { HumanMessage, SystemMessage, isBaseMessage } from "@langchain/core/messages";
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 
-import { renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
+import { renderCurrentEventContext, renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
 import { errorDetail } from "./error-detail.js";
 import { buildHandleChoices } from "./handles.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
@@ -70,6 +70,8 @@ export function renderPlannerContext(context: TurnContext): string {
     sections.push("");
     sections.push(memories);
   }
+  sections.push("");
+  sections.push(renderCurrentEventContext(context.currentMessage));
   sections.push("");
   sections.push("Is there any plausible reason for Хевронія to consider responding to what is happening now?");
   return sections.join("\n\n");
