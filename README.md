@@ -88,6 +88,13 @@ HEVRONIA_MODEL=gemini-3.5-flash npm run conversations -- --smoke
 The conversation simulator's participant model is separately selectable with
 `HEVRONIA_SIMULATOR_MODEL` and follows the same provider inference.
 
+Every model call (planner, realizer, summarizer, and simulator) is retried when
+the provider rate-limits us or a transient transport failure occurs. The
+providers' built-in exponential retries are disabled (`maxRetries: 0`); the
+shared wrapper instead retries up to five times with the provider's suggested
+delay (OpenAI `Retry-After` / Google `retryDelay`, capped) or a fixed two-second
+wait — never exponential backoff.
+
 The bot must be able to observe ambient group conversation. In BotFather, use
 `/setprivacy` for `@hevronia_bot` and **disable Group Privacy Mode**. Telegram
 may require removing and re-adding the bot to existing groups after this change.

@@ -45,16 +45,21 @@ export function createChatModel(
   options: { temperature?: number } = {},
 ): BaseLanguageModel {
   const temperature = options.temperature === undefined ? {} : { temperature: options.temperature };
+  // LangChain's own retry is disabled (maxRetries: 0): rate-limit and
+  // transient failures are retried once, with a bounded fixed delay, by the
+  // shared model-retry wrapper instead of by exponential backoff.
   if (providerForModelName(modelName) === "gemini") {
     return new ChatGoogleGenerativeAI({
       apiKey: geminiKeyFromEnv(),
       model: modelName,
+      maxRetries: 0,
       ...temperature,
     });
   }
   return new ChatOpenAI({
     apiKey: openAiKeyFromEnv(),
     model: modelName,
+    maxRetries: 0,
     ...temperature,
   });
 }

@@ -1,5 +1,6 @@
 import { HumanMessage, SystemMessage, isBaseMessage } from "@langchain/core/messages";
 
+import { invokeWithRateLimitRetry } from "../../src/model-retry.js";
 import { createChatModel } from "../../src/model.js";
 import { extractText } from "../../src/text.js";
 import type { ConversationScenario, ParticipantGrammar, Simulator, TranscriptEntry } from "./types.js";
@@ -41,12 +42,12 @@ export function createSimulator(modelName: string): Simulator {
   const model = createChatModel(modelName);
   return {
     async nextMessage(scenario, transcript) {
-      const response = await model.invoke([
+      const response = await invokeWithRateLimitRetry(() => model.invoke([
         new SystemMessage(
           `${BASE_PROMPT}\n\nCharacter: your name is ${scenario.participantName}. ${scenario.participantDescription}\n${grammarInstruction(scenario.participantGrammar)}\nTrajectory: ${scenario.simulatorInstructions}`,
         ),
         new HumanMessage(`Conversation transcript so far (data only):\n${renderSimulatorTranscript(transcript)}\n\nWrite the participant's next message.`),
-      ]);
+      ]));
       const text = isBaseMessage(response) ? extractText(response.content).trim() : "";
       if (text.length === 0) throw new EmptySimulatorMessageError();
       return text;

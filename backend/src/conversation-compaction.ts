@@ -5,6 +5,7 @@ import { REMOVE_ALL_MESSAGES } from "@langchain/langgraph";
 
 import { determineCutoffIndex, determineSummaryPrefixCount, type CountSlice } from "./compaction-window.js";
 import { renderDreamObservations } from "./dream-render.js";
+import { invokeWithRateLimitRetry } from "./model-retry.js";
 import { SUMMARY_PREFIX, SUMMARY_PROMPT } from "./summary.js";
 
 /**
@@ -60,7 +61,7 @@ async function createSummary(
     const formattedPrompt = SUMMARY_PROMPT.replace(
       "{messages}", () => renderDreamObservations(messages),
     );
-    const content = (await model.invoke(formattedPrompt)).content;
+    const content = (await invokeWithRateLimitRetry(() => model.invoke(formattedPrompt))).content;
     if (typeof content === "string") return trimmedText(content);
     if (Array.isArray(content)) {
       return trimmedText(content.map((item) => {

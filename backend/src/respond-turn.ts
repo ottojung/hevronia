@@ -6,6 +6,7 @@ import type { RespondInput } from "./conversation-types.js";
 import { toSilenceLog, toSpeakLog } from "./decision-log.js";
 import { GeneratedTurn } from "./generated-turn.js";
 import type { LazyLongTermMemory } from "./long-term-memory/runtime.js";
+import { invokeWithRateLimitRetry } from "./model-retry.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { memoriesForCharacter } from "./participant-memory.js";
 import type {
@@ -76,12 +77,12 @@ export async function respondTurn(
     const focusMemories = focusSender === undefined
       ? []
       : memoriesForCharacter(participantMemories, focusSender);
-    const response = await dependencies.model.invoke([
+    const response = await invokeWithRateLimitRetry(() => dependencies.model.invoke([
       new SystemMessage(dependencies.personality),
       new HumanMessage(realizationContext(
         history, focusMemories, speak.address, speak.subjective, candidates,
       )),
-    ]);
+    ]));
     if (!isBaseMessage(response)) return GeneratedTurn.fromEnd();
     const replyText = extractText(response.content).trim();
     if (!replyText) return GeneratedTurn.fromEnd();

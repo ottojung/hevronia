@@ -4,6 +4,7 @@ import { createAgent, providerStrategy, toolStrategy } from "langchain";
 
 import { renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
+import { invokeWithRateLimitRetry } from "./model-retry.js";
 import { isGeminiChatModel } from "./model.js";
 import { buildPlannerChoices } from "./reply-choices.js";
 import {
@@ -105,9 +106,9 @@ export function createSocialDecisionMaker(
             systemPrompt: `${personality}\n\n${PLANNING_MODE}`,
             responseFormat: providerStrategy(schema),
           });
-      const result = await agent.invoke({
+      const result = await invokeWithRateLimitRetry(() => agent.invoke({
         messages: [new HumanMessage(renderDecisionContext(context))],
-      });
+      }));
       const response = schema.parse(result.structuredResponse);
       return response.decision;
     },

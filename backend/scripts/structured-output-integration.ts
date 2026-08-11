@@ -8,6 +8,7 @@ import {
   modelFromEnv,
   providerForModelName,
 } from "../src/model.js";
+import { invokeWithRateLimitRetry } from "../src/model-retry.js";
 import {
   socialDecisionResponseSchema,
 } from "../src/social-decision.js";
@@ -29,9 +30,9 @@ const agent = createAgent({
   responseFormat: socialDecisionResponseSchema,
 });
 
-const result = await agent.invoke({
+const result = await invokeWithRateLimitRetry(() => agent.invoke({
   messages: [new AIMessage("test")],
-});
+}));
 const parsed = socialDecisionResponseSchema.parse(result.structuredResponse);
 assert.ok(parsed.decision.action === "silence" || parsed.decision.action === "speak");
 console.log(
