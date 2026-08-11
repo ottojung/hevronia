@@ -68,18 +68,15 @@ export function renderDreamCharacterList(characters: readonly CharacterHandle[])
 }
 
 /**
- * Renders the conversational standing of the latest event: whether it was
- * directed at Хевронія herself and in what kind of chat it appeared. Telegram
- * computes `directlyAddressed` from private chats, explicit mentions, and
- * replies to Хевронія; without this line a private "привіт" is
- * indistinguishable from ambient group chatter.
+ * Renders the social environment of the whole conversation once, so the
+ * models do not have to guess whether a "привіт" was a private message or
+ * ambient group chatter. The framing is a property of the thread, not of any
+ * single message, so it never singles out the latest event as the one Хевронія
+ * is expected to answer.
  */
-export function renderCurrentEventContext(message: ObservedTelegramMessage): string {
-  if (message.chatKind === "private") {
-    return "The latest message came to you in a private chat, so it is addressed to you directly.";
+export function renderConversationFraming(chatKind: ObservedTelegramMessage["chatKind"]): string {
+  if (chatKind === "private") {
+    return "This is a private chat: every message here is addressed to you, and only the two of you can see it.";
   }
-  if (message.directlyAddressed) {
-    return "The latest message is addressed to you directly.";
-  }
-  return "The latest message appeared as ambient group conversation, not explicitly addressed to you.";
+  return "This is a group chat, where most messages are not addressed to you; only messages marked as such are.";
 }

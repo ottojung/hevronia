@@ -1,7 +1,7 @@
 import { HumanMessage, SystemMessage, isBaseMessage } from "@langchain/core/messages";
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 
-import { renderCurrentEventContext, renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
+import { renderConversationFraming, renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
 import { errorDetail } from "./error-detail.js";
 import { buildHandleChoices } from "./handles.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
@@ -65,13 +65,13 @@ export function renderPlannerContext(context: TurnContext): string {
   sections.push("");
   sections.push("This is the conversation history currently visible to you:");
   sections.push(renderDreamObservations(context.boundedHistory));
+  sections.push("");
+  sections.push(renderConversationFraming(context.currentMessage.chatKind));
   const memories = renderParticipantMemoryContexts(context.participantMemories);
   if (memories !== "") {
     sections.push("");
     sections.push(memories);
   }
-  sections.push("");
-  sections.push(renderCurrentEventContext(context.currentMessage));
   sections.push("");
   sections.push("Is there any plausible reason for Хевронія to consider responding to what is happening now?");
   return sections.join("\n\n");

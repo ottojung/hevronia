@@ -29,5 +29,11 @@ export function renderParticipantMessage(event: ObservedTelegramMessage): string
       : `the Telegram source ${targetSubject}`;
     head = `Your sleeping mind made ${speaker} reply to ${target} with:`;
   }
-  return `${head}\n\n${event.text}`;
+  const directness = event.replyTo !== null && event.replyTo.targetIsHevronia
+    // The reply wording already says the message came back to Хевронія.
+    ? ""
+    : event.directlyAddressed
+      ? "\n\nThis message was addressed to you directly."
+      : "";
+  return `${head}\n\n${event.text}${directness}`;
 }

@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { HumanMessage } from "@langchain/core/messages";
 
 import {
-  renderCurrentEventContext,
+  renderConversationFraming,
   renderDreamEvent,
   renderDreamObservations,
 } from "../src/dream-render.js";
@@ -172,7 +172,7 @@ test("planner context lists characters, history, and memories but never handles 
   assert.match(rendered, /In your dream you currently see these characters:/);
   assert.match(rendered, /Character 42, currently displayed by Telegram as “Оля”/);
   assert.ok(rendered.indexOf("раніше") < rendered.indexOf("Оля боїться павуків"));
-  assert.match(rendered, /The latest message appeared as ambient group conversation, not explicitly addressed to you\./);
+  assert.match(rendered, /This is a group chat, where most messages are not addressed to you/);
   assert.doesNotMatch(rendered, /Character handles/);
   assert.doesNotMatch(rendered, /Reply-message handles/);
   assert.doesNotMatch(rendered, /P1/);
@@ -278,7 +278,7 @@ test("realizer context keeps the dream framing id-free and shows the handles", (
   assert.match(rendered, /Your sleeping mind made character 42 say:/);
   assert.match(rendered, /Character handles \(addressCharacter must be one of these\):\n\nP1 = character 42/);
   assert.match(rendered, /Reply-message handles \(replyToMessage must be one of these, or null\):\n\nM1 = the first eligible visible message/);
-  assert.match(rendered, /The latest message appeared as ambient group conversation, not explicitly addressed to you\./);
+  assert.match(rendered, /This is a group chat, where most messages are not addressed to you/);
   assert.doesNotMatch(rendered, /912345/);
   assert.doesNotMatch(rendered, /telegram-user:/);
   assert.doesNotMatch(rendered, /spreadsheet/);
@@ -318,16 +318,33 @@ test("Хевронія's own reply to a Telegram source uses source wording", ()
   assert.doesNotMatch(rendered, /channel -500/);
 });
 
-test("the current-event context names direct address and chat kind in dream terms", () => {
-  const privateChat = participant(1, 42, "Оля", "привіт", { chatKind: "private" });
-  assert.match(renderCurrentEventContext(privateChat),
-    /came to you in a private chat, so it is addressed to you directly\./);
-  const directInGroup = participant(2, 42, "Оля", "привіт", { directlyAddressed: true });
-  assert.match(renderCurrentEventContext(directInGroup),
-    /The latest message is addressed to you directly\./);
-  const ambientInGroup = participant(3, 42, "Оля", "привіт");
-  assert.match(renderCurrentEventContext(ambientInGroup),
-    /The latest message appeared as ambient group conversation, not explicitly addressed to you\./);
+test("the conversation framing names the chat kind once, without singling out the last message", () => {
+  assert.match(renderConversationFraming("private"),
+    /This is a private chat: every message here is addressed to you/);
+  assert.match(renderConversationFraming("group"),
+    /This is a group chat, where most messages are not addressed to you/);
+  assert.match(renderConversationFraming("supergroup"),
+    /This is a group chat, where most messages are not addressed to you/);
+  assert.doesNotMatch(renderConversationFraming("group"), /latest message/i);
+});
+
+test("each directly addressed participant event carries its own marker", () => {
+  const addressed = participant(1, 42, "Оля", "привіт", { directlyAddressed: true });
+  const rendered = renderDreamEvent(addressed);
+  assert.match(rendered, /This message was addressed to you directly\./);
+  const ambient = participant(2, 42, "Оля", "привіт");
+  assert.doesNotMatch(renderDreamEvent(ambient), /addressed to you directly/);
+});
+
+test("a reply to Хевронія is not double-marked with a directness line", () => {
+  const reply = participant(3, 42, "Оля", "та ні", {
+    directlyAddressed: true,
+    replyTo: { targetMessageId: 2, targetSender: { kind: "user", id: 999 },
+      targetSenderDisplayName: "Хевронія", targetText: "ти прийдеш?", targetIsHevronia: true },
+  });
+  const rendered = renderDreamEvent(reply);
+  assert.match(rendered, /reply to one of your earlier messages with:/);
+  assert.doesNotMatch(rendered, /addressed to you directly/);
 });
 
 test("surfaced memories render with notebook labels and no store vocabulary", () => {

@@ -1,6 +1,6 @@
 import { type BaseMessage } from "@langchain/core/messages";
 
-import { renderCurrentEventContext, renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
+import { renderConversationFraming, renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
 import { buildHandleChoices } from "./handles.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
 import type { TurnContext, VisibleMessage } from "./realizer-schema.js";
@@ -35,6 +35,8 @@ export function renderRealizerContext(context: TurnContext): string {
   sections.push("This is the conversation history currently visible to you:");
   sections.push(renderDreamObservations(context.boundedHistory, choices.messageAnnotations));
   sections.push("");
+  sections.push(renderConversationFraming(context.currentMessage.chatKind));
+  sections.push("");
   sections.push("Character handles (addressCharacter must be one of these):");
   sections.push(choices.characters.map(({ handle, character }) =>
     `${handle} = ${character.subject}`).join("\n"));
@@ -47,8 +49,6 @@ export function renderRealizerContext(context: TurnContext): string {
     sections.push("");
     sections.push(memories);
   }
-  sections.push("");
-  sections.push(renderCurrentEventContext(context.currentMessage));
   return sections.join("\n\n");
 }
 
