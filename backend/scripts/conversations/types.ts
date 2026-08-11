@@ -35,7 +35,8 @@ export interface ConversationScenario {
 export type TranscriptEntry =
   | { speaker: "participant"; text: string }
   | { speaker: "hevronia"; text: string }
-  | { speaker: "hevronia"; silence: true };
+  | { speaker: "hevronia"; silence: true }
+  | { speaker: "hevronia"; ended: true };
 
 export interface Simulator {
   nextMessage(scenario: ConversationScenario, transcript: readonly TranscriptEntry[]): Promise<string>;
@@ -50,7 +51,8 @@ export interface ScenarioDependencies {
 
 export type ScenarioStoppingReason =
   | "round limit reached"
-  | "stopped after several consecutive silences";
+  | "stopped after several consecutive silences"
+  | "generator produced no message";
 
 export type ScenarioResult =
   | {

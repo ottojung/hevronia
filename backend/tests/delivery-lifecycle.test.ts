@@ -34,3 +34,14 @@ test("failed Telegram reply never invokes outgoing persistence", async () => {
   }));
   assert.equal(persisted, false);
 });
+
+test("an ended turn delivers nothing and never shows typing", async () => {
+  const turn = GeneratedTurn.fromEnd();
+  let touched = false;
+  const result = await deliverGeneratedTurn(turn, {
+    showTyping: async () => { touched = true; },
+    reply: async () => { touched = true; return 1; },
+  });
+  assert.deepEqual(result, { status: "silence" });
+  assert.equal(touched, false);
+});

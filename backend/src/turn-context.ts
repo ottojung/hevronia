@@ -14,17 +14,6 @@ import type { SubjectiveState, VisibleMessage } from "./social-decision.js";
 
 export { deliveredEvent, replyRelationshipFor, resolveSpeakDecision } from "./speak-resolution.js";
 
-export class InvalidRealizationResponseError extends Error {
-  constructor() {
-    super("Realization model returned no Telegram message");
-    this.name = "InvalidRealizationResponseError";
-  }
-}
-
-export function isInvalidRealizationResponseError(error: unknown): error is InvalidRealizationResponseError {
-  return error instanceof InvalidRealizationResponseError;
-}
-
 export function visibleMessages(messages: BaseMessage[]): VisibleMessage[] {
   const result: VisibleMessage[] = [];
   for (const message of messages) {

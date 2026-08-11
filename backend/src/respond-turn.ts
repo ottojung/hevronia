@@ -14,7 +14,7 @@ import type {
   SocialDecisionMaker,
 } from "./social-decision.js";
 import { extractText } from "./text.js";
-import { InvalidRealizationResponseError, realizationContext } from "./turn-context.js";
+import { realizationContext } from "./turn-context.js";
 import { reportPlannerFailure } from "./planner-failure.js";
 import {
   UnresolvableSpeakDecisionError,
@@ -82,9 +82,9 @@ export async function respondTurn(
         history, focusMemories, speak.address, speak.subjective, candidates,
       )),
     ]);
-    if (!isBaseMessage(response)) throw new InvalidRealizationResponseError();
+    if (!isBaseMessage(response)) return GeneratedTurn.fromEnd();
     const replyText = extractText(response.content).trim();
-    if (!replyText) throw new InvalidRealizationResponseError();
+    if (!replyText) return GeneratedTurn.fromEnd();
     const replyTo = replyRelationshipFor(speak.replyTo);
     return GeneratedTurn.fromSpeak(replyText, replyTo, (messageId) => {
       const delivered = deliveredEvent(

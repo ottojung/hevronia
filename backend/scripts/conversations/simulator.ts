@@ -58,6 +58,7 @@ function renderSimulatorTranscript(transcript: readonly TranscriptEntry[]): stri
   if (transcript.length === 0) return "[conversation has not started]";
   return transcript.map((entry) => {
     if (entry.speaker === "participant") return `Participant: ${entry.text}`;
+    if ("ended" in entry) return "Хевронія: [conversation ended]";
     if ("silence" in entry) return "Хевронія: [silence]";
     return `Хевронія: ${entry.text}`;
   }).join("\n");

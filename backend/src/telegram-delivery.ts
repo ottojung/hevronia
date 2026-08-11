@@ -22,7 +22,7 @@ export async function deliverGeneratedTurn(
   turn: GeneratedTurn,
   delivery: TelegramTurnDelivery,
 ): Promise<TelegramDeliveryResult> {
-  if (turn.outcome.action === "silence") {
+  if (turn.outcome.action === "silence" || turn.outcome.action === "ended") {
     return { status: "silence" };
   }
   const speak = turn.outcome;

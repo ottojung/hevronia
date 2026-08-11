@@ -8,31 +8,34 @@ export interface RunRecord {
   result: ScenarioResult;
 }
 
-export function createRunId(date = new Date()): string {
-  return date.toISOString().replaceAll(":", "-").replace(".", "-");
+export function createRunId(date = new Date(), revision?: string): string {
+  const base = date.toISOString().replaceAll(":", "-").replace(".", "-");
+  return revision === undefined ? base : `${base}-${revision}`;
 }
 
 export async function saveRun(
   directory: string,
   records: readonly RunRecord[],
   simulatorModel: string,
+  revision: string,
 ): Promise<void> {
   await mkdir(directory, { recursive: true });
   for (const record of records) {
     try {
-      await writeFile(join(directory, `${record.scenario.id}.md`), renderScenario(record, simulatorModel));
+      await writeFile(join(directory, `${record.scenario.id}.md`),
+        renderScenario(record, simulatorModel, revision));
     } catch (error) {
       console.warn(`Failed to save transcript for ${record.scenario.id}: ${String(error)}`);
     }
   }
   try {
-    await writeFile(join(directory, "index.md"), renderIndex(records, simulatorModel));
+    await writeFile(join(directory, "index.md"), renderIndex(records, simulatorModel, revision));
   } catch (error) {
     console.warn(`Failed to save the run index: ${String(error)}`);
   }
 }
 
-function renderScenario(record: RunRecord, simulatorModel: string): string {
+function renderScenario(record: RunRecord, simulatorModel: string, revision: string): string {
   const result = record.result;
   const meta = [
     `# ${record.scenario.title}`,
@@ -52,6 +55,7 @@ function renderScenario(record: RunRecord, simulatorModel: string): string {
     `- **Actual rounds:** ${result.roundsCompleted}`,
     `- **Stopping reason:** ${result.status === "completed" ? result.stoppingReason : `failed: ${singleLine(result.failure)}`}`,
     `- **Simulator model:** ${simulatorModel}`,
+    `- **Commit:** ${revision}`,
     "",
     "## Transcript",
     "",
@@ -65,6 +69,7 @@ function renderScenario(record: RunRecord, simulatorModel: string): string {
 function renderEntries(entries: readonly TranscriptEntry[]): string {
   return entries.map((entry) => {
     if (entry.speaker === "participant") return `**Participant:** ${entry.text}`;
+    if ("ended" in entry) return "**Хевронія:** [conversation ended]";
     if ("silence" in entry) return "**Хевронія:** [silence]";
     return `**Хевронія:** ${entry.text}`;
   }).join("\n\n") + "\n";
@@ -74,7 +79,7 @@ function singleLine(text: string): string {
   return text.replaceAll(/\s+/gu, " ").trim();
 }
 
-function renderIndex(records: readonly RunRecord[], simulatorModel: string): string {
+function renderIndex(records: readonly RunRecord[], simulatorModel: string, revision: string): string {
   const categories = [...new Set(records.map((record) => record.scenario.category))];
   const sections = categories.map((category) => {
     const rows = records.filter((record) => record.scenario.category === category).map((record) => {
@@ -87,5 +92,5 @@ function renderIndex(records: readonly RunRecord[], simulatorModel: string): str
     }).join("\n");
     return `## ${category}\n\n| Scenario | ID | Status | Rounds | Behavior tags |\n|---|---|---|---|---|\n${rows}\n`;
   });
-  return `# Conversation simulation run\n\nSimulator model: ${simulatorModel}\n\n${sections.join("\n")}\n`;
+  return `# Conversation simulation run\n\n- **Commit:** ${revision}\n- **Simulator model:** ${simulatorModel}\n\n${sections.join("\n")}\n`;
 }

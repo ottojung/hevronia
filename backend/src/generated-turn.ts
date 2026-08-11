@@ -2,6 +2,7 @@ import type { ReplyRelationship } from "./telegram-event.js";
 
 export type GeneratedTurnOutcome =
   | { action: "silence" }
+  | { action: "ended" }
   | {
       action: "speak";
       replyText: string;
@@ -12,12 +13,15 @@ export type GeneratedTurnOutcome =
 /**
  * The properties that this class carries are:
  * - Silence cannot contain reply text or delivery behavior.
+ * - An ended outcome carries no reply text or delivery behavior and signals
+ *   that the generator produced no message, so the conversation ends.
  * - A speak outcome exposes one consistency operation that persists only a
  *   Telegram-confirmed outgoing event.
  *
  * The proof of those properties is guaranteed by:
  * - This class can only be introduced through these functions:
  *   - `GeneratedTurn.fromSilence()`: constructs only the silence variant.
+ *   - `GeneratedTurn.fromEnd()`: constructs only the ended variant.
  *   - `GeneratedTurn.fromSpeak(...)`: requires post-delivery persistence and
  *     memoizes it after Telegram supplies the delivered message identifier.
  */
@@ -26,6 +30,10 @@ export class GeneratedTurn {
 
   static fromSilence(): GeneratedTurn {
     return new GeneratedTurn({ action: "silence" });
+  }
+
+  static fromEnd(): GeneratedTurn {
+    return new GeneratedTurn({ action: "ended" });
   }
 
   static fromSpeak(

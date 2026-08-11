@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
 import { parseCli, HELP, renderScenarioList, isConversationCliError } from "./cli.js";
+import { formatGitRevision, gitRevision } from "./git.js";
 import { runScenariosConcurrently, runScenariosSequentially } from "./orchestrator.js";
 import { ConversationProgress } from "./progress.js";
 import { completionLine, runScenarioEntry, scenarioHeaderLines } from "./scenario-execution.js";
@@ -29,6 +30,8 @@ async function main(): Promise<void> {
 
   const simulatorModel = process.env["HEVRONIA_SIMULATOR_MODEL"] ?? DEFAULT_SIMULATOR_MODEL;
   const simulator = createSimulator(simulatorModel);
+  const revision = formatGitRevision(gitRevision());
+  console.log(`Run commit: ${revision}`);
   const buffers = new Map<string, string[]>();
   for (const scenario of command.scenarios) {
     buffers.set(scenario.id, scenarioHeaderLines(scenario));
@@ -78,8 +81,8 @@ async function main(): Promise<void> {
       const lines = buffers.get(record.scenario.id) ?? [];
       console.log(lines.join("\n"));
     }
-    const runDirectory = join(CONVERSATION_RUNS_DIR, createRunId());
-    await saveRun(runDirectory, records, simulatorModel);
+    const runDirectory = join(CONVERSATION_RUNS_DIR, createRunId(new Date(), revision));
+    await saveRun(runDirectory, records, simulatorModel, revision);
     console.log(`Transcripts saved to ${runDirectory}`);
   } finally {
     if (liveTimer !== undefined) clearInterval(liveTimer);

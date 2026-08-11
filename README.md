@@ -299,8 +299,11 @@ default; `--parallel` runs all selected scenarios concurrently with no
 concurrency limit. `--smoke` is an explicit synonym for the default, and
 `--rounds N` overrides scenario lengths.
 `HEVRONIA_SIMULATOR_MODEL` selects the participant model and defaults to
-`gpt-5-mini`. Transcripts are saved under
-`backend/.data/conversation-runs/<run-id>/`.
+`gpt-5-mini`. Each run records the Hevronia source commit: the terminal prints
+`Run commit: <hash>` (with a `-dirty` suffix when the working tree has
+uncommitted changes), the run directory name is suffixed with the hash, and
+every saved transcript and the run index carry a `**Commit:**` line.
+Transcripts are saved under `backend/.data/conversation-runs/<run-id>/`.
 
 During a run the terminal only shows a short `[start]` line when a scenario
 begins and, while scenarios run, a single cumulative progress line that stays

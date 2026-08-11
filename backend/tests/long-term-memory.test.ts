@@ -199,7 +199,7 @@ test("an unresolved long-term-memory background job cannot delay respond", async
     model.respond(new AIMessage("valid reply"));
     const turn = await layer.respond({ threadId,
       message: observedMessage("hello", 1), hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    if (turn.outcome.action === "silence") assert.fail("expected a speak");
+    if (turn.outcome.action !== "speak") assert.fail("expected a speak");
     assert.equal(turn.outcome.replyText, "valid reply");
     assert.equal(store.searchCalls.length, 0);
     hanging.resolve([fact("m1", "fact")]);
@@ -416,7 +416,7 @@ test("successful delivery still persists only the delivered event, not memory co
     const turn = await layer.respond({ threadId, message: observedMessage("user text", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
-    if (turn.outcome.action === "silence") assert.fail("expected a speak");
+    if (turn.outcome.action !== "speak") assert.fail("expected a speak");
     turn.outcome.persistDelivery(600);
     assert.equal(store.rememberCalls.length, 1);
     assert.equal(store.rememberCalls[0]?.text, "user text");
@@ -440,7 +440,7 @@ test("search and ingestion failures degrade gracefully through the layer", async
     model.respond(new AIMessage("valid reply"));
     const reply = await layer.respond({ threadId, message: observedMessage("hello", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    if (reply.outcome.action === "silence") assert.fail("expected a speak");
+    if (reply.outcome.action !== "speak") assert.fail("expected a speak");
     assert.equal(reply.outcome.replyText, "valid reply");
     await scheduler.fireAll();
     assert.equal(store.rememberCalls.length, 1);

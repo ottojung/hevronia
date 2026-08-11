@@ -55,6 +55,11 @@ export async function runScenario(
           stoppingReason = "stopped after several consecutive silences";
           break;
         }
+      } else if (turn.outcome.action === "ended") {
+        stoppingReason = "generator produced no message";
+        transcript.push({ speaker: "hevronia", ended: true });
+        dependencies.print("Хевронія: [conversation ended]");
+        break;
       } else {
         consecutiveSilences = 0;
         messageId += 1;

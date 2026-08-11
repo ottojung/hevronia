@@ -257,6 +257,30 @@ test("runner returns a failed result when the layer cannot be created", async ()
   assert.deepEqual(result.transcript, []);
 });
 
+test("runner stops gracefully when the generator ends the conversation", async () => {
+  const firstScenario = scenarios[0];
+  if (firstScenario === undefined) assert.fail("catalog is empty");
+  const layer: ConversationLayer = {
+    respond: () => Promise.resolve(GeneratedTurn.fromEnd()),
+    recordDeliveredMessage: () => undefined,
+    getMessages: () => Promise.resolve([]),
+    warmParticipant: () => undefined,
+    close: () => Promise.resolve(),
+  };
+  const result = await runScenario(firstScenario, 5, {
+    createLayer: () => layer,
+    simulator: { nextMessage: () => Promise.resolve("привіт") },
+    print: () => undefined,
+  });
+  if (result.status !== "completed") assert.fail("expected a completed scenario");
+  assert.equal(result.roundsCompleted, 1);
+  assert.equal(result.stoppingReason, "generator produced no message");
+  assert.deepEqual(result.transcript, [
+    { speaker: "participant", text: "привіт" },
+    { speaker: "hevronia", ended: true },
+  ]);
+});
+
 test("scenario execution is concurrent: scenario B begins before scenario A finishes", async () => {
   const scenarioA = scenarios[0];
   const scenarioB = scenarios[1];

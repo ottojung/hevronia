@@ -388,6 +388,30 @@ test("silence produces no realization call", async () => {
   }
 });
 
+test("an empty realization ends the conversation instead of erroring", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-empty-realize-"));
+  const planner: SocialDecisionMaker = { decide: async () => speakDecision() };
+  const model = fakeModel();
+  model.respond(new AIMessage("   "));
+  const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
+    model, summaryModel: fakeModel(), decisionMaker: planner });
+  try {
+    const turn = await layer.respond({ threadId, message: message(),
+      hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
+    assert.equal(turn.outcome.action, "ended");
+    let touched = false;
+    const sent = await deliverGeneratedTurn(turn, { showTyping: async () => { touched = true; },
+      reply: async () => { touched = true; return 1; } });
+    assert.deepEqual(sent, { status: "silence" });
+    assert.equal(touched, false);
+    const history = JSON.stringify((await layer.getMessages(threadId)).map(({ content }) => content));
+    assert.ok(!history.includes("Make the Telegram message you choose to speak appear"));
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the realizer context concatenates the six subjective sentences verbatim in order", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-verbatim-"));
   const state = subjective();
