@@ -21,12 +21,12 @@ export function isConversationLayerNotInitializedError(
 }
 
 export interface ConversationLayerInitializationDependencies {
-  createStore(openAiApiKey: string, geminiApiKey: string): LongTermMemoryStore;
+  createStore(): LongTermMemoryStore;
   createLayer(lazyMemory: LazyLongTermMemory): ConversationLayerType;
 }
 
 const productionDependencies: ConversationLayerInitializationDependencies = {
-  createStore: createMem0Store,
+  createStore: () => createMem0Store(openAiKeyFromEnv(), geminiKeyFromEnv()),
   createLayer: (lazyMemory) => createConversationLayer({ lazyMemory }),
 };
 
@@ -37,7 +37,7 @@ export function initializeConversationLayer(
   if (sharedLayer !== undefined) {
     return;
   }
-  const store = dependencies.createStore(openAiKeyFromEnv(), geminiKeyFromEnv());
+  const store = dependencies.createStore();
   const lazyMemory = createLazyLongTermMemory({ store });
   sharedLayer = dependencies.createLayer(lazyMemory);
   console.log("Conversation layer initialized");

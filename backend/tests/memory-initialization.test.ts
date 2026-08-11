@@ -31,52 +31,41 @@ function fakeConversationLayer(close = async () => undefined): ConversationLayer
 
 test("initialization constructs the store, runtime, and layer once", async () => {
   const events: string[] = [];
-  process.env["MY_OPENAI_API_KEY"] = "test-key";
-  try {
-    assert.throws(() => getConversationLayer(), isConversationLayerNotInitializedError);
-    initializeConversationLayer({
-      createStore: (apiKey) => {
-        assert.equal(apiKey, "test-key");
-        events.push("store");
-        return fakeStore();
-      },
-      createLayer: (lazyMemory) => {
-        assert.equal(lazyMemory, lazyMemory);
-        events.push("layer");
-        return fakeConversationLayer();
-      },
-    });
-    initializeConversationLayer({
-      createStore: () => {
-        events.push("unexpected");
-        return fakeStore();
-      },
-      createLayer: () => fakeConversationLayer(),
-    });
-    assert.deepEqual(events, ["store", "layer"]);
-    assert.equal(getConversationLayer(), getConversationLayer());
-  } finally {
-    delete process.env["MY_OPENAI_API_KEY"];
-    await closeConversationLayer();
-  }
+  assert.throws(() => getConversationLayer(), isConversationLayerNotInitializedError);
+  initializeConversationLayer({
+    createStore: () => {
+      events.push("store");
+      return fakeStore();
+    },
+    createLayer: (lazyMemory) => {
+      assert.equal(lazyMemory, lazyMemory);
+      events.push("layer");
+      return fakeConversationLayer();
+    },
+  });
+  initializeConversationLayer({
+    createStore: () => {
+      events.push("unexpected");
+      return fakeStore();
+    },
+    createLayer: () => fakeConversationLayer(),
+  });
+  assert.deepEqual(events, ["store", "layer"]);
+  assert.equal(getConversationLayer(), getConversationLayer());
+  await closeConversationLayer();
 });
 
 test("closing resets the shared conversation layer", async () => {
   let closeCount = 0;
-  process.env["MY_OPENAI_API_KEY"] = "test-key";
-  try {
-    initializeConversationLayer({
-      createStore: fakeStore,
-      createLayer: (lazyMemory) => {
-        assert.ok(lazyMemory);
-        return fakeConversationLayer(async () => { closeCount += 1; });
-      },
-    });
-    await closeConversationLayer();
-    assert.equal(closeCount, 1);
-    assert.throws(() => getConversationLayer(), isConversationLayerNotInitializedError);
-  } finally {
-    delete process.env["MY_OPENAI_API_KEY"];
-    await closeConversationLayer();
-  }
+  initializeConversationLayer({
+    createStore: fakeStore,
+    createLayer: (lazyMemory) => {
+      assert.ok(lazyMemory);
+      return fakeConversationLayer(async () => { closeCount += 1; });
+    },
+  });
+  await closeConversationLayer();
+  assert.equal(closeCount, 1);
+  assert.throws(() => getConversationLayer(), isConversationLayerNotInitializedError);
+  await closeConversationLayer();
 });
