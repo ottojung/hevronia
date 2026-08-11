@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { parseCli, HELP, renderScenarioList, isConversationCliError } from "./cli.js";
 import { formatGitRevision, gitRevision } from "./git.js";
 import { runScenariosConcurrently } from "./orchestrator.js";
+import { LiveProgressRenderer } from "./progress-output.js";
 import { ConversationProgress } from "./progress.js";
 import { completionLine, runScenarioEntry, scenarioHeaderLines } from "./scenario-execution.js";
 import { createSimulator, DEFAULT_SIMULATOR_MODEL } from "./simulator.js";
@@ -13,8 +14,6 @@ import { failedScenarioResult } from "./types.js";
 const CONVERSATION_RUNS_DIR = fileURLToPath(
   new URL("../../.data/conversation-runs", import.meta.url),
 );
-
-const LIVE_REFRESH_MS = 1_000;
 
 async function main(): Promise<void> {
   let command;
@@ -37,24 +36,8 @@ async function main(): Promise<void> {
     buffers.set(scenario.id, scenarioHeaderLines(scenario));
   }
   const progress = new ConversationProgress(command.scenarios);
-  const isTty = process.stdout.isTTY === true;
-  const writeLine = (line: string): void => {
-    if (isTty) {
-      process.stdout.write(`\r\x1b[K${line}`);
-    } else {
-      console.log(line);
-    }
-  };
-  const commitLine = (line: string): void => {
-    if (isTty) {
-      process.stdout.write(`\r\x1b[K${line}\n`);
-    } else {
-      console.log(line);
-    }
-  };
-  const liveTimer = isTty
-    ? setInterval(() => writeLine(progress.line()), LIVE_REFRESH_MS)
-    : undefined;
+  const renderer = new LiveProgressRenderer(progress);
+  renderer.start();
   try {
     const results = await runScenariosConcurrently(command.scenarios, async (scenario) => {
       progress.begin(scenario);
@@ -62,12 +45,13 @@ async function main(): Promise<void> {
       const lines = buffers.get(scenario.id) ?? [];
       const result = await runScenarioEntry(scenario, simulator, lines, (roundsCompleted) => {
         progress.advance(scenario.id, roundsCompleted);
-        writeLine(progress.line());
+        renderer.render();
       });
       lines.push(completionLine(scenario, result));
-      commitLine(progress.finish(scenario, result));
+      renderer.commit(progress.finish(scenario, result));
       return result;
     });
+    renderer.stop();
     const records: RunRecord[] = command.scenarios.map((scenario, index) => {
       const result = results[index] ??
         failedScenarioResult(scenario, [], 0, "scenario produced no outcome");
@@ -82,7 +66,7 @@ async function main(): Promise<void> {
     await saveRun(runDirectory, records, simulatorModel, revision);
     console.log(`Transcripts saved to ${runDirectory}`);
   } finally {
-    if (liveTimer !== undefined) clearInterval(liveTimer);
+    renderer.stop();
   }
 }
 

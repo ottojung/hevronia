@@ -12,26 +12,20 @@ export function formatElapsed(ms: number): string {
   return `${minutes}m ${seconds}s`;
 }
 
-interface ActiveScenario {
-  scenario: ConversationScenario;
-  rounds: number;
-}
-
 /**
  * Cumulative progress for a conversation run: finished scenarios over the
- * total, the currently running scenario and its completed rounds, and an ETA
- * that linearly extrapolates the observed time per completed round onto the
- * remaining expected rounds. Progress stays live because the running
- * scenario's rounds are tracked as they happen and the elapsed time is read
- * on every render, so re-rendering the line keeps the ETA current.
+ * total, completed rounds over the total expected rounds, and an ETA that
+ * linearly extrapolates the observed time per completed round onto the
+ * remaining expected rounds. Scenarios run concurrently, so the live line
+ * reports only overall progress and never pretends to show a single running
+ * scenario.
  */
 export class ConversationProgress {
   private readonly totalScenarios: number;
   private readonly totalRounds: number;
   private finished = 0;
   private completedRounds = 0;
-  private readonly active = new Map<string, ActiveScenario>();
-  private displayScenario: ConversationScenario | undefined;
+  private readonly activeRounds = new Map<string, number>();
 
   constructor(
     scenarios: readonly ConversationScenario[],
@@ -43,25 +37,22 @@ export class ConversationProgress {
   }
 
   begin(scenario: ConversationScenario): void {
-    this.active.set(scenario.id, { scenario, rounds: 0 });
-    this.displayScenario = scenario;
+    this.activeRounds.set(scenario.id, 0);
   }
 
   advance(scenarioId: string, roundsCompleted: number): void {
-    const entry = this.active.get(scenarioId);
-    if (entry !== undefined) entry.rounds = roundsCompleted;
+    if (this.activeRounds.has(scenarioId)) {
+      this.activeRounds.set(scenarioId, roundsCompleted);
+    }
   }
 
   line(): string {
-    const prefix = `[${this.finished}/${this.totalScenarios}]`;
-    const active = this.displayScenario === undefined ? "" : this.activeRoundsText(this.displayScenario);
-    const activeRounds = this.totalActiveRounds();
-    return `${prefix}${active} — ETA ${this.eta(this.finished, this.completedRounds + activeRounds)}`;
+    const completedRounds = this.completedRounds + this.totalActiveRounds();
+    return `[${this.finished}/${this.totalScenarios}] ${completedRounds}/${this.totalRounds} rounds — ETA ${this.eta(this.finished, completedRounds)}`;
   }
 
   finish(scenario: ConversationScenario, result: ScenarioResult): string {
-    this.active.delete(scenario.id);
-    if (this.displayScenario?.id === scenario.id) this.displayScenario = undefined;
+    this.activeRounds.delete(scenario.id);
     this.finished += 1;
     this.completedRounds += result.roundsCompleted;
     const outcome = result.status === "completed"
@@ -70,14 +61,9 @@ export class ConversationProgress {
     return `[${this.finished}/${this.totalScenarios}] ${scenario.id} ${outcome} — ETA ${this.eta(this.finished, this.completedRounds)}`;
   }
 
-  private activeRoundsText(scenario: ConversationScenario): string {
-    const rounds = this.active.get(scenario.id)?.rounds ?? 0;
-    return ` ${scenario.id} ${rounds}/${scenario.rounds} rounds`;
-  }
-
   private totalActiveRounds(): number {
     let total = 0;
-    for (const entry of this.active.values()) total += entry.rounds;
+    for (const rounds of this.activeRounds.values()) total += rounds;
     return total;
   }
 

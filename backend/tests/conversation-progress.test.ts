@@ -19,19 +19,20 @@ test("formatElapsed renders seconds and minute-second durations", () => {
   assert.equal(formatElapsed(125_000), "2m 5s");
 });
 
-test("live line tracks the running scenario and refreshes its ETA", () => {
+test("live line reports overall rounds and refreshes its ETA", () => {
   const first = scenarios[0];
   const second = scenarios[1];
   if (first === undefined || second === undefined) assert.fail("catalog is too small");
+  const totalRounds = first.rounds + second.rounds;
   let now = 0;
   const progress = new ConversationProgress([first, second], 0, () => now);
   progress.begin(first);
-  assert.ok(progress.line().includes(`[0/2] ${first.id} 0/${first.rounds} rounds`), progress.line());
+  assert.ok(progress.line().includes(`[0/2] 0/${totalRounds} rounds`), progress.line());
+  assert.ok(!progress.line().includes(first.id), progress.line());
   now = 40_000;
   progress.advance(first.id, 2);
   const line = progress.line();
-  assert.ok(line.includes(`[0/2] ${first.id} 2/${first.rounds} rounds`), line);
-  const totalRounds = first.rounds + second.rounds;
+  assert.ok(line.includes(`[0/2] 2/${totalRounds} rounds`), line);
   const expectedEta = formatElapsed((40_000 / 2) * (totalRounds - 2));
   assert.ok(line.includes(`ETA ~${expectedEta}`), line);
 });
@@ -54,7 +55,8 @@ test("finish reports finished over total and resets the live state", () => {
   const expectedEta = formatElapsed((now / first.rounds) * second.rounds);
   assert.ok(firstLine.includes(`ETA ~${expectedEta}`), firstLine);
   progress.begin(second);
-  assert.ok(progress.line().includes(`[1/2] ${second.id} 0/${second.rounds} rounds`), progress.line());
+  assert.ok(progress.line().includes(`[1/2] ${first.rounds}/${first.rounds + second.rounds} rounds`),
+    progress.line());
   progress.advance(second.id, second.rounds);
   const secondLine = progress.finish(second,
     completedScenarioResult(second, [], second.rounds, "round limit reached"));
