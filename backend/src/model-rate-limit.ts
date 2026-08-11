@@ -1,7 +1,7 @@
 import { GoogleGenerativeAIFetchError } from "@google/generative-ai";
 import { RateLimitError } from "openai";
 
-export const MODEL_RATE_LIMIT_MAX_DELAY_MS = 30_000;
+export const MODEL_RATE_LIMIT_MAX_DELAY_MS = 24 * 60 * 60 * 1_000;
 
 const RATE_LIMIT_MESSAGE =
   /\b429\b|rate.?limit|insufficient.?quota|too many requests|resource.exhausted/i;
@@ -21,7 +21,8 @@ export function isRateLimitError(error: unknown): boolean {
 /**
  * The wait before a retry: the provider's own suggested delay when it
  * supplies one (OpenAI `Retry-After` header, Google `retryDelay` detail),
- * capped, otherwise the caller's fixed base delay. No exponential backoff.
+ * capped at 24 hours, otherwise the caller's fixed base delay. No exponential
+ * backoff.
  */
 export function rateLimitRetryDelayMs(error: unknown, baseDelayMs: number): number {
   const providedSeconds = retryAfterSeconds(error);

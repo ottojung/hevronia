@@ -31,14 +31,21 @@ test("isRateLimitError follows an error cause chain", () => {
   assert.equal(isRateLimitError(wrapped), true);
 });
 
-test("rateLimitRetryDelayMs honors the OpenAI retry-after header and caps it", () => {
+test("rateLimitRetryDelayMs honors the OpenAI retry-after header and caps at 24 hours", () => {
   assert.equal(
     rateLimitRetryDelayMs(openAiRateLimit(new Headers({ "retry-after": "5" })), 2_000),
     5_000,
   );
   assert.equal(
     rateLimitRetryDelayMs(openAiRateLimit(new Headers({ "retry-after": "300" })), 2_000),
-    30_000,
+    300_000,
+  );
+  assert.equal(
+    rateLimitRetryDelayMs(
+      openAiRateLimit(new Headers({ "retry-after": String(3 * 24 * 60 * 60) })),
+      2_000,
+    ),
+    24 * 60 * 60 * 1_000,
   );
   assert.equal(rateLimitRetryDelayMs(openAiRateLimit(), 2_000), 2_000);
 });
@@ -63,13 +70,15 @@ test("retry re-invokes a rate-limited operation until it succeeds", async () => 
   assert.equal(attempts, 3);
 });
 
-test("retry gives up after the configured number of attempts", async () => {
+test("retry has no attempt limit and keeps going past many failures", async () => {
   let attempts = 0;
-  await assert.rejects(() => invokeWithRateLimitRetry(async () => {
+  const result = await invokeWithRateLimitRetry(async () => {
     attempts += 1;
-    throw openAiRateLimit();
-  }, { maxAttempts: 2, baseDelayMs: 0 }));
-  assert.equal(attempts, 2);
+    if (attempts < 7) throw openAiRateLimit();
+    return "ok";
+  }, { baseDelayMs: 0 });
+  assert.equal(result, "ok");
+  assert.equal(attempts, 7);
 });
 
 test("non-rate-limit errors are not retried", async () => {

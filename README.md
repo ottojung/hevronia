@@ -91,9 +91,9 @@ The conversation simulator's participant model is separately selectable with
 Every model call (planner, realizer, summarizer, and simulator) is retried when
 the provider rate-limits us or a transient transport failure occurs. The
 providers' built-in exponential retries are disabled (`maxRetries: 0`); the
-shared wrapper instead retries up to five times with the provider's suggested
-delay (OpenAI `Retry-After` / Google `retryDelay`, capped) or a fixed two-second
-wait — never exponential backoff.
+shared wrapper instead keeps retrying with the provider's suggested delay
+(OpenAI `Retry-After` / Google `retryDelay`, capped at 24 hours) or a fixed
+two-second wait — never exponential backoff and with no attempt limit.
 
 The bot must be able to observe ambient group conversation. In BotFather, use
 `/setprivacy` for `@hevronia_bot` and **disable Group Privacy Mode**. Telegram
