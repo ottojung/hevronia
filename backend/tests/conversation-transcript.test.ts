@@ -38,18 +38,18 @@ test("saveRun embeds the commit, planner decisions, and duration in markdown", a
     "Хевронія: [conversation ended]",
   ];
   try {
-    await saveRun(dir, [{ scenario: firstScenario, result, lines }], "gpt-5.6-luna",
+    await saveRun(dir, [{ scenario: firstScenario, result, lines }], "fake-model2",
       "abc1234-dirty", 123_000);
     const scenarioMarkdown = readFileSync(path.join(dir, `${firstScenario.id}.md`), "utf8");
     assert.ok(scenarioMarkdown.includes("- **Commit:** abc1234-dirty"));
-    assert.ok(scenarioMarkdown.includes("- **Simulator model:** gpt-5.6-luna"));
+    assert.ok(scenarioMarkdown.includes("- **Simulator model:** fake-model2"));
     assert.ok(scenarioMarkdown.includes("**Participant:** привіт"));
     assert.ok(scenarioMarkdown.includes("**Планер:** speak → character 7001"));
     assert.ok(scenarioMarkdown.includes("  The situation is clear to you."));
     assert.ok(scenarioMarkdown.includes("**Хевронія:** [conversation ended]"));
     const indexMarkdown = readFileSync(path.join(dir, "index.md"), "utf8");
     assert.ok(indexMarkdown.includes("- **Commit:** abc1234-dirty"));
-    assert.ok(indexMarkdown.includes("- **Simulator model:** gpt-5.6-luna"));
+    assert.ok(indexMarkdown.includes("- **Simulator model:** fake-model2"));
     assert.ok(indexMarkdown.includes("- **Duration:** 2m 3s"));
   } finally {
     rmSync(dir, { recursive: true, force: true });
