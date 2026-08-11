@@ -8,7 +8,7 @@ import { memoryUserIdForSender } from "./long-term-memory/operations.js";
 import type { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { memoriesForCandidates, selectedParticipantIds } from "./participant-memory.js";
 import type { ParticipantMemoryContext } from "./participant-memory.js";
-import type { VisibleMessage } from "./social-decision.js";
+import type { VisibleMessage } from "./realizer-schema.js";
 import { visibleMessages } from "./turn-context.js";
 
 export interface TurnMemoryContext {

@@ -1,15 +1,16 @@
 import assert from "node:assert/strict";
-import { AIMessage, HumanMessage } from "@langchain/core/messages";
-import { fakeModel } from "@langchain/core/testing";
+import { HumanMessage } from "@langchain/core/messages";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 
 import type { ConversationStore } from "../src/conversation-store.js";
-import { createConversationLayer } from "../src/layer.js";
-import type { SocialDecisionMaker } from "../src/social-decision.js";
+import type { Realizer } from "../src/realizer.js";
 import { deliverGeneratedTurn } from "../src/telegram-delivery.js";
 import { serializeTelegramEvent, type CanonicalTelegramEvent, type ObservedTelegramMessage } from "../src/telegram-event.js";
 import { conversationThreadIdFromTelegramPrivateChat } from "../src/identifiers.js";
-import { silenceDecision } from "./memory-fixtures.js";
+import { realizerSilence, realizerSpeak, stubPlanner, testLayer } from "./memory-fixtures.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(55);
 
@@ -20,6 +21,7 @@ function message(id: number, text: string): ObservedTelegramMessage {
 }
 
 test("confirmed outgoing persistence retries before the next planner context", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-persist-"));
   const events: CanonicalTelegramEvent[] = [];
   let outgoingAttempts = 0;
   const store: ConversationStore = {
@@ -37,20 +39,24 @@ test("confirmed outgoing persistence retries before the next planner context", a
   };
   let plannerCall = 0;
   let laterSawReply = false;
-  const planner: SocialDecisionMaker = { decide: async (context) => {
+  const planner = stubPlanner((context) => {
     plannerCall += 1;
-    if (plannerCall === 1) return { action: "speak", addressCharacter: "P1",
-      replyToMessage: null, interpretation: "care", feltState: "f",
-      activeDesire: "support", desiredOutcome: "reassure",
-      opportunity: "o", pursuit: "p" };
-    laterSawReply = context.boundedHistory.some(({ content }) =>
-      String(content).includes("доставлена відповідь"));
-    return silenceDecision();
-  } };
-  const model = fakeModel();
-  model.respond(new AIMessage("доставлена відповідь"));
-  const layer = createConversationLayer({ model, summaryModel: fakeModel(),
-    conversationStore: store, decisionMaker: planner });
+    if (plannerCall > 1) {
+      laterSawReply = context.boundedHistory.some(({ content }) =>
+        String(content).includes("доставлена відповідь"));
+    }
+    return true;
+  });
+  let realizerCall = 0;
+  const realizer: Realizer = {
+    realize: async () => {
+      realizerCall += 1;
+      if (realizerCall === 1) return realizerSpeak({ message: "доставлена відповідь" });
+      return realizerSilence();
+    },
+  };
+  const layer = testLayer(path.join(dir, "db.sqlite"),
+    { planner, realizer, conversationStore: store });
   try {
     const turn = await layer.respond({ threadId, message: message(1, "важлива річ"),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
@@ -66,10 +72,12 @@ test("confirmed outgoing persistence retries before the next planner context", a
     assert.equal(sends, 1);
   } finally {
     await layer.close();
+    rmSync(dir, { recursive: true, force: true });
   }
 });
 
 test("incoming canonical persistence recovers before planning", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-persist-"));
   const events: CanonicalTelegramEvent[] = [];
   let attempts = 0;
   let planned = false;
@@ -85,13 +93,12 @@ test("incoming canonical persistence recovers before planning", async () => {
       content: serializeTelegramEvent(event), id: `${event.kind}:${event.messageId}`,
     })),
   };
-  const planner: SocialDecisionMaker = { decide: async () => {
+  const planner = stubPlanner((context) => {
     planned = true;
-    assert.equal(events.length, 1);
-    return silenceDecision();
-  } };
-  const layer = createConversationLayer({ model: fakeModel(), summaryModel: fakeModel(),
-    conversationStore: store, decisionMaker: planner });
+    assert.equal(context.boundedHistory.length, 1);
+    return false;
+  });
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner, conversationStore: store });
   try {
     await layer.respond({ threadId, message: message(4, "вхідне"),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
@@ -100,5 +107,6 @@ test("incoming canonical persistence recovers before planning", async () => {
     assert.equal(events.filter(({ kind }) => kind === "participant").length, 1);
   } finally {
     await layer.close();
+    rmSync(dir, { recursive: true, force: true });
   }
 });

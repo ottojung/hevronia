@@ -1,16 +1,9 @@
-import { buildPlannerChoices } from "./reply-choices.js";
-import type { VisibleMessage } from "./social-decision-schema.js";
+import { buildHandleChoices } from "./handles.js";
+import type { ConstFreeJsonSchema, VisibleMessage } from "./realizer-schema.js";
 
-export interface ConstFreeJsonSchema {
-  type: "null" | "boolean" | "object" | "array" | "number" | "string" | "integer";
-  properties?: Record<string, unknown>;
-  required?: string[];
-  additionalProperties?: boolean;
-  [key: string]: unknown;
-}
-
-const subjectiveFields = {
+const jsonSubjectiveFields = {
   interpretation: { type: "string", minLength: 1 },
+  intent: { type: "string", minLength: 1 },
   feltState: { type: "string", minLength: 1 },
   activeDesire: { type: "string", minLength: 1 },
   desiredOutcome: { type: "string", minLength: 1 },
@@ -24,20 +17,15 @@ const subjectiveFields = {
  * `enum` values instead: the action discriminator and the visible P/M handles.
  * The zod schema remains the source of truth for the typed client-side parse.
  */
-export function buildGeminiSocialDecisionJsonSchema(
+export function buildGeminiRealizerJsonSchema(
   candidates: readonly VisibleMessage[],
 ): ConstFreeJsonSchema {
-  const choices = buildPlannerChoices(candidates);
+  const choices = buildHandleChoices(candidates);
   const silenceVariant = {
     type: "object",
-    properties: {
-      action: { type: "string", enum: ["silence"] },
-      ...subjectiveFields,
-    },
-    required: [
-      "action", "interpretation", "feltState", "activeDesire", "desiredOutcome",
-      "opportunity", "pursuit",
-    ],
+    properties: { action: { type: "string", enum: ["silence"] }, ...jsonSubjectiveFields },
+    required: ["action", "interpretation", "intent", "feltState", "activeDesire",
+      "desiredOutcome", "opportunity", "pursuit"],
   };
   const speakVariant = {
     type: "object",
@@ -45,18 +33,16 @@ export function buildGeminiSocialDecisionJsonSchema(
       action: { type: "string", enum: ["speak"] },
       addressCharacter: handleField(choices.characters.map(({ handle }) => handle)),
       replyToMessage: handleField(choices.messages.map(({ handle }) => handle)),
-      ...subjectiveFields,
+      message: { type: "string", minLength: 1 },
+      ...jsonSubjectiveFields,
     },
-    required: [
-      "action", "addressCharacter", "replyToMessage", "interpretation",
-      "feltState", "activeDesire", "desiredOutcome", "opportunity", "pursuit",
-    ],
+    required: ["action", "addressCharacter", "replyToMessage", "message",
+      "interpretation", "intent", "feltState", "activeDesire",
+      "desiredOutcome", "opportunity", "pursuit"],
   };
   return {
     type: "object",
-    properties: {
-      decision: { anyOf: [silenceVariant, speakVariant] },
-    },
+    properties: { decision: { anyOf: [silenceVariant, speakVariant] } },
     required: ["decision"],
   };
 }

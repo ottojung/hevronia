@@ -1,21 +1,79 @@
+import { fakeModel } from "@langchain/core/testing";
+
+import type { AttentionPlanner } from "../src/attention-planner.js";
+import type { ConversationLayer, ConversationLayerOptions } from "../src/conversation-types.js";
 import type { ConversationThreadId, LongTermMemoryUserId } from "../src/identifiers.js";
+import { createConversationLayer } from "../src/layer.js";
 import type { LongTermMemoryStore, MemoryRecord } from "../src/long-term-memory/index.js";
 import type {
   LazyLongTermMemory,
   Scheduler,
 } from "../src/long-term-memory/runtime.js";
-import type { SocialDecision } from "../src/social-decision.js";
+import type { Realizer } from "../src/realizer.js";
+import type { RealizerDecision, TurnContext } from "../src/realizer-schema.js";
 
-export function silenceDecision(): SocialDecision {
+/** Builds a conversation layer with stub models so unit tests never need keys. */
+export function testLayer(
+  dbPath: string,
+  options: ConversationLayerOptions = {},
+): ConversationLayer {
+  return createConversationLayer({
+    dbPath,
+    plannerModel: fakeModel(),
+    realizerModel: fakeModel(),
+    summaryModel: fakeModel(),
+    ...options,
+  });
+}
+
+export function realizerSilence(): RealizerDecision {
   return {
     action: "silence",
     interpretation: "You read this as an ordinary moment with nothing at stake for you.",
+    intent: "They are just chatting idly, without any clear purpose toward you.",
     feltState: "This leaves you quietly indifferent.",
     activeDesire: "You want nothing from speaking right now.",
     desiredOutcome: "You want the present calm to remain undisturbed.",
     opportunity: "You notice no opportunity here that advances anything you want.",
     pursuit: "You decide that staying silent serves you best.",
   };
+}
+
+export function realizerSpeak(
+  overrides: Partial<Extract<RealizerDecision, { action: "speak" }>> = {},
+): Extract<RealizerDecision, { action: "speak" }> {
+  return {
+    action: "speak",
+    addressCharacter: "P1",
+    replyToMessage: null,
+    interpretation: "You understand this as an ordinary moment worth a short reply.",
+    intent: "They want a quick reaction from you.",
+    feltState: "This leaves you mildly interested.",
+    activeDesire: "You want to acknowledge them simply.",
+    desiredOutcome: "You want the moment to be acknowledged without fuss.",
+    opportunity: "You notice the present interaction gives you room to say a few words.",
+    pursuit: "You decide to say something short.",
+    message: "ага",
+    ...overrides,
+  };
+}
+
+export function passingPlanner(): AttentionPlanner {
+  return { consider: async () => true };
+}
+
+export function filteringPlanner(): AttentionPlanner {
+  return { consider: async () => false };
+}
+
+export function stubPlanner(
+  passes: (context: TurnContext) => boolean,
+): AttentionPlanner {
+  return { consider: async (context) => passes(context) };
+}
+
+export function stubRealizer(decision: RealizerDecision): Realizer {
+  return { realize: async () => decision };
 }
 
 export interface SearchCall {

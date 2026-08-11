@@ -4,15 +4,15 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { AIMessage } from "@langchain/core/messages";
+import { AIMessage, type BaseMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
 
-import { createConversationLayer } from "../src/layer.js";
-import type { SocialDecision, SocialDecisionMaker } from "../src/social-decision.js";
+import { SYSTEM_PROMPT } from "../src/personality.js";
+import { createRealizer } from "../src/realizer.js";
 import { renderDreamEvent } from "../src/dream-render.js";
 import type { DeliveredHevroniaMessage, ObservedTelegramMessage } from "../src/telegram-event.js";
 import { conversationThreadIdFromTelegramPrivateChat } from "../src/identifiers.js";
-import { silenceDecision } from "./memory-fixtures.js";
+import { passingPlanner, realizerSpeak, testLayer } from "./memory-fixtures.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(71);
 
@@ -20,54 +20,21 @@ function participant(messageId: number, senderId: number, name: string, text: st
   return { kind: "participant", messageId, sender: { kind: "user", id: senderId }, senderDisplayName: name,
     chatKind: "group", text, messageThreadId: null, replyTo: null, directlyAddressed: false };
 }
-
-function speak(
-  overrides: Partial<Omit<Exclude<SocialDecision, { action: "silence" }>, "action">> = {},
-): Exclude<SocialDecision, { action: "silence" }> {
-  return {
-    action: "speak",
-    addressCharacter: "P1",
-    replyToMessage: null,
-    interpretation: "You understand this as a real change in her life.",
-    feltState: "This leaves you genuinely attentive.",
-    activeDesire: "You want to know what actually happened.",
-    desiredOutcome: "You want the true story to become clear to you.",
-    opportunity: "You notice she is still here and willing to talk.",
-    pursuit: "You decide to ask her directly what happened.",
-    ...overrides,
-  };
-}
-
-test("realization receives the dream character framing and the verbatim subjective paragraph", async () => {
+test("the realizer receives the dream framing, memories, and the character handles it needs", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-target-context-"));
-  let planningCall = 0;
-  const planner: SocialDecisionMaker = { decide: async () => ++planningCall === 1
-    ? silenceDecision()
-    : speak() };
   const model = fakeModel();
-  model.respond((messages) => {
-    const input = messages.map(({ content }) => String(content)).join("\n");
-    assert.match(input, /Character 101, currently displayed by Telegram as “Іра”/);
-    assert.match(input, /Character 202, currently displayed by Telegram as “Макс”/);
-    assert.match(input, /Your sleeping mind made character 101 say:\n\nя звільняюся/);
-    assert.ok(input.includes("You understand this as a real change in her life. " +
-      "This leaves you genuinely attentive. You want to know what actually happened. " +
-      "You want the true story to become clear to you. " +
-      "You notice she is still here and willing to talk. " +
-      "You decide to ask her directly what happened."));
-    assert.match(input, /Make the Telegram message you choose to speak appear\. Return only its visible text\./);
-    assert.doesNotMatch(input, /message 10/);
-    assert.doesNotMatch(input, /message 11/);
-    assert.doesNotMatch(input, /P1/);
-    assert.doesNotMatch(input, /M1/);
-    assert.doesNotMatch(input, /addressCharacter/);
-    assert.doesNotMatch(input, /replyToMessage/);
-    assert.doesNotMatch(input, /telegram-user:/);
-    assert.doesNotMatch(input, /spreadsheet/);
-    return new AIMessage("стій. а шо сталося?");
+  const captured: string[] = [];
+  const replyHandler = (messages: BaseMessage[]) => {
+    captured.push(messages.map((item) => typeof item.content === "string"
+      ? item.content : JSON.stringify(item.content)).join("\n"));
+    return new AIMessage(JSON.stringify({ decision: realizerSpeak({ message: "стій. а шо сталося?" }) }));
+  };
+  model.respond(replyHandler);
+  model.respond(replyHandler);
+  const layer = testLayer(path.join(dir, "db.sqlite"), {
+    planner: passingPlanner(),
+    realizer: createRealizer(model, SYSTEM_PROMPT),
   });
-  const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"), model,
-    summaryModel: fakeModel(), decisionMaker: planner });
   try {
     await layer.respond({ threadId, message: participant(10, 101, "Іра", "я звільняюся"),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
@@ -75,6 +42,17 @@ test("realization receives the dream character framing and the verbatim subjecti
       message: participant(11, 202, "Макс", "хто буде каву"), hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(turn.outcome.action, "speak");
     if (turn.outcome.action === "speak") assert.equal(turn.outcome.replyTo, null);
+    assert.equal(captured.length, 2);
+    const input = captured[1] ?? "";
+    assert.match(input, /Character 101, currently displayed by Telegram as “Іра”/);
+    assert.match(input, /Character 202, currently displayed by Telegram as “Макс”/);
+    assert.match(input, /Your sleeping mind made character 101 say:\n\nя звільняюся/);
+    assert.match(input, /Character handles \(addressCharacter must be one of these\):\n\nP1 = character 101/);
+    assert.match(input, /Reply-message handles \(replyToMessage must be one of these, or null\)/);
+    assert.doesNotMatch(input, /message 10/);
+    assert.doesNotMatch(input, /message 11/);
+    assert.doesNotMatch(input, /telegram-user:/);
+    assert.doesNotMatch(input, /spreadsheet/);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });

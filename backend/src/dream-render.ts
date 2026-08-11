@@ -4,7 +4,7 @@ import { SUMMARY_PREFIX } from "./summary.js";
 import { extractText } from "./text.js";
 import { renderOwnMessage, renderParticipantMessage } from "./dream-render-replies.js";
 import { deserializeTelegramEvent, type CanonicalTelegramEvent } from "./telegram-event.js";
-import type { AddressChoice } from "./reply-choices.js";
+import type { CharacterHandle } from "./handles.js";
 
 /**
  * Renders canonical Telegram events as Хевронія experiences them inside the
@@ -19,15 +19,16 @@ export function renderDreamEvent(event: CanonicalTelegramEvent, replyHandle?: st
     : renderParticipantMessage(event);
   return replyHandle === undefined
     ? body
-    : `${body}\n\nPlanner reply-message handle: ${replyHandle}.`;
+    : `${body}\n\nReply-message handle: ${replyHandle}.`;
 }
 
 /**
- * Renders a bounded message history in the same dream ontology used by both
- * the planner and the realization model. Compaction summaries appear as
- * remembered earlier dream conversation; every other message is a rendered
- * dream event. An optional planner-only annotation map attaches ephemeral
- * reply-message handles to eligible events without exposing message IDs.
+ * Renders a bounded message history in the same dream ontology used by the
+ * attention planner, the smart realizer, and the summary model. Compaction
+ * summaries appear as remembered earlier dream conversation; every other
+ * message is a rendered dream event. An optional annotation map attaches
+ * ephemeral reply-message handles to eligible events without exposing message
+ * IDs.
  */
 export function renderDreamObservations(
   messages: BaseMessage[],
@@ -55,21 +56,9 @@ export function renderDreamObservations(
   return parts.join("\n\n");
 }
 
-export function renderDreamCharacterList(characters: readonly AddressChoice[]): string {
+export function renderDreamCharacterList(characters: readonly CharacterHandle[]): string {
   return characters.map(({ character }) => {
     const label = character.subject.charAt(0).toUpperCase() + character.subject.slice(1);
     return `${label}, currently displayed by Telegram as “${character.displayName}”.`;
   }).join("\n");
-}
-
-/**
- * The deterministic second-person sentence stating whom Хевронія's upcoming
- * message is socially directed toward. A resolved character uses its stable
- * dream label; a null address means ambient, broadcast speech to everyone
- * present, not an unspecified addressee.
- */
-export function addressingSentence(address: AddressChoice | null): string {
-  return address === null
-    ? "You direct what you say to everyone present."
-    : `You direct what you say toward ${address.character.subject}.`;
 }

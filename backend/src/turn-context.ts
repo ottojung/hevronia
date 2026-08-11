@@ -1,18 +1,13 @@
 import { type BaseMessage } from "@langchain/core/messages";
 
-import {
-  addressingSentence,
-  renderDreamCharacterList,
-  renderDreamObservations,
-} from "./dream-render.js";
+import { renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
+import { buildHandleChoices } from "./handles.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
-import type { ParticipantMemoryContext } from "./participant-memory.js";
-import { buildPlannerChoices, type AddressChoice } from "./reply-choices.js";
+import type { TurnContext, VisibleMessage } from "./realizer-schema.js";
 import { deserializeTelegramEvent } from "./telegram-event.js";
 import { extractText } from "./text.js";
-import type { SubjectiveState, VisibleMessage } from "./social-decision.js";
 
-export { deliveredEvent, replyRelationshipFor, resolveSpeakDecision } from "./speak-resolution.js";
+export { deliveredEvent, replyRelationshipFor, resolveRealizerDecision } from "./speak-resolution.js";
 
 export function visibleMessages(messages: BaseMessage[]): VisibleMessage[] {
   const result: VisibleMessage[] = [];
@@ -31,33 +26,33 @@ export function visibleMessages(messages: BaseMessage[]): VisibleMessage[] {
   return result;
 }
 
-export function realizationContext(
-  history: BaseMessage[],
-  memories: ParticipantMemoryContext[],
-  address: AddressChoice | null,
-  subjective: SubjectiveState,
-  candidates: VisibleMessage[],
-): string {
-  const choices = buildPlannerChoices(candidates);
-  const parts: string[] = [];
-  parts.push("In your dream you currently see these characters:");
-  parts.push(renderDreamCharacterList(choices.characters));
-  parts.push("");
-  parts.push("This is the conversation history currently visible to you:");
-  parts.push(renderDreamObservations(history));
-  const memoryText = renderParticipantMemoryContexts(memories);
-  if (memoryText !== "") parts.push(memoryText);
-  parts.push("");
-  parts.push([
-    addressingSentence(address),
-    subjective.interpretation,
-    subjective.feltState,
-    subjective.activeDesire,
-    subjective.desiredOutcome,
-    subjective.opportunity,
-    subjective.pursuit,
-  ].join(" "));
-  parts.push("");
-  parts.push("Make the Telegram message you choose to speak appear. Return only its visible text.");
-  return parts.join("\n\n");
+export function renderRealizerContext(context: TurnContext): string {
+  const choices = buildHandleChoices(context.visibleMessages);
+  const sections: string[] = [];
+  sections.push("In your dream you currently see these characters:");
+  sections.push(renderDreamCharacterList(choices.characters));
+  sections.push("");
+  sections.push("This is the conversation history currently visible to you:");
+  sections.push(renderDreamObservations(context.boundedHistory, choices.messageAnnotations));
+  sections.push("");
+  sections.push("Character handles (addressCharacter must be one of these):");
+  sections.push(choices.characters.map(({ handle, character }) =>
+    `${handle} = ${character.subject}`).join("\n"));
+  sections.push("");
+  sections.push("Reply-message handles (replyToMessage must be one of these, or null):");
+  sections.push(choices.messages.map(({ handle }, index) =>
+    `${handle} = ${ordinal(index + 1)} eligible visible message`).join("\n"));
+  const memories = renderParticipantMemoryContexts(context.participantMemories);
+  if (memories !== "") {
+    sections.push("");
+    sections.push(memories);
+  }
+  return sections.join("\n\n");
+}
+
+function ordinal(value: number): string {
+  if (value === 1) return "the first";
+  if (value === 2) return "the second";
+  if (value === 3) return "the third";
+  return `the ${value}th`;
 }

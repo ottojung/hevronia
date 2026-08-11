@@ -5,17 +5,17 @@ import { AIMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
 import { providerStrategy } from "langchain";
 
+import { buildGeminiRealizerJsonSchema } from "../src/gemini-realizer-schema.js";
 import { SYSTEM_PROMPT } from "../src/personality.js";
+import { createRealizer } from "../src/realizer.js";
 import {
-  buildGeminiSocialDecisionJsonSchema,
-  buildSocialDecisionResponseSchema,
-  createSocialDecisionMaker,
-  socialDecisionResponseSchema,
-  socialDecisionSchema,
-  type SocialDecisionContext,
-} from "../src/social-decision.js";
+  buildRealizerResponseSchema,
+  realizerDecisionSchema,
+  realizerResponseSchema,
+  type TurnContext,
+} from "../src/realizer-schema.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
-import { silenceDecision } from "./memory-fixtures.js";
+import { realizerSilence, realizerSpeak } from "./memory-fixtures.js";
 
 function message(overrides: Partial<ObservedTelegramMessage> = {}): ObservedTelegramMessage {
   return { kind: "participant", messageId: 10, sender: { kind: "user", id: 88 },
@@ -23,7 +23,7 @@ function message(overrides: Partial<ObservedTelegramMessage> = {}): ObservedTele
     directlyAddressed: false, ...overrides };
 }
 
-const context: SocialDecisionContext = {
+const context: TurnContext = {
   boundedHistory: [],
   currentMessage: message(),
   visibleMessages: [{ messageId: 10, sender: { kind: "user", id: 88 },
@@ -31,52 +31,40 @@ const context: SocialDecisionContext = {
   participantMemories: [],
 };
 
-function plannerWithResponse(content: string) {
+function realizerWithResponse(content: string) {
   const model = fakeModel();
   model.respond(new AIMessage(content));
-  return createSocialDecisionMaker(model, SYSTEM_PROMPT);
+  return createRealizer(model, SYSTEM_PROMPT);
 }
 
 test("provider schema root is an object, not a top-level union", () => {
-  const providerSchema = providerStrategy(socialDecisionResponseSchema).schema;
+  const providerSchema = providerStrategy(realizerResponseSchema).schema;
   assert.equal(providerSchema["type"], "object");
   assert.ok(providerSchema["properties"]);
   assert.deepEqual(providerSchema["required"], ["decision"]);
   assert.equal(providerSchema["additionalProperties"], false);
 
-  const domainStrategy = providerStrategy(socialDecisionSchema);
+  const domainStrategy = providerStrategy(realizerDecisionSchema);
   const domainSchema = domainStrategy.schema;
   assert.equal(domainSchema["type"], undefined);
   assert.ok(domainSchema["anyOf"]);
 });
 
-test("decide returns unwrapped silence decision with the full private state", async () => {
-  const silence = silenceDecision();
-  const planner = plannerWithResponse(JSON.stringify({ decision: silence }));
-  assert.deepEqual(await planner.decide(context), silence);
+test("realize returns an unwrapped silence decision with the full private state", async () => {
+  const silence = realizerSilence();
+  const realizer = realizerWithResponse(JSON.stringify({ decision: silence }));
+  assert.deepEqual(await realizer.realize(context), silence);
 });
 
-test("decide returns unwrapped speak decision", async () => {
-  const decision = {
-    action: "speak",
-    addressCharacter: "P1",
-    replyToMessage: null,
-    interpretation: "This character is asking me for a favour.",
-    feltState: "This leaves you mildly interested in what they need.",
-    activeDesire: "You want to understand what they actually want.",
-    desiredOutcome: "You want to know enough to decide whether it matters to you.",
-    opportunity: "You notice the present interaction gives you room to ask.",
-    pursuit: "You decide to ask a direct question.",
-  };
-  const planner = plannerWithResponse(JSON.stringify({ decision }));
-  assert.deepEqual(await planner.decide(context), decision);
+test("realize returns an unwrapped speak decision with message and handles", async () => {
+  const decision = realizerSpeak({ message: "стій, я зараз" });
+  const realizer = realizerWithResponse(JSON.stringify({ decision }));
+  assert.deepEqual(await realizer.realize(context), decision);
 });
 
 test("the dynamic schema restricts addressCharacter and replyToMessage to visible handles", () => {
-  const schema = buildSocialDecisionResponseSchema(context.visibleMessages);
-  const speak = { action: "speak", addressCharacter: "P1", replyToMessage: "M1",
-    interpretation: "i", feltState: "f", activeDesire: "a", desiredOutcome: "o",
-    opportunity: "o", pursuit: "p" };
+  const schema = buildRealizerResponseSchema(context.visibleMessages);
+  const speak = realizerSpeak({ addressCharacter: "P1", replyToMessage: "M1" });
   assert.equal(schema.safeParse({ decision: speak }).success, true);
   for (const bad of ["7001", "Юхим", "character 7001", "P9", "M9", "я не братимусь розбирати це"]) {
     assert.equal(schema.safeParse({ decision: { ...speak, addressCharacter: bad } }).success,
@@ -87,7 +75,7 @@ test("the dynamic schema restricts addressCharacter and replyToMessage to visibl
 });
 
 test("the Gemini schema uses enums instead of const and lists the visible handles", () => {
-  const schema = buildGeminiSocialDecisionJsonSchema(context.visibleMessages);
+  const schema = buildGeminiRealizerJsonSchema(context.visibleMessages);
   const serialized = JSON.stringify(schema);
   assert.ok(!serialized.includes('"const"'));
   assert.ok(!serialized.includes("additionalProperties"));
@@ -105,17 +93,20 @@ test("malformed provider responses are rejected", async () => {
     JSON.stringify({ decision: { action: "silence", extra: true } }),
     JSON.stringify({ decision: { action: "speak", addressCharacter: "P1" } }),
     JSON.stringify({ decision: { action: "speak", addressCharacter: null,
-      replyToMessage: null, interpretation: "", feltState: "f", activeDesire: "a",
-      desiredOutcome: "o", opportunity: "o", pursuit: "p" } }),
+      replyToMessage: null, interpretation: "i", intent: "", feltState: "f",
+      activeDesire: "a", desiredOutcome: "o", opportunity: "o", pursuit: "p",
+      message: "x" } }),
     JSON.stringify({ decision: { action: "speak", addressCharacter: "P1",
-      replyToMessage: null, interpretation: "i", feltState: "f", activeDesire: "a",
-      desiredOutcome: "o", opportunity: "o", pursuit: "p", targetChoice: "A" } }),
+      replyToMessage: null, interpretation: "i", intent: "t", feltState: "f",
+      activeDesire: "a", desiredOutcome: "o", opportunity: "o", pursuit: "p",
+      message: "x", targetChoice: "A" } }),
     JSON.stringify({ decision: { action: "speak", addressCharacter: "P1",
-      targetMessageId: 10, interpretation: "i", feltState: "f", activeDesire: "a",
-      desiredOutcome: "o", opportunity: "o", pursuit: "p" } }),
+      targetMessageId: 10, interpretation: "i", intent: "t", feltState: "f",
+      activeDesire: "a", desiredOutcome: "o", opportunity: "o", pursuit: "p",
+      message: "x" } }),
   ];
   for (const content of cases) {
-    const planner = plannerWithResponse(content);
-    await assert.rejects(() => planner.decide(context));
+    const realizer = realizerWithResponse(content);
+    await assert.rejects(() => realizer.realize(context));
   }
 });

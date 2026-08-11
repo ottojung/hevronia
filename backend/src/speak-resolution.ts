@@ -1,10 +1,6 @@
-import { buildPlannerChoices } from "./reply-choices.js";
-import type { ReplyMessageChoice } from "./reply-choices.js";
-import type {
-  SocialDecision,
-  SpeakDecision,
-  VisibleMessage,
-} from "./social-decision.js";
+import { buildHandleChoices } from "./handles.js";
+import type { CharacterHandle, MessageHandle } from "./handles.js";
+import type { RealizerDecision, VisibleMessage } from "./realizer-schema.js";
 import type {
   DeliveredHevroniaMessage,
   ObservedTelegramMessage,
@@ -12,48 +8,42 @@ import type {
   TelegramSenderIdentity,
 } from "./telegram-event.js";
 
-export class UnresolvableSpeakDecisionError extends Error {
+export class UnresolvableRealizerDecisionError extends Error {
   constructor(addressCharacter: string | null, replyToMessage: string | null) {
     super(
-      "Planner speak decision references planner handles not present in the visible context " +
+      "Realizer speak decision references handles not present in the visible context " +
       `(addressCharacter=${addressCharacter}, replyToMessage=${replyToMessage})`,
     );
-    this.name = "UnresolvableSpeakDecisionError";
+    this.name = "UnresolvableRealizerDecisionError";
   }
 }
 
-export function resolveSpeakDecision(
-  decision: Exclude<SocialDecision, { action: "silence" }>,
-  candidates: VisibleMessage[],
-): SpeakDecision | undefined {
-  const choices = buildPlannerChoices(candidates);
-  let address: SpeakDecision["address"] = null;
+export interface ResolvedRealizerDecision {
+  address: CharacterHandle | null;
+  replyTo: MessageHandle | null;
+}
+
+export function resolveRealizerDecision(
+  decision: Extract<RealizerDecision, { action: "speak" }>,
+  candidates: readonly VisibleMessage[],
+): ResolvedRealizerDecision | undefined {
+  const choices = buildHandleChoices(candidates);
+  let address: CharacterHandle | null = null;
   if (decision.addressCharacter !== null) {
     const found = choices.characters.find(({ handle }) => handle === decision.addressCharacter);
     if (found === undefined) return undefined;
     address = found;
   }
-  let replyTo: ReplyMessageChoice | null = null;
+  let replyTo: MessageHandle | null = null;
   if (decision.replyToMessage !== null) {
     const found = choices.messages.find(({ handle }) => handle === decision.replyToMessage);
     if (found === undefined) return undefined;
     replyTo = found;
   }
-  return {
-    address,
-    replyTo,
-    subjective: {
-      interpretation: decision.interpretation,
-      feltState: decision.feltState,
-      activeDesire: decision.activeDesire,
-      desiredOutcome: decision.desiredOutcome,
-      opportunity: decision.opportunity,
-      pursuit: decision.pursuit,
-    },
-  };
+  return { address, replyTo };
 }
 
-export function replyRelationshipFor(replyTo: ReplyMessageChoice | null): ReplyRelationship | null {
+export function replyRelationshipFor(replyTo: MessageHandle | null): ReplyRelationship | null {
   if (replyTo === null) return null;
   return {
     targetMessageId: replyTo.message.messageId,

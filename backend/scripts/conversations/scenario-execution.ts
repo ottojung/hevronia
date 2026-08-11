@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 
 import { createConversationLayer } from "../../src/layer.js";
 import type { LazyLongTermMemory } from "../../src/long-term-memory/runtime.js";
-import type { SocialDecisionLog } from "../../src/social-decision.js";
+import { formatPlannerLog, formatRealizerLog } from "./diagnostics.js";
 import { PreseededLazyMemory } from "./preseeded-lazy-memory.js";
 import { errorDetail, runScenario } from "./runner.js";
 import { failedScenarioResult } from "./types.js";
@@ -12,20 +12,6 @@ import type { ConversationScenario, ScenarioResult, Simulator } from "./types.js
 
 function createScenarioMemory(scenario: ConversationScenario): LazyLongTermMemory {
   return new PreseededLazyMemory(scenario.longTermMemory ?? []);
-}
-
-function formatPlannerLog(log: SocialDecisionLog): string {
-  if (log.action === "silence") {
-    return [
-      "Планер: [silence]",
-      `  ${log.interpretation} ${log.feltState} ${log.activeDesire} ${log.desiredOutcome} ${log.opportunity} ${log.pursuit}`,
-    ].join("\n");
-  }
-  const address = log.addressName ?? "(нікому)";
-  return [
-    `Планер: speak → ${address}`,
-    `  ${log.interpretation} ${log.feltState} ${log.activeDesire} ${log.desiredOutcome} ${log.opportunity} ${log.pursuit}`,
-  ].join("\n");
 }
 
 export async function runScenarioEntry(
@@ -44,12 +30,8 @@ export async function runScenarioEntry(
       createLayer: () => createConversationLayer({
         dbPath: join(directory, "checkpoints.sqlite"),
         lazyMemory: createScenarioMemory(scenario),
-        onSocialDecision: (log) => lines.push(formatPlannerLog(log)),
-        onPlannerError: (rendered) => {
-          const [first, ...rest] = rendered.split("\n");
-          lines.push(`Планер: [error] ${first}`);
-          for (const line of rest) lines.push(`  ${line}`);
-        },
+        onPlannerDecision: (log) => lines.push(formatPlannerLog(log)),
+        onRealizerDecision: (log) => lines.push(formatRealizerLog(log)),
       }),
       print: (line) => lines.push(line),
     });

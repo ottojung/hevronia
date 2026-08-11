@@ -21,12 +21,6 @@ export function smartModelFromEnv(): string {
   return configuredModelEnv("HEVRONIA_SMART_MODEL") ?? DEFAULT_SMART_MODEL;
 }
 
-export const DEFAULT_MODEL = smartModelFromEnv();
-
-export function modelFromEnv(): string {
-  return configuredModelEnv("HEVRONIA_MODEL") ?? DEFAULT_MODEL;
-}
-
 export function providerForModelName(model: string): ModelProvider {
   return model.trim().toLowerCase().startsWith("gemini") ? "gemini" : "openai";
 }
@@ -53,9 +47,15 @@ export function geminiKeyFromEnv(): string {
   return apiKey;
 }
 
+export interface ChatModelOptions {
+  temperature?: number;
+  /** Reduces thinking effort for cheap, recall-oriented stages. */
+  lowThinking?: boolean;
+}
+
 export function createChatModel(
   modelName: string,
-  options: { temperature?: number } = {},
+  options: ChatModelOptions = {},
 ): BaseLanguageModel {
   const temperature = options.temperature === undefined ? {} : { temperature: options.temperature };
   // LangChain's own retry is disabled (maxRetries: 0): rate-limit and
@@ -66,6 +66,7 @@ export function createChatModel(
       apiKey: geminiKeyFromEnv(),
       model: modelName,
       maxRetries: 0,
+      ...(options.lowThinking === true ? { thinkingConfig: { thinkingLevel: "LOW" } } : {}),
       ...temperature,
     });
   }
@@ -73,10 +74,11 @@ export function createChatModel(
     apiKey: openAiKeyFromEnv(),
     model: modelName,
     maxRetries: 0,
+    ...(options.lowThinking === true ? { reasoning: { effort: "low" } } : {}),
     ...temperature,
   });
 }
 
-export function isGeminiChatModel(model: BaseLanguageModel): boolean {
+export function isGeminiChatModel(model: BaseLanguageModel): model is ChatGoogleGenerativeAI {
   return model instanceof ChatGoogleGenerativeAI;
 }

@@ -1,5 +1,5 @@
 import { EMBEDDING_MODEL, MEMORY_MODEL } from "../../src/long-term-memory/index.js";
-import { cheapModelFromEnv, modelFromEnv, smartModelFromEnv } from "../../src/model.js";
+import { cheapModelFromEnv, smartModelFromEnv } from "../../src/model.js";
 
 export interface ModelSelections {
   responseModel: string;
@@ -12,7 +12,7 @@ export interface ModelSelections {
 
 export function collectModelSelections(simulatorModel: string): ModelSelections {
   return {
-    responseModel: modelFromEnv(),
+    responseModel: smartModelFromEnv(),
     simulatorModel,
     memoryModel: MEMORY_MODEL,
     embeddingModel: EMBEDDING_MODEL,

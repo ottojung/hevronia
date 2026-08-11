@@ -1,7 +1,7 @@
 import type { RecalledMemory, LongTermMemorySnapshot } from "./long-term-memory/runtime.js";
 import { longTermMemoryUserIdFromTelegramSender } from "./identifiers.js";
 import type { TelegramSenderIdentity } from "./telegram-event.js";
-import type { VisibleMessage } from "./social-decision.js";
+import type { VisibleMessage } from "./realizer-schema.js";
 
 const MAX_MEMORY_PARTICIPANTS = 5;
 

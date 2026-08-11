@@ -1,39 +1,30 @@
-import { HumanMessage, SystemMessage, isBaseMessage } from "@langchain/core/messages";
-import type { BaseLanguageModel } from "@langchain/core/language_models/base";
-
 import type { ConversationStore } from "./conversation-store.js";
 import type { RespondInput } from "./conversation-types.js";
-import { toSilenceLog, toSpeakLog } from "./decision-log.js";
+import type { AttentionPlanner, PlannerDecisionLog } from "./attention-planner.js";
+import { toRealizerDecisionLog } from "./decision-log.js";
+import { errorDetail } from "./error-detail.js";
 import { GeneratedTurn } from "./generated-turn.js";
 import type { LazyLongTermMemory } from "./long-term-memory/runtime.js";
-import { invokeWithRateLimitRetry } from "./model-retry.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
-import { memoriesForCharacter } from "./participant-memory.js";
-import type {
-  SocialDecision,
-  SocialDecisionLog,
-  SocialDecisionMaker,
-} from "./social-decision.js";
-import { extractText } from "./text.js";
-import { realizationContext } from "./turn-context.js";
-import { reportPlannerFailure } from "./planner-failure.js";
+import type { Realizer, RealizerDecisionLog } from "./realizer.js";
+import type { RealizerDecision, TurnContext } from "./realizer-schema.js";
 import {
-  UnresolvableSpeakDecisionError,
+  UnresolvableRealizerDecisionError,
   deliveredEvent,
   replyRelationshipFor,
-  resolveSpeakDecision,
+  resolveRealizerDecision,
 } from "./speak-resolution.js";
 import { acquireTurnContext } from "./turn-memory.js";
 
 export interface RespondTurnDependencies {
   store: ConversationStore;
-  planner: SocialDecisionMaker;
-  model: BaseLanguageModel;
+  planner: AttentionPlanner;
+  realizer: Realizer;
   personality: string;
   canonicalWrites: PendingConversationWrites;
   lazyMemory?: LazyLongTermMemory;
-  onSocialDecision?: (log: SocialDecisionLog) => void;
-  onPlannerError?: (rendered: string) => void;
+  onPlannerDecision?: (log: PlannerDecisionLog) => void;
+  onRealizerDecision?: (log: RealizerDecisionLog) => void;
 }
 
 export async function respondTurn(
@@ -43,53 +34,65 @@ export async function respondTurn(
   const { lazyMemory } = dependencies;
   const memoryTurn = lazyMemory?.beginTurn();
   try {
-    const { history, candidates, participantMemories } = await acquireTurnContext(
+    const memory = await acquireTurnContext(
       dependencies.store, dependencies.canonicalWrites, lazyMemory,
       memoryTurn?.snapshot, input,
     );
-    let decision: SocialDecision;
+    const context: TurnContext = {
+      boundedHistory: memory.history,
+      currentMessage: input.message,
+      visibleMessages: memory.candidates,
+      participantMemories: memory.participantMemories,
+    };
+
+    let plannerPassed = true;
+    let plannerFailed = false;
     try {
-      decision = await dependencies.planner.decide({
-        boundedHistory: history, currentMessage: input.message,
-        visibleMessages: candidates, participantMemories,
-      });
+      plannerPassed = await dependencies.planner.consider(context);
     } catch (error) {
-      reportPlannerFailure(dependencies.onPlannerError, error, input.message.text, candidates,
-        { addressCharacter: null, replyToMessage: null });
-      return GeneratedTurn.fromSilence();
+      plannerFailed = true;
+      dependencies.onPlannerDecision?.({ outcome: "failure", errorDetail: errorDetail(error) });
+      // Fail open: a failed attention pre-filter must never create an
+      // irreversible false negative, so continue to the smart realizer.
     }
+    if (!plannerFailed) {
+      if (plannerPassed) {
+        dependencies.onPlannerDecision?.({ outcome: "pass" });
+      } else {
+        dependencies.onPlannerDecision?.({ outcome: "filter" });
+        return GeneratedTurn.fromSilence();
+      }
+    }
+
+    let decision: RealizerDecision;
+    try {
+      decision = await dependencies.realizer.realize(context);
+    } catch (error) {
+      dependencies.onRealizerDecision?.({ action: "failure", errorDetail: errorDetail(error) });
+      throw error;
+    }
+
     if (decision.action === "silence") {
-      dependencies.onSocialDecision?.(toSilenceLog(decision));
+      dependencies.onRealizerDecision?.(toRealizerDecisionLog(decision, undefined));
       return GeneratedTurn.fromSilence();
     }
-    const speak = resolveSpeakDecision(decision, candidates);
-    if (speak === undefined) {
-      reportPlannerFailure(dependencies.onPlannerError,
-        new UnresolvableSpeakDecisionError(decision.addressCharacter, decision.replyToMessage),
-        input.message.text, candidates,
-        { addressCharacter: decision.addressCharacter, replyToMessage: decision.replyToMessage });
+
+    const resolved = resolveRealizerDecision(decision, context.visibleMessages);
+    if (resolved === undefined) {
+      dependencies.onRealizerDecision?.({
+        action: "failure",
+        errorDetail: errorDetail(new UnresolvableRealizerDecisionError(
+          decision.addressCharacter, decision.replyToMessage,
+        )),
+      });
       return GeneratedTurn.fromSilence();
     }
-    dependencies.onSocialDecision?.(toSpeakLog(speak));
-    const focusSender = speak.address !== null
-      ? speak.address.character.sender
-      : speak.replyTo !== null ? speak.replyTo.message.sender : undefined;
-    const focusMemories = focusSender === undefined
-      ? []
-      : memoriesForCharacter(participantMemories, focusSender);
-    const response = await invokeWithRateLimitRetry(() => dependencies.model.invoke([
-      new SystemMessage(dependencies.personality),
-      new HumanMessage(realizationContext(
-        history, focusMemories, speak.address, speak.subjective, candidates,
-      )),
-    ]));
-    if (!isBaseMessage(response)) return GeneratedTurn.fromEnd();
-    const replyText = extractText(response.content).trim();
-    if (!replyText) return GeneratedTurn.fromEnd();
-    const replyTo = replyRelationshipFor(speak.replyTo);
-    return GeneratedTurn.fromSpeak(replyText, replyTo, (messageId) => {
+
+    dependencies.onRealizerDecision?.(toRealizerDecisionLog(decision, resolved));
+    const replyTo = replyRelationshipFor(resolved.replyTo);
+    return GeneratedTurn.fromSpeak(decision.message, replyTo, (messageId) => {
       const delivered = deliveredEvent(
-        messageId, input.hevroniaSender, replyText, input.message, replyTo,
+        messageId, input.hevroniaSender, decision.message, input.message, replyTo,
       );
       dependencies.canonicalWrites.enqueue(
         input.threadId, () => dependencies.store.append(input.threadId, delivered),

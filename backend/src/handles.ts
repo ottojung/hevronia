@@ -1,6 +1,6 @@
 import { notebookSubject } from "./telegram-event.js";
 import type { TelegramSenderIdentity } from "./telegram-event.js";
-import type { VisibleMessage } from "./social-decision.js";
+import type { VisibleMessage } from "./realizer-schema.js";
 
 export interface DreamCharacter {
   sender: TelegramSenderIdentity;
@@ -10,41 +10,41 @@ export interface DreamCharacter {
   displayName: string;
 }
 
-export interface AddressChoice {
-  /** Mechanical planner handle, e.g. "P1". Never shown to the realizer. */
+export interface CharacterHandle {
+  /** Ephemeral per-turn handle, e.g. "P1". Chosen by the smart realizer. */
   handle: string;
   character: DreamCharacter;
 }
 
-export interface ReplyMessageChoice {
-  /** Mechanical planner handle, e.g. "M1". Never shown to the realizer. */
+export interface MessageHandle {
+  /** Ephemeral per-turn handle, e.g. "M1". Chosen by the smart realizer. */
   handle: string;
   message: VisibleMessage;
 }
 
-export interface PlannerChoices {
-  characters: AddressChoice[];
-  messages: ReplyMessageChoice[];
+export interface RealizerChoices {
+  characters: CharacterHandle[];
+  messages: MessageHandle[];
   /** messageId → message handle, for annotating rendered history entries. */
   messageAnnotations: ReadonlyMap<number, string>;
 }
 
-export function buildPlannerChoices(candidates: readonly VisibleMessage[]): PlannerChoices {
+export function buildHandleChoices(candidates: readonly VisibleMessage[]): RealizerChoices {
   const seen = new Map<string, VisibleMessage>();
   for (const candidate of candidates) {
     const key = `${candidate.sender.kind}:${candidate.sender.id}`;
     if (!seen.has(key)) seen.set(key, candidate);
   }
-  const characters: AddressChoice[] = [...seen.values()].map((candidate, index) => ({
-    handle: plannerHandle("P", index),
+  const characters: CharacterHandle[] = [...seen.values()].map((candidate, index) => ({
+    handle: handleFor("P", index),
     character: {
       sender: candidate.sender,
       subject: notebookSubject(candidate.sender),
       displayName: candidate.senderDisplayName,
     },
   }));
-  const messages: ReplyMessageChoice[] = candidates.map((message, index) => ({
-    handle: plannerHandle("M", index),
+  const messages: MessageHandle[] = candidates.map((message, index) => ({
+    handle: handleFor("M", index),
     message,
   }));
   const messageAnnotations = new Map(
@@ -53,6 +53,6 @@ export function buildPlannerChoices(candidates: readonly VisibleMessage[]): Plan
   return { characters, messages, messageAnnotations };
 }
 
-function plannerHandle(prefix: "P" | "M", index: number): string {
+function handleFor(prefix: "P" | "M", index: number): string {
   return `${prefix}${index + 1}`;
 }
