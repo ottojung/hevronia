@@ -1,23 +1,6 @@
 import { failedScenarioResult } from "./types.js";
 import type { ConversationScenario, ScenarioResult } from "./types.js";
 
-export async function runScenariosSequentially(
-  scenarios: readonly ConversationScenario[],
-  execute: (scenario: ConversationScenario) => Promise<ScenarioResult>,
-): Promise<ScenarioResult[]> {
-  const results: ScenarioResult[] = [];
-  for (const scenario of scenarios) {
-    let result: ScenarioResult;
-    try {
-      result = await execute(scenario);
-    } catch (error) {
-      result = failedScenarioResult(scenario, [], 0, failureDetail(error));
-    }
-    results.push(result);
-  }
-  return results;
-}
-
 export async function runScenariosConcurrently(
   scenarios: readonly ConversationScenario[],
   execute: (scenario: ConversationScenario) => Promise<ScenarioResult>,

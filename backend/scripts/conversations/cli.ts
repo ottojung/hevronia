@@ -4,7 +4,7 @@ import type { ConversationScenario } from "./types.js";
 export type CliCommand =
   | { action: "help" }
   | { action: "list" }
-  | { action: "run"; scenarios: ConversationScenario[]; rounds: number | undefined; parallel: boolean };
+  | { action: "run"; scenarios: ConversationScenario[]; rounds: number | undefined };
 
 export class ConversationCliError extends Error {
   constructor(message: string) {
@@ -20,7 +20,6 @@ export function isConversationCliError(error: unknown): error is ConversationCli
 export function parseCli(arguments_: readonly string[]): CliCommand {
   let all = false;
   let smoke = false;
-  let parallel = false;
   let rounds: number | undefined;
   const ids: string[] = [];
   for (let index = 0; index < arguments_.length; index += 1) {
@@ -30,7 +29,6 @@ export function parseCli(arguments_: readonly string[]): CliCommand {
     if (argument === "--list") return { action: "list" };
     if (argument === "--all") { all = true; continue; }
     if (argument === "--smoke") { smoke = true; continue; }
-    if (argument === "--parallel") { parallel = true; continue; }
     if (argument === "--rounds") {
       const value = arguments_[index + 1];
       const parsed = Number(value);
@@ -60,15 +58,14 @@ export function parseCli(arguments_: readonly string[]): CliCommand {
     if (scenario === undefined) throw new ConversationCliError(`Unknown scenario: ${id}`);
     return scenario;
   });
-  return { action: "run", scenarios: selected, rounds, parallel };
+  return { action: "run", scenarios: selected, rounds };
 }
 
 export const HELP = `Usage: npm run conversations -- [options] [scenario IDs]
 
-Without arguments, runs the small smoke suite sequentially.
+Without arguments, runs the small smoke suite.
   --all       Run every scenario in the catalog
   --smoke     Run the small smoke suite (same as the default)
-  --parallel  Run all selected scenarios concurrently
   --list      List scenarios without API calls
   --rounds N  Override rounds for every selected scenario
   --help      Show this help`;

@@ -294,10 +294,9 @@ personality-regression transcripts, not automated scoring or unit tests.
 Run the small smoke suite with `npm run conversations`, every scenario in the
 catalog with `npm run conversations -- --all`, selected scenarios with
 `npm run conversations -- normal-stranger slow-friendship`, or inspect the
-catalog with `npm run conversations -- --list`. Scenarios run sequentially by
-default; `--parallel` runs all selected scenarios concurrently with no
-concurrency limit. `--smoke` is an explicit synonym for the default, and
-`--rounds N` overrides scenario lengths.
+catalog with `npm run conversations -- --list`. All selected scenarios run
+concurrently with no concurrency limit. `--smoke` is an explicit synonym for
+the default, and `--rounds N` overrides scenario lengths.
 `HEVRONIA_SIMULATOR_MODEL` selects the participant model and defaults to
 `gpt-5-mini`. Each run records the Hevronia source commit: the terminal prints
 `Run commit: <hash>` (with a `-dirty` suffix when the working tree has

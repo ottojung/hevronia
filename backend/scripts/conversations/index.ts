@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { parseCli, HELP, renderScenarioList, isConversationCliError } from "./cli.js";
 import { formatGitRevision, gitRevision } from "./git.js";
-import { runScenariosConcurrently, runScenariosSequentially } from "./orchestrator.js";
+import { runScenariosConcurrently } from "./orchestrator.js";
 import { ConversationProgress } from "./progress.js";
 import { completionLine, runScenarioEntry, scenarioHeaderLines } from "./scenario-execution.js";
 import { createSimulator, DEFAULT_SIMULATOR_MODEL } from "./simulator.js";
@@ -55,11 +55,8 @@ async function main(): Promise<void> {
   const liveTimer = isTty
     ? setInterval(() => writeLine(progress.line()), LIVE_REFRESH_MS)
     : undefined;
-  const runScenarios = command.parallel
-    ? runScenariosConcurrently
-    : runScenariosSequentially;
   try {
-    const results = await runScenarios(command.scenarios, async (scenario) => {
+    const results = await runScenariosConcurrently(command.scenarios, async (scenario) => {
       progress.begin(scenario);
       console.log(`[start] ${scenario.id}`);
       const lines = buffers.get(scenario.id) ?? [];
