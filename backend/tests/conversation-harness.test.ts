@@ -91,6 +91,14 @@ test("CLI parses explicit IDs and round overrides", () => {
   if (explicit.action === "run") {
     assert.equal(explicit.rounds, 3);
     assert.deepEqual(explicit.scenarios.map(({ id }) => id), ["normal-stranger", "subtle-rudeness"]);
+    for (const scenario of explicit.scenarios) assert.equal(scenario.rounds, 3);
+  }
+  const noOverride = parseCli(["normal-stranger"]);
+  assert.equal(noOverride.action, "run");
+  if (noOverride.action === "run") {
+    const catalogDefault = scenarios.find((scenario) => scenario.id === "normal-stranger");
+    assert.ok(catalogDefault);
+    assert.equal(noOverride.scenarios[0]?.rounds, catalogDefault.rounds);
   }
 });
 

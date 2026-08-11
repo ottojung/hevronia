@@ -56,9 +56,20 @@ export function parseCli(arguments_: readonly string[]): CliCommand {
   const selected = selectedIds.map((id) => {
     const scenario = scenarios.find((candidate) => candidate.id === id);
     if (scenario === undefined) throw new ConversationCliError(`Unknown scenario: ${id}`);
-    return scenario;
+    return withRoundsOverride(scenario, rounds);
   });
   return { action: "run", scenarios: selected, rounds };
+}
+
+// `--rounds` overrides the catalog default for every selected scenario. The
+// override is applied to the scenario object itself so that the runner, the
+// progress line, and the completion line all agree on the effective round
+// count without threading a separate parameter through the run.
+function withRoundsOverride(
+  scenario: ConversationScenario,
+  override: number | undefined,
+): ConversationScenario {
+  return override === undefined ? scenario : { ...scenario, rounds: override };
 }
 
 export const HELP = `Usage: npm run conversations -- [options] [scenario IDs]
