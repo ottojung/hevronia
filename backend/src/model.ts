@@ -81,7 +81,7 @@ export function createChatModel(
 // OpenAI reasoning models (o-series, gpt-5.x) accept only the default
 // temperature and reject any explicit value. The deterministic 0 is dropped
 // instead of sent; any other value still passes through for classic models.
-function openAiTemperature(temperature: number | undefined): { temperature?: number } {
+export function openAiTemperature(temperature: number | undefined): { temperature?: number } {
   if (temperature === undefined || temperature === 0) return {};
   return { temperature };
 }

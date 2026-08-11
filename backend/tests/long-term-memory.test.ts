@@ -165,6 +165,23 @@ test("Mem0 production configuration carries the extraction policy and explicit c
   assert.doesNotMatch(LONG_TERM_MEMORY_POLICY, /\bUser\b/);
 });
 
+test("a non-Gemini cheap model routes memory extraction to the OpenAI provider", () => {
+  const config = createMem0Config("openai-key", "gemini-key", "gpt-5.6-mini");
+  assert.equal(config.llm.provider, "openai");
+  assert.equal(config.llm.config.apiKey, "openai-key");
+  assert.equal(config.llm.config.model, "gpt-5.6-mini");
+  assert.ok(!("temperature" in config.llm.config));
+  assert.equal(config.embedder.config.apiKey, "openai-key");
+});
+
+test("a Gemini cheap model keeps extraction on the Gemini provider with temperature 0", () => {
+  const config = createMem0Config("openai-key", "gemini-key", "gemini-3.5-flash-lite");
+  assert.equal(config.llm.provider, "google");
+  assert.equal(config.llm.config.apiKey, "gemini-key");
+  assert.equal(config.llm.config.model, "gemini-3.5-flash-lite");
+  assert.equal(config.llm.config["temperature"], 0);
+});
+
 test("the extraction policy version is bumped to reflect subject-relative memories", async () => {
   assert.equal(MEMORY_POLICY_VERSION, 2);
   const client: Mem0Client = {
