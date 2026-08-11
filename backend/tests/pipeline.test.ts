@@ -233,6 +233,12 @@ test("the planner model is cheap with low thinking; the realizer is smart withou
     const smartOpenAi = createChatModel("gpt-5.6-luna");
     assert.ok(smartOpenAi instanceof ChatOpenAI);
     assert.equal(smartOpenAi.reasoning?.effort, undefined);
+    const deterministicOpenAi = createChatModel("gpt-5.6-luna", { temperature: 0 });
+    assert.ok(deterministicOpenAi instanceof ChatOpenAI);
+    assert.equal(deterministicOpenAi.temperature, undefined);
+    const tunedOpenAi = createChatModel("gpt-5.6-luna", { temperature: 0.5 });
+    assert.ok(tunedOpenAi instanceof ChatOpenAI);
+    assert.equal(tunedOpenAi.temperature, 0.5);
   } finally {
     delete process.env["MY_GEMINI_API_KEY"];
     delete process.env["MY_OPENAI_API_KEY"];

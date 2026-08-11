@@ -57,7 +57,6 @@ export function createChatModel(
   modelName: string,
   options: ChatModelOptions = {},
 ): BaseLanguageModel {
-  const temperature = options.temperature === undefined ? {} : { temperature: options.temperature };
   // LangChain's own retry is disabled (maxRetries: 0): rate-limit and
   // transient failures are retried once, with a bounded fixed delay, by the
   // shared model-retry wrapper instead of by exponential backoff.
@@ -67,7 +66,7 @@ export function createChatModel(
       model: modelName,
       maxRetries: 0,
       ...(options.lowThinking === true ? { thinkingConfig: { thinkingLevel: "LOW" } } : {}),
-      ...temperature,
+      ...(options.temperature === undefined ? {} : { temperature: options.temperature }),
     });
   }
   return new ChatOpenAI({
@@ -75,8 +74,16 @@ export function createChatModel(
     model: modelName,
     maxRetries: 0,
     ...(options.lowThinking === true ? { reasoning: { effort: "low" } } : {}),
-    ...temperature,
+    ...openAiTemperature(options.temperature),
   });
+}
+
+// OpenAI reasoning models (o-series, gpt-5.x) accept only the default
+// temperature and reject any explicit value. The deterministic 0 is dropped
+// instead of sent; any other value still passes through for classic models.
+function openAiTemperature(temperature: number | undefined): { temperature?: number } {
+  if (temperature === undefined || temperature === 0) return {};
+  return { temperature };
 }
 
 export function isGeminiChatModel(model: BaseLanguageModel): model is ChatGoogleGenerativeAI {
