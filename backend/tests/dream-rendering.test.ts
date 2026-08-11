@@ -342,6 +342,19 @@ test("surfaced memories render with notebook labels and no store vocabulary", ()
   assert.equal(renderParticipantMemoryContexts([]), "");
 });
 
+test("contexts without memories never claim that memories surfaced", () => {
+  const rendered = renderParticipantMemoryContexts([
+    { participant: { kind: "user", id: 42 }, memories: [{ text: "Оля боїться павуків" }] },
+    { participant: { kind: "user", id: 17 }, memories: [] },
+  ]);
+  assert.match(rendered, /character 42/);
+  assert.doesNotMatch(rendered, /character 17/);
+  assert.doesNotMatch(rendered, /surfaced.*\n\nSome memories|surfaced[\s\S]*character 17/);
+  assert.equal(renderParticipantMemoryContexts([
+    { participant: { kind: "user", id: 17 }, memories: [] },
+  ]), "");
+});
+
 test("notebook labels distinguish characters from channel sources", () => {
   const character: TelegramSenderIdentity = { kind: "user", id: 42 };
   const channel: TelegramSenderIdentity = { kind: "chat", id: -500 };

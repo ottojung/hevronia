@@ -53,6 +53,17 @@ test("memoriesForCandidates projects synchronously from the snapshot", () => {
   assert.ok(!contexts.some(({ participant }) => participant.kind !== "user" || participant.id === -500));
 });
 
+test("memoriesForCandidates drops participants with no recalled memories", () => {
+  const snapshot = staticMemory(new Map([
+    [longTermMemoryUserIdFromTelegramSender(101).toPersistenceKey(),
+      [{ text: "Іра працювала над цим тижнями" }]],
+  ])).beginTurn().snapshot;
+  const contexts = memoriesForCandidates(snapshot, candidates);
+  assert.equal(contexts.length, 1);
+  assert.equal(contexts[0]?.participant.id, 101);
+  assert.equal(contexts[0]?.memories.length, 1);
+});
+
 test("planner and realizer both receive all relevant participant memories", async () => {
   const memory = staticMemory(new Map([
     [longTermMemoryUserIdFromTelegramSender(101).toPersistenceKey(),
