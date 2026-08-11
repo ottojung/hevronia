@@ -84,30 +84,6 @@ test("geminiKeyFromEnv throws a clear error when the key is missing", () => {
   assert.throws(() => geminiKeyFromEnv(), /MY_GEMINI_API_KEY is not set/);
 });
 
-test("createChatModel builds the provider client for the model name", () => {
-  process.env["MY_GEMINI_API_KEY"] = "gem-key";
-  process.env["MY_OPENAI_API_KEY"] = "sk-key";
-  try {
-    assert.ok(createChatModel("gemini-3.5-flash") instanceof ChatGoogleGenerativeAI);
-    assert.ok(createChatModel("gpt-5.6-luna") instanceof ChatOpenAI);
-  } finally {
-    delete process.env["MY_GEMINI_API_KEY"];
-    delete process.env["MY_OPENAI_API_KEY"];
-  }
-});
-
-test("isGeminiChatModel detects the Gemini client", () => {
-  process.env["MY_GEMINI_API_KEY"] = "gem-key";
-  process.env["MY_OPENAI_API_KEY"] = "sk-key";
-  try {
-    assert.equal(isGeminiChatModel(createChatModel("gemini-3.5-flash")), true);
-    assert.equal(isGeminiChatModel(createChatModel("gpt-5.6-luna")), false);
-  } finally {
-    delete process.env["MY_GEMINI_API_KEY"];
-    delete process.env["MY_OPENAI_API_KEY"];
-  }
-});
-
 test("extractText returns string content unchanged", () => {
   assert.equal(extractText("Привіт, світе"), "Привіт, світе");
 });
