@@ -60,3 +60,9 @@ test("a model error from the planner is a planner failure", async () => {
   const model = fakeModel().alwaysThrow(new Error("planner offline"));
   await assert.rejects(() => createAttentionPlanner(model).consider(context), /planner offline/);
 });
+
+test("a directly addressed event passes without consulting the model", async () => {
+  const addressed = { ...context, currentMessage: { ...context.currentMessage, directlyAddressed: true } };
+  const model = fakeModel().alwaysThrow(new Error("must not be called"));
+  assert.equal(await createAttentionPlanner(model).consider(addressed), true);
+});

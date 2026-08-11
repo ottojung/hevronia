@@ -80,6 +80,13 @@ export function renderPlannerContext(context: TurnContext): string {
 export function createAttentionPlanner(model: BaseLanguageModel): AttentionPlanner {
   return {
     async consider(context: TurnContext): Promise<boolean> {
+      // Telegram computes direct address reliably (private chats, explicit
+      // mentions, replies to Хевронія), so a directly addressed event passes
+      // without consulting the cheap model: the gate must never turn that
+      // unambiguous signal into an irreversible false negative.
+      if (context.currentMessage.directlyAddressed) {
+        return true;
+      }
       const response = await invokeWithRateLimitRetry(() => model.invoke([
         new SystemMessage(PLANNER_PROMPT),
         new HumanMessage(renderPlannerContext(context)),
