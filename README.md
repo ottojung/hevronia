@@ -81,6 +81,8 @@ HEVRONIA_SMART_MODEL (optional, defaults to gemini-3.5-flash-lite)
   summarizer.
 - `HEVRONIA_CHEAP_MODEL` is the cheap attention planner (with low thinking
   effort), the participant simulator, and Mem0's long-term-memory extraction.
+  Memory extraction uses the cheap model's own provider, so a non-Gemini cheap
+  model is served by the OpenAI provider rather than the Google one.
 
 `HEVRONIA_SIMULATOR_MODEL` (optional) overrides the simulator's participant
 model. A model name starting with `gemini` uses the Gemini provider
