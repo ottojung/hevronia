@@ -19,20 +19,25 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
   const lazyMemory = options.lazyMemory;
   mkdirSync(dirname(dbPath), { recursive: true });
   const checkpointer = SqliteSaver.fromConnString(dbPath);
-  const plannerModel = options.plannerModel
-    ?? createChatModel(cheapModelFromEnv(), { lowThinking: true, temperature: 0 });
-  const realizerModel = options.realizerModel ?? createChatModel(smartModelFromEnv());
-  const summaryModel = options.summaryModel
-    ?? createChatModel(smartModelFromEnv(), { temperature: 0 });
+  // Default chat models are built only when the corresponding component is
+  // actually created, so a fully stubbed layer (planner, realizer, and
+  // summaryModel supplied) never touches a provider key.
   const store = options.conversationStore ?? createConversationStore(checkpointer, {
-    summaryModel,
+    summaryModel: options.summaryModel
+      ?? createChatModel(smartModelFromEnv(), { temperature: 0 }),
     triggerTokens: options.triggerTokens ?? COMPACTION.triggerTokens,
     keepTokens: options.keepTokens ?? COMPACTION.keepTokens,
     trimTokensToSummarize: options.trimTokensToSummarize ?? COMPACTION.trimTokensToSummarize,
     tokenCounter: options.tokenCounter,
   });
-  const planner = options.planner ?? createAttentionPlanner(plannerModel);
-  const realizer = options.realizer ?? createRealizer(realizerModel, personality);
+  const planner = options.planner ?? createAttentionPlanner(
+    options.plannerModel
+      ?? createChatModel(cheapModelFromEnv(), { lowThinking: true, temperature: 0 }),
+  );
+  const realizer = options.realizer ?? createRealizer(
+    options.realizerModel ?? createChatModel(smartModelFromEnv()),
+    personality,
+  );
   const canonicalWrites = options.pendingConversationWrites ?? new PendingConversationWrites();
   const respondDependencies = { store, planner, realizer, personality, canonicalWrites,
     lazyMemory, onPlannerDecision: options.onPlannerDecision,
