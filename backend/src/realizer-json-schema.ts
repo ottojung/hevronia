@@ -12,23 +12,31 @@ const jsonSubjectiveFields = {
 };
 
 /**
- * Gemini's function-calling schema rejects `const` and deep `anyOf` trees, so
- * this builds the same decision shape as a plain JSON Schema that uses flat
- * `enum` values instead: the action discriminator and the visible P/M handles.
- * The zod schema remains the source of truth for the typed client-side parse.
+ * Builds the realizer's decision shape as a plain, fully inlined JSON Schema
+ * with no `$ref` or `$defs`: every field is repeated literally in both
+ * variants. OpenAI's structured-output validation rejects references that do
+ * not point to top-level definitions, so inlining keeps one schema usable by
+ * every provider. The zod schema (`buildRealizerResponseSchema`) remains the
+ * source of truth for the typed client-side parse; these schemas only
+ * constrain the generated output, so `const` is replaced with single-element
+ * `enum` values.
  */
-export function buildGeminiRealizerJsonSchema(
+export function buildRealizerJsonSchema(
   candidates: readonly VisibleMessage[],
+  strict: boolean,
 ): ConstFreeJsonSchema {
   const choices = buildHandleChoices(candidates);
+  const objectKeywords = strict ? { additionalProperties: false } : {};
   const silenceVariant = {
     type: "object",
+    ...objectKeywords,
     properties: { action: { type: "string", enum: ["silence"] }, ...jsonSubjectiveFields },
     required: ["action", "interpretation", "intent", "feltState", "activeDesire",
       "desiredOutcome", "opportunity", "pursuit"],
   };
   const speakVariant = {
     type: "object",
+    ...objectKeywords,
     properties: {
       action: { type: "string", enum: ["speak"] },
       addressCharacter: handleField(choices.characters.map(({ handle }) => handle)),
@@ -42,9 +50,26 @@ export function buildGeminiRealizerJsonSchema(
   };
   return {
     type: "object",
+    ...objectKeywords,
     properties: { decision: { anyOf: [silenceVariant, speakVariant] } },
     required: ["decision"],
   };
+}
+
+/**
+ * Gemini's function-calling schema rejects `const` and `additionalProperties`,
+ * so the non-strict variant omits the latter and uses flat `enum` values.
+ */
+export function buildGeminiRealizerJsonSchema(candidates: readonly VisibleMessage[]): ConstFreeJsonSchema {
+  return buildRealizerJsonSchema(candidates, false);
+}
+
+/**
+ * OpenAI strict structured outputs require `additionalProperties: false` on
+ * every object, so the strict variant sets it while staying fully inlined.
+ */
+export function buildOpenAiRealizerJsonSchema(candidates: readonly VisibleMessage[]): ConstFreeJsonSchema {
+  return buildRealizerJsonSchema(candidates, true);
 }
 
 function handleField(handles: readonly string[]): Record<string, unknown> {

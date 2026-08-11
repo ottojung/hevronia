@@ -5,7 +5,7 @@ import { AIMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
 import { providerStrategy } from "langchain";
 
-import { buildGeminiRealizerJsonSchema } from "../src/gemini-realizer-schema.js";
+import { buildGeminiRealizerJsonSchema, buildOpenAiRealizerJsonSchema } from "../src/realizer-json-schema.js";
 import { SYSTEM_PROMPT } from "../src/personality.js";
 import { createRealizer } from "../src/realizer.js";
 import {
@@ -82,6 +82,26 @@ test("the Gemini schema uses enums instead of const and lists the visible handle
   assert.ok(serialized.includes('"enum"'));
   assert.ok(serialized.includes("P1"));
   assert.ok(serialized.includes("M1"));
+});
+
+test("the OpenAI schema is fully inlined and strict-compatible", () => {
+  const schema = buildOpenAiRealizerJsonSchema(context.visibleMessages);
+  const serialized = JSON.stringify(schema);
+  assert.ok(!serialized.includes('"$ref"'));
+  assert.ok(!serialized.includes('"$defs"'));
+  assert.ok(!serialized.includes('"const"'));
+  assert.ok(!serialized.includes('"minLength":0'));
+  assert.ok(serialized.includes('"additionalProperties":false'));
+  assert.ok(serialized.includes('"enum":["silence"]'));
+  assert.ok(serialized.includes("P1"));
+  assert.ok(serialized.includes("M1"));
+});
+
+test("the OpenAI schema keeps additionalProperties off for Gemini but on for OpenAI", () => {
+  const geminiSchema = JSON.stringify(buildGeminiRealizerJsonSchema(context.visibleMessages));
+  const openAiSchema = JSON.stringify(buildOpenAiRealizerJsonSchema(context.visibleMessages));
+  assert.ok(!geminiSchema.includes("additionalProperties"));
+  assert.ok(openAiSchema.includes('"additionalProperties":false'));
 });
 
 test("malformed provider responses are rejected", async () => {

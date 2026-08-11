@@ -2,7 +2,7 @@ import { HumanMessage } from "@langchain/core/messages";
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
 import { createAgent, providerStrategy, toolStrategy } from "langchain";
 
-import { buildGeminiRealizerJsonSchema } from "./gemini-realizer-schema.js";
+import { buildGeminiRealizerJsonSchema, buildOpenAiRealizerJsonSchema } from "./realizer-json-schema.js";
 import { invokeWithRateLimitRetry } from "./model-retry.js";
 import { isGeminiChatModel } from "./model.js";
 import { REALIZER_MODE } from "./realizer-prompt.js";
@@ -62,7 +62,9 @@ export function createRealizer(
             model,
             tools: [],
             systemPrompt: `${personality}\n\n${REALIZER_MODE}`,
-            responseFormat: providerStrategy(schema),
+            responseFormat: providerStrategy(
+              buildOpenAiRealizerJsonSchema(context.visibleMessages),
+            ),
           });
       const result = await invokeWithRateLimitRetry(() => agent.invoke({
         messages: [new HumanMessage(renderRealizerContext(context))],
