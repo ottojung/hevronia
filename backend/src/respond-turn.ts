@@ -61,10 +61,11 @@ export async function respondTurn(
       // name is persisted from a failed planner.
     }
 
-    context.naturalNames = await applyProposedNames(
+    const applied = await applyProposedNames(
       dependencies.naturalNameStore, memory.namingChoices,
       plannerDecision.naturalNames, memory.naturalNames,
     );
+    context.naturalNames = applied.merged;
 
     if (!plannerFailed) {
       const canFilter = !(input.message.chatKind === "private"
@@ -72,13 +73,13 @@ export async function respondTurn(
       if (!plannerDecision.attention && canFilter) {
         dependencies.onPlannerDecision?.({
           outcome: "filter", attention: false,
-          naturalNames: plannerDecision.naturalNames,
+          naturalNames: applied.newNames,
         });
         return GeneratedTurn.fromSilence();
       }
       dependencies.onPlannerDecision?.({
         outcome: "pass", attention: plannerDecision.attention,
-        naturalNames: plannerDecision.naturalNames,
+        naturalNames: applied.newNames,
       });
     }
 

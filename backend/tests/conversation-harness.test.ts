@@ -412,9 +412,7 @@ test("an opaque identity falls back to its exact @username, never an invented ni
   assert.equal(identity.username, "wt_t1g3y137");
   const planner = stubPlannerDecision((_context, namingChoices) => ({
     attention: true,
-    naturalNames: Object.fromEntries(
-      namingChoices.map(({ handle, username }) => [handle, `@${username ?? ""}`]),
-    ),
+    naturalNames: Object.fromEntries(namingChoices.map(({ handle }) => [handle, null])),
   }));
   const realizer: Realizer = { realize: async () => realizerSilence() };
   const threadId = conversationThreadIdFromTelegramPrivateChat(7_003);

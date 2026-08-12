@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 
 import { AIMessage } from "@langchain/core/messages";
@@ -13,6 +16,8 @@ import {
   type MissingNaturalNameChoice,
 } from "../src/attention-planner.js";
 import { buildHandleChoices } from "../src/handles.js";
+import { applyProposedNames } from "../src/natural-names/apply.js";
+import { createNaturalNameStore } from "../src/natural-names/store.js";
 import type { TurnContext } from "../src/realizer-schema.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 
@@ -120,7 +125,7 @@ test("the OpenAI and Gemini provider schemas expose exactly the same naming choi
   assert.equal(openAi, gemini);
 });
 
-test("the naming value schema allows a Cyrillic alias or the exact @username", () => {
+test("the naming value schema allows a Cyrillic alias or null, never a username", () => {
   const schema = buildPlannerResponseSchema([choice("P2", 63, "wt_t1g3y137")]);
   const parse = (name: unknown) => schema.safeParse({
     attention: "yes", naturalNames: { P2: name },
@@ -128,32 +133,35 @@ test("the naming value schema allows a Cyrillic alias or the exact @username", (
   assert.equal(parse("Боб"), true);
   assert.equal(parse("Супербоб"), true);
   assert.equal(parse("Анна"), true);
-  assert.equal(parse("@wt_t1g3y137"), true);
-  assert.equal(parse("wt_t1g3y137"), false, "raw username without @ is rejected");
+  assert.equal(parse(null), true, "the planner may decline an alias");
+  assert.equal(parse("@wt_t1g3y137"), false, "the app owns the @username fallback, not the schema");
+  assert.equal(parse("wt_t1g3y137"), false, "raw username is rejected");
   assert.equal(parse("@wt_t1g3y138"), false, "modified username is rejected");
   assert.equal(parse("CyberBob"), false, "Latin invented nickname is rejected");
   assert.equal(parse("Аня1"), false, "digit is not a name");
 });
 
-test("the naming value schema for a user without a username allows only a Cyrillic alias", () => {
+test("the naming value schema allows null for a user without a username", () => {
   const schema = buildPlannerResponseSchema([choice("P2", 63, null)]);
   const parse = (name: unknown) => schema.safeParse({
     attention: "yes", naturalNames: { P2: name },
   }).success;
   assert.equal(parse("Олена"), true);
-  assert.equal(parse("@wt_t1g3y137"), false, "an @username is not a display-name alias");
+  assert.equal(parse(null), true);
+  assert.equal(parse("@wt_t1g3y137"), false);
   assert.equal(parse("Bob"), false);
 });
 
-test("the provider value schema encodes the Cyrillic alias and exact username restriction", () => {
+test("the provider value schema encodes the Cyrillic alias or null restriction", () => {
   const serialized = JSON.stringify(buildPlannerJsonSchema([choice("P2", 63, "wt_t1g3y137")]));
   assert.ok(serialized.includes('"pattern":'));
-  assert.ok(serialized.includes('"enum":["@wt_t1g3y137"]'));
+  assert.ok(serialized.includes('"type":"null"'));
   assert.ok(serialized.includes('"anyOf"'));
   assert.ok(serialized.includes("А-Яа-я"));
+  assert.doesNotMatch(serialized, /@wt_t1g3y137/);
 });
 
-test("the latest visible Telegram metadata wins for a recurring sender", () => {
+test("the latest visible Telegram metadata wins for a recurring sender", async () => {
   const visible: import("../src/realizer-schema.js").VisibleMessage[] = [
     { messageId: 1, sender: { kind: "user", id: 52 }, senderDisplayName: "Bob",
       senderUsername: null, text: "old" },
@@ -167,13 +175,19 @@ test("the latest visible Telegram metadata wins for a recurring sender", () => {
   const choices = missingNaturalNameChoices(characters, new Map());
   assert.equal(choices[0]?.username, "super_bob3000");
   assert.equal(choices[0]?.displayName, "SuperBob3000");
-  const schema = buildPlannerResponseSchema(choices);
-  assert.equal(schema.safeParse({
-    attention: "yes", naturalNames: { P1: "@super_bob3000" },
-  }).success, true);
-  assert.equal(schema.safeParse({
-    attention: "yes", naturalNames: { P1: "@bob" },
-  }).success, false, "stale username must not be allowed");
+  // the app's null fallback uses the latest username, never the stale one
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-latest-"));
+  const store = createNaturalNameStore(path.join(dir, "natural-names.sqlite"));
+  try {
+    const applied = await applyProposedNames(
+      store, choices, { P1: null }, new Map(),
+    );
+    assert.equal(applied.merged.get(52), "@super_bob3000");
+    assert.equal(applied.newNames["P1"], "@super_bob3000");
+  } finally {
+    await store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("an exact planner response returns attention and names", async () => {
@@ -182,6 +196,45 @@ test("an exact planner response returns attention and names", async () => {
   }));
   const decision = await planner.consider(context, [choice("P2", 63)]);
   assert.deepEqual(decision, { attention: true, naturalNames: { P2: "Аня" } });
+});
+
+test("a planner response with a null alias round-trips as null", async () => {
+  const planner = plannerWithResponse(JSON.stringify({
+    attention: "yes", naturalNames: { P2: null },
+  }));
+  const decision = await planner.consider(context, [choice("P2", 63, "wt_t1g3y137")]);
+  assert.deepEqual(decision, { attention: true, naturalNames: { P2: null } });
+});
+
+test("the app resolves a null alias to the exact @username when one exists", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-app-fallback-"));
+  const store = createNaturalNameStore(path.join(dir, "natural-names.sqlite"));
+  try {
+    const applied = await applyProposedNames(
+      store, [choice("P2", 63, "wt_t1g3y137")], { P2: null }, new Map(),
+    );
+    assert.equal(applied.merged.get(63), "@wt_t1g3y137");
+    assert.deepEqual(applied.newNames, { P2: "@wt_t1g3y137" });
+  } finally {
+    await store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the app leaves a null-alias person unnamed when there is no username", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-app-none-"));
+  const store = createNaturalNameStore(path.join(dir, "natural-names.sqlite"));
+  try {
+    const applied = await applyProposedNames(
+      store, [choice("P2", 63, null)], { P2: null }, new Map(),
+    );
+    assert.equal(applied.merged.get(63), undefined);
+    assert.deepEqual(applied.newNames, {});
+    assert.equal(await store.get(63), undefined);
+  } finally {
+    await store.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("a malformed planner response is a planner failure", async () => {

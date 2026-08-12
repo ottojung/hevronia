@@ -33,14 +33,17 @@ Say "yes" when there is a plausible indication that Хевронія may care en
 
 Say "no" only for ordinary background chatter where there is no plausible reason for Хевронія to get involved. You may also say "no" when something directed at her has already been completely dealt with and the new event adds nothing material, but apply this conservatively. You are a gate, not Хевронія's social mind.
 
-Your naming job: the notebook has no natural name yet for each visible person listed under "Names to assign" in the context. For every one of them, choose exactly one value from the two allowed forms, using the person's Telegram username as the primary source:
+Your naming job: the notebook has no natural name yet for each visible person listed under "Names to assign" in the context. For every one of them, answer one question: is there a reasonable Cyrillic way to call this person?
 
-1. If the username has a nice, obvious, unambiguous Cyrillic conversational rendering, use that rendering — for example @Anna → «Анна» or «Аня», @SuperBob3000 → «Супербоб» or «Боб», @xXAnnaKyivXx → «Анна» or «Аня».
-2. Otherwise use the person's exact Telegram @username unchanged — for example @wt_t1g3y137 stays «@wt_t1g3y137».
+Prefer a Cyrillic alias whenever the person's Telegram username contains a reasonably recognizable, pronounceable name or handle. It does not need to be a person's proven real name; preserving a recognizable part is fine:
+- @Anna → «Анна» or «Аня»
+- @SuperBob3000 → «Супербоб» or «Боб»
+- @xXAnnaKyivXx → «Анна» or «Аня»
+- @dark_sheep_666 → «Даркшіп» or similar
 
-Never invent an unrelated nickname, never modify or transliterate a username that has no obvious Cyrillic rendering, and never invent a name from a display name when the username is the source. If the person has no Telegram username, use a clear natural Cyrillic rendering of their display name only when it is obvious; otherwise do not invent anything.
+Use null instead of an alias only when a Cyrillic rendering would require substantially making something up, for example @wt_t1g3y137. If the person has no Telegram username, prefer a Cyrillic alias from their display name when it contains a recognizable name; otherwise use null.
 
-Everyone listed under "Names to assign" must receive one of the allowed values; nobody outside that list may be given a name or renamed.
+Everyone listed under "Names to assign" must receive either a Cyrillic alias or null; nobody outside that list may be given a name or renamed.
 
 Return exactly the required structured output: attention as "yes" or "no", and naturalNames keyed by the exact handles listed under "Names to assign".`;
 
@@ -53,14 +56,15 @@ export class PlannerOutputError extends Error {
 
 export interface PlannerDecision {
   attention: boolean;
-  /** Proposed natural names keyed by the exact naming-choice handles. */
-  naturalNames: Readonly<Record<string, string>>;
+  /** Proposed natural names keyed by the exact naming-choice handles; null means no alias. */
+  naturalNames: Readonly<Record<string, string | null>>;
 }
 
 export type PlannerDecisionLog =
   | {
       outcome: "pass" | "filter";
       attention: boolean;
+      /** Resolved names assigned this turn (after the app's @username fallback). */
       naturalNames: Readonly<Record<string, string>>;
     }
   | { outcome: "failure"; errorDetail: string };

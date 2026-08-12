@@ -21,7 +21,7 @@ export interface MissingNaturalNameChoice {
 
 interface PlannerResponse {
   attention: "yes" | "no";
-  naturalNames: Record<string, string>;
+  naturalNames: Record<string, string | null>;
 }
 
 /**
@@ -51,14 +51,12 @@ export function missingNaturalNameChoices(
 
 /**
  * The allowed value for one unnamed person: a short Cyrillic conversational
- * alias, or — when a Telegram username exists — exactly that `@username`.
- * Arbitrary Latin handles, modified usernames, and invented nicknames that do
- * not read as Cyrillic names are impossible.
+ * alias, or `null` when no reasonable alias exists. The application decides
+ * the mechanical fallback from `null` (the exact `@username`, or leaving the
+ * person unnamed when there is none); the schema never receives usernames or
+ * invented Latin handles.
  */
-export function namingValueSchema(choice: MissingNaturalNameChoice): z.ZodType<string> {
-  if (choice.username === null || choice.username === "") return cyrillicAliasSchema;
-  return cyrillicAliasSchema.or(z.literal(`@${choice.username}`));
-}
+export const namingValueSchema: z.ZodType<string | null> = cyrillicAliasSchema.nullable();
 
 /**
  * Builds the planner's expected response schema dynamically from the exact
@@ -70,7 +68,7 @@ export function buildPlannerResponseSchema(
   namingChoices: readonly MissingNaturalNameChoice[],
 ): z.ZodType<PlannerResponse> {
   const naturalNames = z.object(
-    Object.fromEntries(namingChoices.map((choice) => [choice.handle, namingValueSchema(choice)])),
+    Object.fromEntries(namingChoices.map(({ handle }) => [handle, namingValueSchema])),
   ).strict();
   return z.object({
     attention: z.enum(["yes", "no"]),
@@ -81,8 +79,8 @@ export function buildPlannerResponseSchema(
 /**
  * Plain, fully inlined provider JSON Schema mirroring the zod schema: the
  * exact naming-choice handles are the only `naturalNames` properties, are all
- * required, and no other property is allowed. Both provider paths expose the
- * identical strict structure.
+ * required, and no other property is allowed. Each value is either a Cyrillic
+ * alias or `null`.
  */
 export function buildPlannerJsonSchema(
   namingChoices: readonly MissingNaturalNameChoice[],
@@ -96,7 +94,7 @@ export function buildPlannerJsonSchema(
         type: "object",
         additionalProperties: false,
         properties: Object.fromEntries(
-          namingChoices.map((choice) => [choice.handle, namingValueJsonSchema(choice)]),
+          namingChoices.map(({ handle }) => [handle, namingValueJsonSchema()]),
         ),
         required: namingChoices.map(({ handle }) => handle),
       },
@@ -105,14 +103,17 @@ export function buildPlannerJsonSchema(
   };
 }
 
-function namingValueJsonSchema(choice: MissingNaturalNameChoice): Record<string, unknown> {
-  const alias = {
-    type: "string",
-    pattern: CYRILLIC_ALIAS_PATTERN,
-    minLength: 1,
-    maxLength: MAX_NATURAL_NAME_LENGTH,
+function namingValueJsonSchema(): Record<string, unknown> {
+  return {
+    anyOf: [
+      {
+        type: "string",
+        pattern: CYRILLIC_ALIAS_PATTERN,
+        minLength: 1,
+        maxLength: MAX_NATURAL_NAME_LENGTH,
+      },
+      { type: "null" },
+    ],
   };
-  if (choice.username === null || choice.username === "") return alias;
-  return { anyOf: [alias, { type: "string", enum: [`@${choice.username}`] }] };
 }
 
