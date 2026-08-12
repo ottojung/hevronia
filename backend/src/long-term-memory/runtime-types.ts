@@ -93,6 +93,8 @@ export interface RuntimeState {
   cache: Map<string, UserCache>;
   queuedByUser: Map<string, number>;
   queue: MemoryJob[];
+  /** userKey → threadKey → chronological texts awaiting a queued ingestion job. */
+  pendingIngestion: Map<string, Map<string, string[]>>;
   foregroundCount: number;
   running: number;
   lifecycle: RuntimeLifecycle;

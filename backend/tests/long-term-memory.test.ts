@@ -133,7 +133,7 @@ test("the Mem0 adapter passes add metadata, maps extraction results, and scopes 
   const store = longTermMemoryStoreFromMem0(client);
   const userId = longTermMemoryUserIdFromTelegramSender(555);
   const threadId = conversationThreadIdFromTelegramPrivateChat(2);
-  const records = await store.rememberUserMessage(userId, threadId, "я люблю чай");
+  const records = await store.rememberUserMessages(userId, threadId, ["я люблю чай"]);
   assert.equal(records.length, 1);
   assert.equal(records[0]?.id, "m1");
   assert.equal(records[0]?.text, "extracted fact");
@@ -195,10 +195,10 @@ test("the extraction policy version is bumped to reflect subject-relative memori
     deleteAll: async () => ({ message: "deleted" }),
   };
   const adapter = longTermMemoryStoreFromMem0(client);
-  await adapter.rememberUserMessage(
+  await adapter.rememberUserMessages(
     longTermMemoryUserIdFromTelegramSender(1),
     conversationThreadIdFromTelegramPrivateChat(9),
-    "я люблю чай",
+    ["я люблю чай"],
   );
 });
 
@@ -300,7 +300,7 @@ test("a silent turn still observes the user's message for future memory", async 
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(turn.outcome.action, "silence");
     await scheduler.fireAll();
-    assert.deepEqual(store.rememberCalls.map(({ text }) => text), ["ambient"]);
+    assert.deepEqual(store.rememberCalls.flatMap(({ texts }) => texts), ["ambient"]);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
@@ -319,7 +319,7 @@ test("an undelivered reply still observes the user's message", async () => {
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     if (turn.outcome.action === "silence") assert.fail("expected a speak");
     await scheduler.fireAll();
-    assert.deepEqual(store.rememberCalls.map(({ text }) => text), ["hello"]);
+    assert.deepEqual(store.rememberCalls.flatMap(({ texts }) => texts), ["hello"]);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
@@ -337,7 +337,7 @@ test("a generation failure still observes the user's message", async () => {
     await assert.rejects(() => layer.respond({ threadId, message: observedMessage("hello", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false }));
     await scheduler.fireAll();
-    assert.deepEqual(store.rememberCalls.map(({ text }) => text), ["hello"]);
+    assert.deepEqual(store.rememberCalls.flatMap(({ texts }) => texts), ["hello"]);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
@@ -357,7 +357,7 @@ test("one incoming message is never ingested twice", async () => {
     if (turn.outcome.action === "speak") turn.outcome.persistDelivery(500);
     await scheduler.fireAll();
     assert.equal(store.rememberCalls.length, 1);
-    assert.equal(store.rememberCalls[0]?.text, "single");
+    assert.deepEqual(store.rememberCalls[0]?.texts, ["single"]);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
@@ -420,7 +420,7 @@ test("human-authored text remains person-memory evidence at the boundary", async
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
     assert.equal(store.rememberCalls.length, 1);
-    assert.equal(store.rememberCalls[0]?.text, "з людини");
+    assert.deepEqual(store.rememberCalls[0]?.texts, ["з людини"]);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
@@ -442,7 +442,7 @@ test("successful delivery still persists only the delivered event, not memory co
     if (turn.outcome.action !== "speak") assert.fail("expected a speak");
     turn.outcome.persistDelivery(600);
     assert.equal(store.rememberCalls.length, 1);
-    assert.equal(store.rememberCalls[0]?.text, "user text");
+    assert.deepEqual(store.rememberCalls[0]?.texts, ["user text"]);
     assert.ok(!JSON.stringify(store.rememberCalls).includes("purple one"));
     const stored = await layer.getMessages(threadId);
     assert.ok(stored.some((message) => String(message.content).includes("purple one")));

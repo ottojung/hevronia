@@ -167,7 +167,7 @@ export interface SearchCall {
 export interface RememberCall {
   userId: string;
   threadId: string;
-  text: string;
+  texts: string[];
 }
 
 export class FakeScheduler implements Scheduler {
@@ -221,7 +221,7 @@ export class FakeStore implements LongTermMemoryStore {
   rememberImpl?: (
     userId: string,
     threadId: string,
-    text: string,
+    messages: readonly string[],
   ) => MemoryRecord[] | Promise<MemoryRecord[]>;
   activeSearches = 0;
   maxActiveSearches = 0;
@@ -240,18 +240,20 @@ export class FakeStore implements LongTermMemoryStore {
     }
   }
 
-  async rememberUserMessage(
+  async rememberUserMessages(
     userId: LongTermMemoryUserId,
     threadId: ConversationThreadId,
-    userMessage: string,
+    messages: readonly string[],
   ): Promise<MemoryRecord[]> {
     this.rememberCalls.push({
       userId: userId.toPersistenceKey(),
       threadId: threadId.toPersistenceKey(),
-      text: userMessage,
+      texts: [...messages],
     });
     if (this.rememberImpl !== undefined) {
-      return await this.rememberImpl(userId.toPersistenceKey(), threadId.toPersistenceKey(), userMessage);
+      return await this.rememberImpl(
+        userId.toPersistenceKey(), threadId.toPersistenceKey(), messages,
+      );
     }
     return [];
   }

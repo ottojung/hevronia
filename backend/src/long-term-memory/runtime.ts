@@ -47,6 +47,7 @@ export function createLazyLongTermMemory(options: LazyLongTermMemoryOptions): La
     cache: new Map(),
     queuedByUser: new Map(),
     queue: [],
+    pendingIngestion: new Map(),
     foregroundCount: 0,
     running: 0,
     lifecycle: "open",

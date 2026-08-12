@@ -112,7 +112,8 @@ test("background concurrency never exceeds one", async () => {
   await scheduler.fireAll();
   assert.ok(store.searchCalls.length > 0);
   assert.equal(store.maxActiveSearches, 1);
-  assert.equal(store.rememberCalls.length, 10);
+  assert.equal(store.rememberCalls.length, 1);
+  assert.equal(store.rememberCalls[0]?.texts.length, 10);
   await memory.close();
 });
 
@@ -199,13 +200,27 @@ test("a running topical query is not cancelled and a newer pending query runs af
   await memory.close();
 });
 
-test("every observed user message is ingested and never coalesced away", async () => {
+test("already-queued same-user/same-thread messages coalesce into one ingestion in order", async () => {
   const { memory, store, scheduler } = createMemory();
   memory.observeUserMessage(userId, threadId, "one");
   memory.observeUserMessage(userId, threadId, "two");
   memory.observeUserMessage(userId, threadId, "three");
   await scheduler.fireAll();
-  assert.deepEqual(store.rememberCalls.map(({ text }) => text), ["one", "two", "three"]);
+  assert.deepEqual(store.rememberCalls.map(({ texts }) => texts), [["one", "two", "three"]]);
+  await memory.close();
+});
+
+test("ingestion jobs for different threads and users do not merge", async () => {
+  const { memory, store, scheduler } = createMemory();
+  const otherThread = conversationThreadIdFromTelegramPrivateChat(902);
+  const otherUser = longTermMemoryUserIdFromTelegramSender(777);
+  memory.observeUserMessage(userId, threadId, "thread-a-1");
+  memory.observeUserMessage(userId, otherThread, "thread-b-1");
+  memory.observeUserMessage(otherUser, threadId, "user-b-1");
+  memory.observeUserMessage(userId, threadId, "thread-a-2");
+  await scheduler.fireAll();
+  assert.deepEqual(store.rememberCalls.map(({ texts }) => texts.sort().join(",")).sort(),
+    ["thread-a-1,thread-a-2", "thread-b-1", "user-b-1"].sort());
   await memory.close();
 });
 
@@ -455,7 +470,8 @@ test("the idle grace period happens once per foreground-to-background transition
   }
   assert.equal(scheduler.pending.length, 1);
   await scheduler.fireAll();
-  assert.equal(store.rememberCalls.length, 5);
+  assert.equal(store.rememberCalls.length, 1);
+  assert.equal(store.rememberCalls[0]?.texts.length, 5);
   assert.ok(store.searchCalls.length > 0);
   assert.equal(scheduler.pending.length, 1);
   await memory.close();

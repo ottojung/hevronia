@@ -29,10 +29,15 @@ export interface LongTermMemoryStore {
     topK: number,
   ): Promise<MemoryRecord[]>;
 
-  rememberUserMessage(
+  /**
+   * Ingests several chronological user messages from the same conversation
+   * thread in one Mem0 extraction, preserving them as separate user-role
+   * messages rather than concatenating them.
+   */
+  rememberUserMessages(
     userId: LongTermMemoryUserId,
     threadId: ConversationThreadId,
-    userMessage: string,
+    messages: readonly string[],
   ): Promise<MemoryRecord[]>;
 
   deleteAll(userId: LongTermMemoryUserId): Promise<void>;
@@ -85,9 +90,9 @@ export function longTermMemoryStoreFromMem0(memory: Mem0Client): LongTermMemoryS
       });
       return memoryRecordsFromItems(result.results);
     },
-    async rememberUserMessage(userId, threadId, userMessage) {
+    async rememberUserMessages(userId, threadId, messages) {
       const result = await memory.add(
-        [{ role: "user", content: userMessage }],
+        messages.map((content) => ({ role: "user", content })),
         {
           userId: userId.toPersistenceKey(),
           metadata: {
