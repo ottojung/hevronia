@@ -41,11 +41,12 @@ import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 const threadId = conversationThreadIdFromTelegramPrivateChat(1);
 
 function observedMessage(text: string, messageId: number, senderId = 1,
-  kind: "user" | "chat" = "user"): ObservedTelegramMessage {
+  kind: "user" | "chat" = "user",
+  overrides: Partial<ObservedTelegramMessage> = {}): ObservedTelegramMessage {
   return { kind: "participant", messageId,
     sender: kind === "user" ? { kind: "user", id: senderId } : { kind: "chat", id: -500 },
-    senderDisplayName: "Віталик", chatKind: "private", text, messageThreadId: null,
-    replyTo: null, directlyAddressed: true };
+    senderDisplayName: "Віталик", senderUsername: null, chatKind: "private", text, messageThreadId: null,
+    replyTo: null, directlyAddressed: true, ...overrides };
 }
 
 function speakReply(model: ReturnType<typeof fakeModel>, text: string): void {
@@ -67,6 +68,7 @@ function fixture(overrides: {
     planner: overrides.planner ?? passingPlanner(),
     realizer: createRealizer(model, SYSTEM_PROMPT),
     summaryModel: fakeModel(),
+    naturalNameDbPath: path.join(dir, "natural-names.sqlite"),
     lazyMemory: overrides.lazyMemory,
   });
   return { dir, model, layer };
@@ -240,10 +242,12 @@ test("the current turn uses only the snapshot captured at turn start", async () 
   });
   const { dir, layer } = fixture({ lazyMemory: memory, planner });
   try {
-    await layer.respond({ threadId, message: observedMessage("hello", 1),
+    await layer.respond({ threadId,
+      message: observedMessage("hello", 1, 1, "user", { chatKind: "group", directlyAddressed: false }),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
-    await layer.respond({ threadId, message: observedMessage("again", 2),
+    await layer.respond({ threadId,
+      message: observedMessage("again", 2, 1, "user", { chatKind: "group", directlyAddressed: false }),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
     assert.deepEqual(seen[0], ["baseline fact"]);
@@ -268,11 +272,13 @@ test("newly learned memory appears on the next turn", async () => {
   const { dir, layer } = fixture({ lazyMemory: memory, planner });
   try {
     await layer.respond({ threadId,
-      message: observedMessage("my favourite colour is purple", 1),
+      message: observedMessage("my favourite colour is purple", 1, 1, "user",
+        { chatKind: "group", directlyAddressed: false }),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.deepEqual(seen[0], []);
     await scheduler.fireAll();
-    await layer.respond({ threadId, message: observedMessage("again", 2),
+    await layer.respond({ threadId,
+      message: observedMessage("again", 2, 1, "user", { chatKind: "group", directlyAddressed: false }),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.deepEqual(seen[1], ["Favourite colour is purple."]);
   } finally {
@@ -289,7 +295,8 @@ test("a silent turn still observes the user's message for future memory", async 
   const { dir, layer } = fixture({ lazyMemory: memory,
     planner: filteringPlanner() });
   try {
-    const turn = await layer.respond({ threadId, message: observedMessage("ambient", 1, 111),
+    const turn = await layer.respond({ threadId,
+      message: observedMessage("ambient", 1, 111, "user", { chatKind: "group", directlyAddressed: false }),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(turn.outcome.action, "silence");
     await scheduler.fireAll();
@@ -365,7 +372,8 @@ test("chat senders receive no person-scoped memory work", async () => {
   const { dir, layer } = fixture({ lazyMemory: memory,
     planner: filteringPlanner() });
   try {
-    await layer.respond({ threadId, message: observedMessage("з каналу", 1, 0, "chat"),
+    await layer.respond({ threadId,
+      message: observedMessage("з каналу", 1, 0, "chat", { chatKind: "group", directlyAddressed: false }),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
     assert.equal(store.searchCalls.length, 0);
@@ -384,7 +392,8 @@ test("bot-authored text is not person-memory evidence but still reaches canonica
   const { dir, layer } = fixture({ lazyMemory: memory,
     planner: filteringPlanner() });
   try {
-    await layer.respond({ threadId, message: observedMessage("з бота", 1, 101),
+    await layer.respond({ threadId,
+      message: observedMessage("з бота", 1, 101, "user", { chatKind: "group", directlyAddressed: false }),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: true });
     await scheduler.fireAll();
     assert.equal(store.searchCalls.length, 0);
@@ -406,7 +415,8 @@ test("human-authored text remains person-memory evidence at the boundary", async
   const { dir, layer } = fixture({ lazyMemory: memory,
     planner: filteringPlanner() });
   try {
-    await layer.respond({ threadId, message: observedMessage("з людини", 1, 101),
+    await layer.respond({ threadId,
+      message: observedMessage("з людини", 1, 101, "user", { chatKind: "group", directlyAddressed: false }),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
     assert.equal(store.rememberCalls.length, 1);

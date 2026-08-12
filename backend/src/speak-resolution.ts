@@ -49,6 +49,7 @@ export function replyRelationshipFor(replyTo: MessageHandle | null): ReplyRelati
     targetMessageId: replyTo.message.messageId,
     targetSender: replyTo.message.sender,
     targetSenderDisplayName: replyTo.message.senderDisplayName,
+    targetSenderUsername: replyTo.message.senderUsername,
     targetText: replyTo.message.text,
     targetIsHevronia: false,
   };
@@ -62,5 +63,6 @@ export function deliveredEvent(
   replyTo: ReplyRelationship | null,
 ): DeliveredHevroniaMessage {
   return { kind: "hevronia", messageId, sender, senderDisplayName: "Хевронія",
-    chatKind: source.chatKind, text, messageThreadId: source.messageThreadId, replyTo };
+    senderUsername: null, chatKind: source.chatKind, text,
+    messageThreadId: source.messageThreadId, replyTo };
 }

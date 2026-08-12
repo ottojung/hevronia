@@ -14,11 +14,11 @@ test("user and send-as-chat identities remain distinct and chat senders skip mem
   assert.deepEqual(telegramSenderIdentity(777), { kind: "user", id: 777 });
   assert.deepEqual(telegramSenderIdentity(777, -500), { kind: "chat", id: -500 });
   const user = createObservedTelegramMessage({ messageId: 1,
-    sender: { kind: "user", id: 101 }, senderDisplayName: "Новини",
+    sender: { kind: "user", id: 101 }, senderDisplayName: "Новини", senderUsername: "news_feed",
     chatKind: "group", text: "від людини", messageThreadId: null,
     mentionsHevronia: false, replyTo: null });
   const sendAsChat = createObservedTelegramMessage({ messageId: 2,
-    sender: { kind: "chat", id: -500 }, senderDisplayName: "Новини",
+    sender: { kind: "chat", id: -500 }, senderDisplayName: "Новини", senderUsername: null,
     chatKind: "group", text: "від каналу", messageThreadId: null,
     mentionsHevronia: false, replyTo: null });
   assert.match(renderDreamEvent(user), /Your sleeping mind made character 101 say:/);
@@ -66,11 +66,11 @@ test("user and send-as-chat identities remain distinct and chat senders skip mem
 
 test("reply relationships preserve a chat target identity", () => {
   const reply = createObservedTelegramMessage({ messageId: 3,
-    sender: { kind: "user", id: 101 }, senderDisplayName: "Іра",
+    sender: { kind: "user", id: 101 }, senderDisplayName: "Іра", senderUsername: null,
     chatKind: "group", text: "та ні", messageThreadId: null,
     mentionsHevronia: false, replyTo: { targetMessageId: 2,
       targetSender: { kind: "chat", id: -500 }, targetSenderDisplayName: "Новини",
-      targetText: "від каналу", targetsHevronia: false } });
+      targetSenderUsername: null, targetText: "від каналу", targetsHevronia: false } });
   assert.equal(reply.replyTo?.targetSender.kind, "chat");
   const rendered = renderDreamEvent(reply);
   assert.match(rendered, /Your sleeping mind made character 101 reply to the Telegram source channel 500 with:/);

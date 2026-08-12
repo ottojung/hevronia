@@ -45,14 +45,14 @@ function participant(
   overrides: Partial<ObservedTelegramMessage> = {},
 ): ObservedTelegramMessage {
   return { kind: "participant", messageId, sender: { kind: "user", id: senderId },
-    senderDisplayName: name, chatKind: "group", text, messageThreadId: null,
-    replyTo: null, directlyAddressed: false, ...overrides };
+    senderDisplayName: name, senderUsername: null, chatKind: "group", text,
+    messageThreadId: null, replyTo: null, directlyAddressed: false, ...overrides };
 }
 
 function ownMessage(messageId: number, text: string, replyTo: ReplyRelationship | null): DeliveredHevroniaMessage {
   return { kind: "hevronia", messageId, sender: { kind: "user", id: 999 },
-    senderDisplayName: "Хевронія", chatKind: "group", messageThreadId: null,
-    text, replyTo };
+    senderDisplayName: "Хевронія", senderUsername: null, chatKind: "group",
+    messageThreadId: null, text, replyTo };
 }
 
 function context(history: HumanMessage[], visible: VisibleMessage[]): TurnContext {
@@ -62,6 +62,7 @@ function context(history: HumanMessage[], visible: VisibleMessage[]): TurnContex
     visibleMessages: visible,
     participantMemories: [{ participant: { kind: "user", id: 42 },
       memories: [{ text: "Оля боїться павуків" }] }],
+    naturalNames: new Map(),
   };
 }
 
@@ -89,7 +90,7 @@ test("message text is rendered verbatim, never narrated as fact", () => {
 test("a reply to Хевронія's own message uses the sleeping-mind framing without ids", () => {
   const event = participant(912345, 42, "Оля", "я ніби з тобою десь зустрічався", {
     replyTo: { targetMessageId: 912344, targetSender: { kind: "user", id: 999 },
-      targetSenderDisplayName: "Хевронія", targetText: "привіт", targetIsHevronia: true },
+      targetSenderDisplayName: "Хевронія", targetSenderUsername: null, targetText: "привіт", targetIsHevronia: true },
     directlyAddressed: true,
   });
   const rendered = renderDreamEvent(event);
@@ -103,7 +104,7 @@ test("a reply to Хевронія's own message uses the sleeping-mind framing w
 test("a reply to another character names the target character", () => {
   const event = participant(912346, 42, "Оля", "та ні", {
     replyTo: { targetMessageId: 912345, targetSender: { kind: "user", id: 17 },
-      targetSenderDisplayName: "Макс", targetText: "де ти?", targetIsHevronia: false },
+      targetSenderDisplayName: "Макс", targetSenderUsername: null, targetText: "де ти?", targetIsHevronia: false },
   });
   const rendered = renderDreamEvent(event);
   assert.match(rendered, /Your sleeping mind made character 42 reply to character 17 with:/);
@@ -122,7 +123,7 @@ test("Хевронія's standalone own message is framed as a chosen action", (
 test("Хевронія's own reply is framed as a chosen reply to a character", () => {
   const rendered = renderDreamEvent(ownMessage(912401, "не пригадую", {
     targetMessageId: 912346, targetSender: { kind: "user", id: 42 },
-    targetSenderDisplayName: "Оля", targetText: "привіт", targetIsHevronia: false,
+    targetSenderDisplayName: "Оля", targetSenderUsername: null, targetText: "привіт", targetIsHevronia: false,
   }));
   assert.match(rendered, /You previously chose to reply to character 42 with:/);
   assert.match(rendered, /не пригадую/);
@@ -166,11 +167,11 @@ test("planner context lists characters, history, and memories but never handles 
     new HumanMessage({ content: serializeTelegramEvent(incoming) }),
   ];
   const rendered = renderPlannerContext(context(history, [
-    { messageId: 912354, sender: { kind: "user", id: 42 }, senderDisplayName: "Оля", text: "раніше" },
-    { messageId: 912355, sender: { kind: "user", id: 42 }, senderDisplayName: "Оля", text: "привіт" },
-  ]));
+    { messageId: 912354, sender: { kind: "user", id: 42 },   senderDisplayName: "Оля", senderUsername: null, text: "раніше" },
+    { messageId: 912355, sender: { kind: "user", id: 42 },   senderDisplayName: "Оля", senderUsername: null, text: "привіт" },
+  ]), []);
   assert.match(rendered, /In your dream you currently see these characters:/);
-  assert.match(rendered, /Character 42, currently displayed by Telegram as “Оля”/);
+  assert.match(rendered, /Character 42 in your notebook has not acquired a natural name yet\.\nTelegram currently displays them as “Оля”\./);
   assert.ok(rendered.indexOf("раніше") < rendered.indexOf("Оля боїться павуків"));
   assert.match(rendered, /This is a group chat, where most messages are not addressed to you/);
   assert.doesNotMatch(rendered, /Character handles/);
@@ -193,8 +194,8 @@ test("reply-message handles annotate history entries for the realizer only", () 
     new HumanMessage({ content: serializeTelegramEvent(participant(912346, 17, "Макс", "а ти де?")) }),
   ];
   const candidates: VisibleMessage[] = [
-    { messageId: 912345, sender: { kind: "user", id: 42 }, senderDisplayName: "Оля", text: "привіт" },
-    { messageId: 912346, sender: { kind: "user", id: 17 }, senderDisplayName: "Макс", text: "а ти де?" },
+    { messageId: 912345, sender: { kind: "user", id: 42 },   senderDisplayName: "Оля", senderUsername: null, text: "привіт" },
+    { messageId: 912346, sender: { kind: "user", id: 17 },   senderDisplayName: "Макс", senderUsername: null, text: "а ти де?" },
   ];
   const choices = buildHandleChoices(candidates);
   assert.equal(choices.characters[0]?.handle, "P1");
@@ -210,9 +211,9 @@ test("reply-message handles annotate history entries for the realizer only", () 
 
 test("the character list lists recurring participants once", () => {
   const candidates: VisibleMessage[] = [
-    { messageId: 1, sender: { kind: "user", id: 42 }, senderDisplayName: "Оля", text: "а" },
-    { messageId: 2, sender: { kind: "user", id: 42 }, senderDisplayName: "Оля", text: "б" },
-    { messageId: 3, sender: { kind: "user", id: 7 }, senderDisplayName: "Макс", text: "в" },
+    { messageId: 1, sender: { kind: "user", id: 42 },   senderDisplayName: "Оля", senderUsername: null, text: "а" },
+    { messageId: 2, sender: { kind: "user", id: 42 },   senderDisplayName: "Оля", senderUsername: null, text: "б" },
+    { messageId: 3, sender: { kind: "user", id: 7 },   senderDisplayName: "Макс", senderUsername: null, text: "в" },
   ];
   const choices = buildHandleChoices(candidates);
   assert.deepEqual(choices.characters.map(({ character }) => character.subject),
@@ -235,7 +236,7 @@ test("realizer schema selects an address and a reply message, never a message id
 
 test("the dynamic realizer schema restricts handles to visible candidates", () => {
   const candidates: VisibleMessage[] = [
-    { messageId: 912345, sender: { kind: "user", id: 42 }, senderDisplayName: "Оля", text: "привіт" },
+    { messageId: 912345, sender: { kind: "user", id: 42 },   senderDisplayName: "Оля", senderUsername: null, text: "привіт" },
   ];
   const schema = buildRealizerResponseSchema(candidates);
   const speak = realizerSpeak({ addressCharacter: "P1", replyToMessage: "M1" });
@@ -250,7 +251,7 @@ test("the dynamic realizer schema restricts handles to visible candidates", () =
 
 test("speak decisions resolve to internal choices and invalid handles fail safely", () => {
   const candidates: VisibleMessage[] = [
-    { messageId: 912345, sender: { kind: "user", id: 42 }, senderDisplayName: "Оля", text: "привіт" },
+    { messageId: 912345, sender: { kind: "user", id: 42 },   senderDisplayName: "Оля", senderUsername: null, text: "привіт" },
   ];
   const resolved = resolveRealizerDecision(realizerSpeak({
     addressCharacter: "P1", replyToMessage: "M1",
@@ -272,11 +273,11 @@ test("realizer context keeps the dream framing id-free and shows the handles", (
     new HumanMessage({ content: serializeTelegramEvent(participant(912345, 42, "Оля", "привіт")) }),
   ];
   const rendered = renderRealizerContext(context(history, [
-    { messageId: 912345, sender: { kind: "user", id: 42 }, senderDisplayName: "Оля", text: "привіт" },
+    { messageId: 912345, sender: { kind: "user", id: 42 },   senderDisplayName: "Оля", senderUsername: null, text: "привіт" },
   ]));
-  assert.match(rendered, /Character 42, currently displayed by Telegram as “Оля”/);
+  assert.match(rendered, /Character 42 in your notebook has not acquired a natural name yet\.\nTelegram currently displays them as “Оля”\./);
   assert.match(rendered, /Your sleeping mind made character 42 say:/);
-  assert.match(rendered, /Character handles \(addressCharacter must be one of these\):\n\nP1 = character 42/);
+  assert.match(rendered, /Character handles \(addressCharacter must be one of these\):\n\nP1 = unnamed character 42/);
   assert.match(rendered, /Reply-message handles \(replyToMessage must be one of these, or null\):\n\nM1 = the first eligible visible message/);
   assert.match(rendered, /This is a group chat, where most messages are not addressed to you/);
   assert.doesNotMatch(rendered, /912345/);
@@ -300,7 +301,7 @@ test("a chat source renders as a Telegram source, never a dream character", () =
 test("a participant reply to a Telegram source uses source wording", () => {
   const event = participant(912380, 42, "Оля", "та ні", {
     replyTo: { targetMessageId: 912379, targetSender: { kind: "chat", id: -500 },
-      targetSenderDisplayName: "Новини", targetText: "оголошення", targetIsHevronia: false },
+      targetSenderDisplayName: "Новини", targetSenderUsername: null, targetText: "оголошення", targetIsHevronia: false },
   });
   const rendered = renderDreamEvent(event);
   assert.match(rendered, /Your sleeping mind made character 42 reply to the Telegram source channel 500 with:/);
@@ -311,7 +312,7 @@ test("a participant reply to a Telegram source uses source wording", () => {
 test("Хевронія's own reply to a Telegram source uses source wording", () => {
   const rendered = renderDreamEvent(ownMessage(912381, "дякую", {
     targetMessageId: 912380, targetSender: { kind: "chat", id: -500 },
-    targetSenderDisplayName: "Новини", targetText: "оголошення", targetIsHevronia: false,
+    targetSenderDisplayName: "Новини", targetSenderUsername: null, targetText: "оголошення", targetIsHevronia: false,
   }));
   assert.match(rendered, /You previously chose to reply to the Telegram source channel 500 with:/);
   assert.ok(rendered.includes("дякую"));
@@ -340,7 +341,7 @@ test("a reply to Хевронія is not double-marked with a directness line", 
   const reply = participant(3, 42, "Оля", "та ні", {
     directlyAddressed: true,
     replyTo: { targetMessageId: 2, targetSender: { kind: "user", id: 999 },
-      targetSenderDisplayName: "Хевронія", targetText: "ти прийдеш?", targetIsHevronia: true },
+      targetSenderDisplayName: "Хевронія", targetSenderUsername: null, targetText: "ти прийдеш?", targetIsHevronia: true },
   });
   const rendered = renderDreamEvent(reply);
   assert.match(rendered, /reply to one of your earlier messages with:/);

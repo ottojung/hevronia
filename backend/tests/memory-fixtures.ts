@@ -1,6 +1,10 @@
 import { fakeModel } from "@langchain/core/testing";
 
-import type { AttentionPlanner } from "../src/attention-planner.js";
+import type {
+  AttentionPlanner,
+  MissingNaturalNameChoice,
+  PlannerDecision,
+} from "../src/attention-planner.js";
 import type { ConversationLayer, ConversationLayerOptions } from "../src/conversation-types.js";
 import type { ConversationThreadId, LongTermMemoryUserId } from "../src/identifiers.js";
 import { createConversationLayer } from "../src/layer.js";
@@ -123,17 +127,31 @@ export function realizerSpeak(
 }
 
 export function passingPlanner(): AttentionPlanner {
-  return { consider: async () => true };
+  return { consider: async () => ({ attention: true, naturalNames: {} }) };
 }
 
 export function filteringPlanner(): AttentionPlanner {
-  return { consider: async () => false };
+  return { consider: async () => ({ attention: false, naturalNames: {} }) };
 }
 
 export function stubPlanner(
   passes: (context: TurnContext) => boolean,
 ): AttentionPlanner {
-  return { consider: async (context) => passes(context) };
+  return {
+    consider: async (context) => ({
+      attention: passes(context),
+      naturalNames: {},
+    }),
+  };
+}
+
+export function stubPlannerDecision(
+  decide: (
+    context: TurnContext,
+    namingChoices: readonly MissingNaturalNameChoice[],
+  ) => PlannerDecision,
+): AttentionPlanner {
+  return { consider: async (context, namingChoices) => decide(context, namingChoices) };
 }
 
 export function stubRealizer(decision: RealizerDecision): Realizer {

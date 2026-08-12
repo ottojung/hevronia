@@ -16,13 +16,19 @@ function formatJudgment(label: string, judgment: SubjectiveJudgment): string {
 }
 
 export function formatPlannerLog(log: PlannerDecisionLog): string {
-  if (log.outcome === "pass") {
-    return "Планер: yes → передано реалізатору";
+  if (log.outcome === "failure") {
+    return `Планер: [error → передано реалізатору] ${singleLine(log.errorDetail)}`;
   }
-  if (log.outcome === "filter") {
-    return "Планер: no → повідомлення відфільтровано";
-  }
-  return `Планер: [error → передано реалізатору] ${singleLine(log.errorDetail)}`;
+  const head = log.outcome === "pass"
+    ? "Планер: yes → передано реалізатору"
+    : "Планер: no → повідомлення відфільтровано";
+  const names = Object.entries(log.naturalNames);
+  if (names.length === 0) return head;
+  return [
+    head,
+    "  нові природні імена:",
+    ...names.map(([handle, name]) => `    ${handle}: ${name}`),
+  ].join("\n");
 }
 
 function formatJudgments(log: Extract<RealizerDecisionLog, { action: "silence" | "speak" }>): string {

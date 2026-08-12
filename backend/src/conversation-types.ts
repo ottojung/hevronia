@@ -33,6 +33,9 @@ export interface ConversationLayerOptions {
   onRealizerDecision?: (log: RealizerDecisionLog) => void;
   conversationStore?: import("./conversation-store.js").ConversationStore;
   pendingConversationWrites?: import("./pending-conversation-writes.js").PendingConversationWrites;
+  /** SQLite path for the natural-name notebook; derived as a sibling of dbPath when unset. */
+  naturalNameDbPath?: string;
+  naturalNameStore?: import("./natural-names/store.js").NaturalNameStore;
 }
 
 export interface ConversationLayer {

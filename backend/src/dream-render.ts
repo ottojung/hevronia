@@ -6,21 +6,29 @@ import { renderOwnMessage, renderParticipantMessage } from "./dream-render-repli
 import {
   deserializeTelegramEvent,
   type CanonicalTelegramEvent,
+  type NaturalNames,
   type ObservedTelegramMessage,
 } from "./telegram-event.js";
 import type { CharacterHandle } from "./handles.js";
+
+const EMPTY_NAMES: NaturalNames = new Map();
 
 /**
  * Renders canonical Telegram events as Хевронія experiences them inside the
  * dream: other characters' utterances are products appearing through her
  * sleeping mind, while her own earlier delivered messages are actions she
- * chose. Stable dream-character labels identify participants; Telegram
- * display names and internal message IDs never appear.
+ * chose. Dream-character labels identify participants — their natural name
+ * when the notebook has one, otherwise the stable "character N" label;
+ * Telegram display names and internal message IDs never appear.
  */
-export function renderDreamEvent(event: CanonicalTelegramEvent, replyHandle?: string): string {
+export function renderDreamEvent(
+  event: CanonicalTelegramEvent,
+  replyHandle?: string,
+  naturalNames: NaturalNames = EMPTY_NAMES,
+): string {
   const body = event.kind === "hevronia"
-    ? renderOwnMessage(event)
-    : renderParticipantMessage(event);
+    ? renderOwnMessage(event, naturalNames)
+    : renderParticipantMessage(event, naturalNames);
   return replyHandle === undefined
     ? body
     : `${body}\n\nReply-message handle: ${replyHandle}.`;
@@ -32,11 +40,13 @@ export function renderDreamEvent(event: CanonicalTelegramEvent, replyHandle?: st
  * summaries appear as remembered earlier dream conversation; every other
  * message is a rendered dream event. An optional annotation map attaches
  * ephemeral reply-message handles to eligible events without exposing message
- * IDs.
+ * IDs, and an optional natural-name map replaces "character N" labels with
+ * established names.
  */
 export function renderDreamObservations(
   messages: BaseMessage[],
   replyChoiceAnnotations?: ReadonlyMap<number, string>,
+  naturalNames: NaturalNames = EMPTY_NAMES,
 ): string {
   const remembered: string[] = [];
   const observations: string[] = [];
@@ -47,7 +57,9 @@ export function renderDreamObservations(
       continue;
     }
     const event = deserializeTelegramEvent(content);
-    observations.push(renderDreamEvent(event, replyChoiceAnnotations?.get(event.messageId)));
+    observations.push(renderDreamEvent(
+      event, replyChoiceAnnotations?.get(event.messageId), naturalNames,
+    ));
   }
   const parts: string[] = [];
   if (remembered.length > 0) {
@@ -62,9 +74,18 @@ export function renderDreamObservations(
 
 export function renderDreamCharacterList(characters: readonly CharacterHandle[]): string {
   return characters.map(({ character }) => {
-    const label = character.subject.charAt(0).toUpperCase() + character.subject.slice(1);
-    return `${label}, currently displayed by Telegram as “${character.displayName}”.`;
-  }).join("\n");
+    const username = character.username === null || character.username === ""
+      ? ""
+      : `\nTheir Telegram username is @${character.username}.`;
+    if (character.subject === character.notebook) {
+      return `${capitalize(character.notebook)} in your notebook has not acquired a natural name yet.\nTelegram currently displays them as “${character.displayName}”.${username}`;
+    }
+    return `${capitalize(character.subject)}, who is ${character.notebook} in your notebook.\nTelegram currently displays them as “${character.displayName}”.${username}`;
+  }).join("\n\n");
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 /**

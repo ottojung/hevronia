@@ -104,6 +104,7 @@ export interface VisibleMessage {
   messageId: number;
   sender: import("./telegram-event.js").TelegramSenderIdentity;
   senderDisplayName: string;
+  senderUsername: string | null;
   text: string;
 }
 
@@ -112,4 +113,6 @@ export interface TurnContext {
   currentMessage: import("./telegram-event.js").ObservedTelegramMessage;
   visibleMessages: VisibleMessage[];
   participantMemories: ParticipantMemoryContext[];
+  /** Persisted natural names keyed by Telegram user id. */
+  naturalNames: import("./telegram-event.js").NaturalNames;
 }

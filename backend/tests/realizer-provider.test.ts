@@ -19,16 +19,17 @@ import { realizerSilence, realizerSpeak } from "./memory-fixtures.js";
 
 function message(overrides: Partial<ObservedTelegramMessage> = {}): ObservedTelegramMessage {
   return { kind: "participant", messageId: 10, sender: { kind: "user", id: 88 },
-    senderDisplayName: "Іра", chatKind: "group", messageThreadId: null, text: "та ні", replyTo: null,
-    directlyAddressed: false, ...overrides };
+    senderDisplayName: "Іра", senderUsername: null, chatKind: "group", messageThreadId: null,
+    text: "та ні", replyTo: null, directlyAddressed: false, ...overrides };
 }
 
 const context: TurnContext = {
   boundedHistory: [],
   currentMessage: message(),
   visibleMessages: [{ messageId: 10, sender: { kind: "user", id: 88 },
-    senderDisplayName: "Іра", text: "та ні" }],
+    senderDisplayName: "Іра", senderUsername: null, text: "та ні" }],
   participantMemories: [],
+  naturalNames: new Map(),
 };
 
 function realizerWithResponse(content: string) {

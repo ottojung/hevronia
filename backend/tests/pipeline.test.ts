@@ -35,7 +35,7 @@ const threadId = conversationThreadIdFromTelegramPrivateChat(66);
 
 function message(id = 1, text = "привіт"): ObservedTelegramMessage {
   return { kind: "participant", messageId: id, sender: { kind: "user", id: 88 },
-    senderDisplayName: "Іра", chatKind: "group", messageThreadId: null, text, replyTo: null,
+    senderDisplayName: "Іра", senderUsername: null, chatKind: "group", messageThreadId: null, text, replyTo: null,
     directlyAddressed: false };
 }
 
@@ -263,7 +263,7 @@ test("the realizer receives the full personality, history, and memories, not pla
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     const input = captured.join("\n");
     assert.match(input, /You are Хевронія/);
-    assert.match(input, /Character 88, currently displayed by Telegram as “Іра”/);
+    assert.match(input, /Character 88 in your notebook has not acquired a natural name yet\.\nTelegram currently displays them as “Іра”\./);
     assert.match(input, /Your sleeping mind made character 88 say:/);
     assert.match(input, /Character handles \(addressCharacter must be one of these\)/);
     assert.doesNotMatch(input, /Planner character handles/);
@@ -276,8 +276,8 @@ test("the realizer receives the full personality, history, and memories, not pla
 });
 
 test("conversation diagnostics distinguish filtered, realizer-silence, and realizer-speak", () => {
-  assert.ok(formatPlannerLog({ outcome: "pass" }).includes("yes"));
-  assert.ok(formatPlannerLog({ outcome: "filter" }).includes("відфільтровано"));
+  assert.ok(formatPlannerLog({ outcome: "pass", attention: true, naturalNames: {} }).includes("yes"));
+  assert.ok(formatPlannerLog({ outcome: "filter", attention: false, naturalNames: {} }).includes("відфільтровано"));
   const failure = formatPlannerLog({ outcome: "failure", errorDetail: "boom" });
   assert.ok(failure.includes("передано реалізатору"));
   assert.ok(failure.includes("boom"));

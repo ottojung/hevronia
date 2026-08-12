@@ -1,13 +1,17 @@
-import { notebookSubject } from "./telegram-event.js";
+import { dreamSubject, notebookSubject, type NaturalNames } from "./telegram-event.js";
 import type { TelegramSenderIdentity } from "./telegram-event.js";
 import type { VisibleMessage } from "./realizer-schema.js";
 
 export interface DreamCharacter {
   sender: TelegramSenderIdentity;
-  /** Stable dream label, e.g. "character 42" or "channel 500". */
+  /** Dream label the models address, e.g. "Боб", "character 42", "channel 500". */
   subject: string;
+  /** The stable notebook identity, e.g. "character 42" or "channel 500". */
+  notebook: string;
   /** The name Telegram currently displays for this character. */
   displayName: string;
+  /** The Telegram @username, if known. */
+  username: string | null;
 }
 
 export interface CharacterHandle {
@@ -29,7 +33,10 @@ export interface RealizerChoices {
   messageAnnotations: ReadonlyMap<number, string>;
 }
 
-export function buildHandleChoices(candidates: readonly VisibleMessage[]): RealizerChoices {
+export function buildHandleChoices(
+  candidates: readonly VisibleMessage[],
+  naturalNames: NaturalNames = new Map(),
+): RealizerChoices {
   const seen = new Map<string, VisibleMessage>();
   for (const candidate of candidates) {
     const key = `${candidate.sender.kind}:${candidate.sender.id}`;
@@ -39,8 +46,10 @@ export function buildHandleChoices(candidates: readonly VisibleMessage[]): Reali
     handle: handleFor("P", index),
     character: {
       sender: candidate.sender,
-      subject: notebookSubject(candidate.sender),
+      subject: dreamSubject(candidate.sender, naturalNames),
+      notebook: notebookSubject(candidate.sender),
       displayName: candidate.senderDisplayName,
+      username: candidate.senderUsername ?? null,
     },
   }));
   const messages: MessageHandle[] = candidates.map((message, index) => ({

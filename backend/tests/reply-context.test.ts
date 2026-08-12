@@ -18,7 +18,8 @@ const threadId = conversationThreadIdFromTelegramPrivateChat(71);
 
 function participant(messageId: number, senderId: number, name: string, text: string): ObservedTelegramMessage {
   return { kind: "participant", messageId, sender: { kind: "user", id: senderId }, senderDisplayName: name,
-    chatKind: "group", text, messageThreadId: null, replyTo: null, directlyAddressed: false };
+    senderUsername: null, chatKind: "group", text, messageThreadId: null, replyTo: null,
+    directlyAddressed: false };
 }
 test("the realizer receives the dream framing, memories, and the character handles it needs", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-target-context-"));
@@ -44,10 +45,10 @@ test("the realizer receives the dream framing, memories, and the character handl
     if (turn.outcome.action === "speak") assert.equal(turn.outcome.replyTo, null);
     assert.equal(captured.length, 2);
     const input = captured[1] ?? "";
-    assert.match(input, /Character 101, currently displayed by Telegram as “Іра”/);
-    assert.match(input, /Character 202, currently displayed by Telegram as “Макс”/);
+    assert.match(input, /Character 101 in your notebook has not acquired a natural name yet\.\nTelegram currently displays them as “Іра”\./);
+    assert.match(input, /Character 202 in your notebook has not acquired a natural name yet\.\nTelegram currently displays them as “Макс”\./);
     assert.match(input, /Your sleeping mind made character 101 say:\n\nя звільняюся/);
-    assert.match(input, /Character handles \(addressCharacter must be one of these\):\n\nP1 = character 101/);
+    assert.match(input, /Character handles \(addressCharacter must be one of these\):\n\nP1 = unnamed character 101/);
     assert.match(input, /Reply-message handles \(replyToMessage must be one of these, or null\)/);
     assert.doesNotMatch(input, /message 10/);
     assert.doesNotMatch(input, /message 11/);
@@ -62,12 +63,12 @@ test("the realizer receives the dream framing, memories, and the character handl
 test("incoming and outgoing events share one reply relationship and render its target", () => {
   const incoming: ObservedTelegramMessage = { ...participant(6, 101, "Іра", "та ні"),
     replyTo: { targetMessageId: 5, targetSender: { kind: "user", id: 999 },
-      targetSenderDisplayName: "Хевронія", targetText: "ти точно прийдеш?",
+      targetSenderDisplayName: "Хевронія", targetSenderUsername: null, targetText: "ти точно прийдеш?",
       targetIsHevronia: true }, directlyAddressed: true };
   const outgoing: DeliveredHevroniaMessage = { kind: "hevronia", messageId: 7, sender: { kind: "user", id: 999 },
-    senderDisplayName: "Хевронія", chatKind: "group", messageThreadId: null,
+    senderDisplayName: "Хевронія", senderUsername: null, chatKind: "group", messageThreadId: null,
     text: "ну ясно", replyTo: { targetMessageId: 6, targetSender: { kind: "user", id: 101 },
-      targetSenderDisplayName: "Іра", targetText: "та ні", targetIsHevronia: false } };
+      targetSenderDisplayName: "Іра", targetSenderUsername: null, targetText: "та ні", targetIsHevronia: false } };
   if (outgoing.replyTo === null) assert.fail("expected outgoing reply relationship");
   assert.deepEqual(Object.keys(incoming.replyTo ?? {}), Object.keys(outgoing.replyTo));
   const incomingRendered = renderDreamEvent(incoming);

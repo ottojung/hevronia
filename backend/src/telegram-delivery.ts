@@ -43,8 +43,8 @@ export async function deliverFallbackMessage(
   const deliveredMessageId = await delivery.reply(input.text, input.replyTo.targetMessageId);
   persist({
     kind: "hevronia", messageId: deliveredMessageId, sender: input.sender,
-    senderDisplayName: "Хевронія", chatKind: input.chatKind, text: input.text,
-    messageThreadId: input.messageThreadId, replyTo: input.replyTo,
+    senderDisplayName: "Хевронія", senderUsername: null, chatKind: input.chatKind,
+    text: input.text, messageThreadId: input.messageThreadId, replyTo: input.replyTo,
   });
   return { status: "delivered", persistence: "queued" };
 }

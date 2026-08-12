@@ -19,18 +19,18 @@ import { memoriesForCandidates, selectedParticipantIds } from "../src/participan
 import { realizerSpeak, staticMemory, stubPlanner, testLayer } from "./memory-fixtures.js";
 
 function message(id: number, sender: TelegramSenderIdentity, name: string, text: string): ObservedTelegramMessage {
-  return { kind: "participant", messageId: id, sender, senderDisplayName: name,
+  return { kind: "participant", messageId: id, sender, senderDisplayName: name, senderUsername: null,
     chatKind: "group", text, messageThreadId: null, replyTo: null,
     directlyAddressed: false };
 }
 
 const candidates: VisibleMessage[] = [
   { messageId: 1, sender: { kind: "user", id: 101 },
-    senderDisplayName: "Іра", text: "я нарешті це зробила" },
+    senderDisplayName: "Іра", senderUsername: null, text: "я нарешті це зробила" },
   { messageId: 2, sender: { kind: "user", id: 202 },
-    senderDisplayName: "Макс", text: "хтось буде каву?" },
+    senderDisplayName: "Макс", senderUsername: null, text: "хтось буде каву?" },
   { messageId: 3, sender: { kind: "chat", id: -500 },
-    senderDisplayName: "Канал", text: "оголошення" },
+    senderDisplayName: "Канал", senderUsername: null, text: "оголошення" },
 ];
 
 test("selected participant ids are user-scoped and bounded", () => {

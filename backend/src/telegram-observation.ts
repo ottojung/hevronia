@@ -4,6 +4,7 @@ export interface TelegramReplyInput {
   targetMessageId: number;
   targetSender: TelegramSenderIdentity;
   targetSenderDisplayName: string;
+  targetSenderUsername: string | null;
   targetText: string | null;
   targetsHevronia: boolean;
 }
@@ -12,6 +13,7 @@ export interface TelegramObservationInput {
   messageId: number;
   sender: TelegramSenderIdentity;
   senderDisplayName: string;
+  senderUsername: string | null;
   chatKind: "private" | "group" | "supergroup";
   text: string;
   messageThreadId: number | null;
@@ -27,6 +29,7 @@ export function createObservedTelegramMessage(
     messageId: input.messageId,
     sender: input.sender,
     senderDisplayName: input.senderDisplayName,
+    senderUsername: input.senderUsername,
     chatKind: input.chatKind,
     text: input.text,
     messageThreadId: input.messageThreadId,
@@ -34,6 +37,7 @@ export function createObservedTelegramMessage(
       targetMessageId: input.replyTo.targetMessageId,
       targetSender: input.replyTo.targetSender,
       targetSenderDisplayName: input.replyTo.targetSenderDisplayName,
+      targetSenderUsername: input.replyTo.targetSenderUsername,
       targetText: input.replyTo.targetText,
       targetIsHevronia: input.replyTo.targetsHevronia,
     },

@@ -3,7 +3,7 @@ import type { ConversationLayer } from "../../src/conversation-types.js";
 import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../../src/telegram-event.js";
 import type { ConversationScenario, ScenarioDependencies, ScenarioResult, ScenarioStoppingReason, TranscriptEntry } from "./types.js";
 import { completedScenarioResult, failedScenarioResult } from "./types.js";
-import { PARTICIPANT_ID, HEVRONIA_ID, CHAT_ID } from "./identities.js";
+import { PARTICIPANT_ID, HEVRONIA_ID, CHAT_ID, participantIdentityFor } from "./identities.js";
 
 export function errorDetail(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
@@ -32,14 +32,16 @@ export async function runScenario(
   };
   try {
     layer = await dependencies.createLayer();
+    const identity = participantIdentityFor(scenario.id);
     for (let round = 0; round < rounds; round += 1) {
       const participantText = await dependencies.simulator.nextMessage(scenario, transcript);
       transcript.push({ speaker: "participant", text: participantText });
-      dependencies.print(`${scenario.participantName}: ${participantText}`);
+      dependencies.print(`${identity.displayName}: ${participantText}`);
       messageId += 1;
       const message: ObservedTelegramMessage = {
         kind: "participant", messageId, sender: participantSender,
-        senderDisplayName: scenario.participantName, chatKind: "private", text: participantText,
+        senderDisplayName: identity.displayName, senderUsername: identity.username,
+        chatKind: "private", text: participantText,
         messageThreadId: null, replyTo: null, directlyAddressed: true,
       };
       const turn = await layer.respond({ threadId, message, hevroniaSender,

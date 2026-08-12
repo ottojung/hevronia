@@ -1,9 +1,10 @@
 import { SqliteSaver } from "@langchain/langgraph-checkpoint-sqlite";
 import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 
 import type { ConversationLayer, ConversationLayerOptions } from "./conversation-types.js";
 import { createConversationStore } from "./conversation-store.js";
+import { createNaturalNameStore } from "./natural-names/store.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { respondTurn } from "./respond-turn.js";
 import { warmParticipant } from "./warm-participant.js";
@@ -12,6 +13,16 @@ import { createRealizer } from "./realizer.js";
 import { cheapModelFromEnv, createChatModel, smartModelFromEnv } from "./model.js";
 import { SYSTEM_PROMPT } from "./personality.js";
 import { COMPACTION, DEFAULT_DB_PATH } from "./summary.js";
+
+/**
+ * The natural-name DB for a checkpoint DB: an in-memory DB for `:memory:`
+ * checkpoints, otherwise a sibling file next to the checkpoint file, so a
+ * harness scenario's temporary checkpoint directory also owns its notebook.
+ */
+function naturalNamesDbPathFor(checkpointDbPath: string): string {
+  if (checkpointDbPath === ":memory:") return ":memory:";
+  return join(dirname(checkpointDbPath), "natural-names.sqlite");
+}
 
 export function createConversationLayer(options: ConversationLayerOptions = {}): ConversationLayer {
   const dbPath = options.dbPath ?? DEFAULT_DB_PATH;
@@ -39,8 +50,12 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
     personality,
   );
   const canonicalWrites = options.pendingConversationWrites ?? new PendingConversationWrites();
-  const respondDependencies = { store, planner, realizer, personality, canonicalWrites,
-    lazyMemory, onPlannerDecision: options.onPlannerDecision,
+  const naturalNameStore = options.naturalNameStore
+    ?? createNaturalNameStore(
+      options.naturalNameDbPath ?? naturalNamesDbPathFor(dbPath),
+    );
+  const respondDependencies = { store, planner, realizer, naturalNameStore, personality,
+    canonicalWrites, lazyMemory, onPlannerDecision: options.onPlannerDecision,
     onRealizerDecision: options.onRealizerDecision };
 
   return {
@@ -54,6 +69,7 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
     async close(): Promise<void> {
       await canonicalWrites.drain();
       await lazyMemory?.close();
+      await naturalNameStore.close();
       checkpointer.db.close();
     },
   };

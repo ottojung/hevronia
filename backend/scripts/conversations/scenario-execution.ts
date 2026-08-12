@@ -29,6 +29,7 @@ export async function runScenarioEntry(
       onRound,
       createLayer: () => createConversationLayer({
         dbPath: join(directory, "checkpoints.sqlite"),
+        naturalNameDbPath: join(directory, "natural-names.sqlite"),
         lazyMemory: createScenarioMemory(scenario),
         onPlannerDecision: (log) => lines.push(formatPlannerLog(log)),
         onRealizerDecision: (log) => lines.push(formatRealizerLog(log)),

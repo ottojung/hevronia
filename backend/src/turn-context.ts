@@ -19,6 +19,7 @@ export function visibleMessages(messages: BaseMessage[]): VisibleMessage[] {
         messageId: event.messageId,
         sender: event.sender,
         senderDisplayName: event.senderDisplayName,
+        senderUsername: event.senderUsername,
         text: event.text,
       });
     }
@@ -27,19 +28,21 @@ export function visibleMessages(messages: BaseMessage[]): VisibleMessage[] {
 }
 
 export function renderRealizerContext(context: TurnContext): string {
-  const choices = buildHandleChoices(context.visibleMessages);
+  const choices = buildHandleChoices(context.visibleMessages, context.naturalNames);
   const sections: string[] = [];
   sections.push("In your dream you currently see these characters:");
   sections.push(renderDreamCharacterList(choices.characters));
   sections.push("");
   sections.push("This is the conversation history currently visible to you:");
-  sections.push(renderDreamObservations(context.boundedHistory, choices.messageAnnotations));
+  sections.push(renderDreamObservations(
+    context.boundedHistory, choices.messageAnnotations, context.naturalNames,
+  ));
   sections.push("");
   sections.push(renderConversationFraming(context.currentMessage.chatKind));
   sections.push("");
   sections.push("Character handles (addressCharacter must be one of these):");
   sections.push(choices.characters.map(({ handle, character }) =>
-    `${handle} = ${character.subject}`).join("\n"));
+    `${handle} = ${characterLabel(character)}`).join("\n"));
   sections.push("");
   sections.push("Reply-message handles (replyToMessage must be one of these, or null):");
   sections.push(choices.messages.map(({ handle }, index) =>
@@ -57,4 +60,11 @@ function ordinal(value: number): string {
   if (value === 2) return "the second";
   if (value === 3) return "the third";
   return `the ${value}th`;
+}
+
+function characterLabel(character: import("./handles.js").DreamCharacter): string {
+  if (character.subject === character.notebook) {
+    return `unnamed ${character.notebook}`;
+  }
+  return `${character.subject} (${character.notebook} in your notebook)`;
 }

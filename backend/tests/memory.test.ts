@@ -26,8 +26,9 @@ const threadId = conversationThreadIdFromTelegramPrivateChat(1);
 
 function event(text: string, messageId: number, senderId = 1, name = "Іра",
   messageThreadId: number | null = null): ObservedTelegramMessage {
-  return { kind: "participant", messageId, sender: { kind: "user", id: senderId }, senderDisplayName: name,
-    chatKind: "group", text, messageThreadId, replyTo: null, directlyAddressed: false };
+  return { kind: "participant", messageId, sender: { kind: "user", id: senderId },
+    senderDisplayName: name, senderUsername: null, chatKind: "group", text,
+    messageThreadId, replyTo: null, directlyAddressed: false };
 }
 
 const contentLengthTokens = (messages: { content: unknown }[]): number =>

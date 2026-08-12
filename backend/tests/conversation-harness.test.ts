@@ -133,7 +133,7 @@ test("runner alternates messages, persists increasing reply IDs, records silence
       return Promise.resolve(outcome === "speak"
         ? GeneratedTurn.fromSpeak(`speak ${responseIndex}`, {
           targetMessageId: responseIndex, targetSender: { kind: "user", id: 7_001 },
-          targetSenderDisplayName: "Олена", targetText: "participant",
+          targetSenderDisplayName: "Олена", targetSenderUsername: null, targetText: "participant",
           targetIsHevronia: false,
         }, (id) => persisted.push(id))
         : GeneratedTurn.fromSilence());
@@ -199,7 +199,7 @@ test("runner returns a failed result that keeps the partial transcript", async (
       if (respondCount === 2) return Promise.reject(new Error("boom"));
       return Promise.resolve(GeneratedTurn.fromSpeak(`speak ${respondCount}`, {
         targetMessageId: respondCount, targetSender: { kind: "user", id: 7_001 },
-        targetSenderDisplayName: "Олена", targetText: "participant",
+        targetSenderDisplayName: "Олена", targetSenderUsername: null, targetText: "participant",
         targetIsHevronia: false,
       }, () => undefined));
     },
@@ -326,8 +326,8 @@ test("seeded long-term memory reaches the planner context", async () => {
   const threadId = conversationThreadIdFromTelegramPrivateChat(7_003);
   const message: ObservedTelegramMessage = {
     kind: "participant", messageId: 1, sender: { kind: "user", id: 7_001 },
-    senderDisplayName: "Марина", chatKind: "private", text: "привіт",
-    messageThreadId: null, replyTo: null, directlyAddressed: true,
+    senderDisplayName: "Марина", senderUsername: null, chatKind: "group", text: "привіт",
+    messageThreadId: null, replyTo: null, directlyAddressed: false,
   };
   const layer = testLayer(path.join(dir, "db.sqlite"), { planner, lazyMemory: memory });
   try {

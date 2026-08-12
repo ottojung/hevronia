@@ -16,8 +16,8 @@ const threadId = conversationThreadIdFromTelegramPrivateChat(55);
 
 function message(id: number, text: string): ObservedTelegramMessage {
   return { kind: "participant", messageId: id, sender: { kind: "user", id: 101 },
-    senderDisplayName: "Іра", chatKind: "private", text, messageThreadId: null,
-    replyTo: null, directlyAddressed: true };
+    senderDisplayName: "Іра", senderUsername: null, chatKind: "group", text, messageThreadId: null,
+    replyTo: null, directlyAddressed: false };
 }
 
 test("confirmed outgoing persistence retries before the next planner context", async () => {

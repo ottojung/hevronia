@@ -36,7 +36,9 @@ export async function startBot(): Promise<void> {
       const displayName = ctx.message.sender_chat?.title ??
         telegramDisplayName(ctx.from.first_name, ctx.from.last_name);
       const message = createObservedTelegramMessage({
-        messageId, sender, senderDisplayName: displayName, messageThreadId: messageThreadId ?? null,
+        messageId, sender, senderDisplayName: displayName,
+        senderUsername: ctx.message.from?.username ?? null,
+        messageThreadId: messageThreadId ?? null,
         chatKind: ctx.chat.type, text: ctx.message.text,
         replyTo: reply === undefined ? null : {
           targetMessageId: reply.message_id,
@@ -44,6 +46,7 @@ export async function startBot(): Promise<void> {
             reply.from?.id ?? ctx.from.id, reply.sender_chat?.id,
           ),
           targetSenderDisplayName: reply.sender_chat?.title ?? reply.from?.first_name ?? "unknown",
+          targetSenderUsername: reply.from?.username ?? null,
           targetText: "text" in reply ? reply.text ?? null : "caption" in reply ? reply.caption ?? null : null,
           targetsHevronia: reply.from?.id === me.id,
         },
@@ -74,6 +77,7 @@ export async function startBot(): Promise<void> {
         chatKind: ctx.chat.type, messageThreadId: messageThreadId ?? null,
         replyTo: { targetMessageId: messageId, targetSender: fallbackTargetSender,
           targetSenderDisplayName: telegramDisplayName(ctx.from.first_name, ctx.from.last_name),
+          targetSenderUsername: ctx.message.from?.username ?? null,
           targetText: ctx.message.text, targetIsHevronia: false } }, {
         showTyping: async () => undefined,
         reply: sendReply,
