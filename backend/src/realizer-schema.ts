@@ -31,7 +31,8 @@ export const subjectiveJudgmentKeys: readonly string[] = ["leading", "alternativ
 
 const subjectiveFields = {
   interpretation: subjectiveJudgmentSchema,
-  intent: subjectiveJudgmentSchema,
+  characterIntent: subjectiveJudgmentSchema,
+  dreamIntent: subjectiveJudgmentSchema,
   feltState: subjectiveJudgmentSchema,
   activeDesire: subjectiveJudgmentSchema,
   desiredOutcome: subjectiveJudgmentSchema,

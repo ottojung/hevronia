@@ -230,7 +230,7 @@ test("realizer schema selects an address and a reply message, never a message id
   assert.equal(realizerDecisionSchema.safeParse({
     action: "silence", motive: "x" }).success, false);
   assert.equal(realizerDecisionSchema.safeParse({
-    ...realizerSilence(), intent: "" }).success, false);
+    ...realizerSilence(), characterIntent: "" }).success, false);
   assert.equal(realizerDecisionSchema.safeParse({
     ...speak, message: "   " }).success, false);
 });

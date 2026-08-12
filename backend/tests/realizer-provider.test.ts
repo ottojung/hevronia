@@ -79,13 +79,13 @@ test("the dynamic schema restricts addressCharacter and replyToMessage to visibl
   }
 });
 
-type SubjectiveFieldName = "interpretation" | "intent" | "feltState" | "activeDesire"
-  | "desiredOutcome" | "opportunity" | "fiveTurnStrategy" | "fiftyTurnStrategy";
-const subjectiveFieldNames: readonly SubjectiveFieldName[] = ["interpretation", "intent",
-  "feltState", "activeDesire", "desiredOutcome", "opportunity", "fiveTurnStrategy",
+type SubjectiveFieldName = "interpretation" | "characterIntent" | "dreamIntent" | "feltState"
+  | "activeDesire" | "desiredOutcome" | "opportunity" | "fiveTurnStrategy" | "fiftyTurnStrategy";
+const subjectiveFieldNames: readonly SubjectiveFieldName[] = ["interpretation", "characterIntent",
+  "dreamIntent", "feltState", "activeDesire", "desiredOutcome", "opportunity", "fiveTurnStrategy",
   "fiftyTurnStrategy"];
 
-test("all eight fields carry a full contrastive judgment in both speak and silence", () => {
+test("all nine fields carry a full contrastive judgment in both speak and silence", () => {
   for (const decision of [realizerSpeak(), realizerSilence()]) {
     for (const field of subjectiveFieldNames) {
       const value = decision[field];
@@ -105,19 +105,19 @@ function parseDecision(decision: unknown) {
 
 test("the schema rejects a judgment without an alternative", () => {
   const speak = realizerSpeak();
-  const result = parseDecision({ ...speak, intent: judgment({ alternative: undefined }) });
+  const result = parseDecision({ ...speak, characterIntent: judgment({ alternative: undefined }) });
   assert.equal(result.success, false);
 });
 
 test("the schema rejects a null alternative", () => {
   const speak = realizerSpeak();
-  const result = parseDecision({ ...speak, intent: judgment({ alternative: null }) });
+  const result = parseDecision({ ...speak, characterIntent: judgment({ alternative: null }) });
   assert.equal(result.success, false);
 });
 
 test("the schema rejects a judgment without whyRejected", () => {
   const speak = realizerSpeak();
-  const result = parseDecision({ ...speak, intent: judgment({ whyRejected: undefined }) });
+  const result = parseDecision({ ...speak, characterIntent: judgment({ whyRejected: undefined }) });
   assert.equal(result.success, false);
 });
 
@@ -126,7 +126,7 @@ test("the schema rejects empty judgment strings", () => {
   const judgmentParts: readonly ("leading" | "alternative" | "whyRejected")[] =
     ["leading", "alternative", "whyRejected"];
   for (const key of judgmentParts) {
-    const result = parseDecision({ ...speak, intent: judgment({ [key]: "   " }) });
+    const result = parseDecision({ ...speak, characterIntent: judgment({ [key]: "   " }) });
     assert.equal(result.success, false, key);
   }
 });
@@ -135,7 +135,7 @@ test("the schema rejects unexpected keys inside a judgment", () => {
   const speak = realizerSpeak();
   const result = parseDecision({
     ...speak,
-    intent: { ...speak.intent, extra: "x" },
+    characterIntent: { ...speak.characterIntent, extra: "x" },
   });
   assert.equal(result.success, false);
 });
@@ -183,7 +183,7 @@ test("the OpenAI provider schema nests the required judgment fields", () => {
   assert.ok(serialized.includes('"whyRejected"'));
   assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
   const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
-  assert.equal(judgments.length, 16);
+  assert.equal(judgments.length, 18);
 });
 
 test("the Gemini provider schema nests the required judgment fields", () => {
@@ -193,7 +193,7 @@ test("the Gemini provider schema nests the required judgment fields", () => {
   assert.ok(serialized.includes('"whyRejected"'));
   assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
   const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
-  assert.equal(judgments.length, 16);
+  assert.equal(judgments.length, 18);
 });
 
 test("malformed provider responses are rejected", async () => {
@@ -209,19 +209,20 @@ test("malformed provider responses are rejected", async () => {
     JSON.stringify({ decision: { ...speak(), interpretation: "i" } }),
     // missing Telegram message
     JSON.stringify({ decision: { action: "speak", addressCharacter: "P1",
-      replyToMessage: null, interpretation: judgment(), intent: judgment(), feltState: judgment(),
-      activeDesire: judgment(), desiredOutcome: judgment(), opportunity: judgment(),
+      replyToMessage: null, interpretation: judgment(), characterIntent: judgment(),
+      dreamIntent: judgment(), feltState: judgment(), activeDesire: judgment(),
+      desiredOutcome: judgment(), opportunity: judgment(),
       fiveTurnStrategy: judgment(), fiftyTurnStrategy: judgment() } }),
     // unexpected key at the decision level
     JSON.stringify({ decision: { ...speak(), targetChoice: "A" } }),
     // unexpected key inside a judgment
-    JSON.stringify({ decision: { ...speak(), intent: { ...judgment(), extra: true } } }),
+    JSON.stringify({ decision: { ...speak(), characterIntent: { ...judgment(), extra: true } } }),
     // missing alternative inside a judgment
-    JSON.stringify({ decision: { ...speak(), intent: judgment({ alternative: undefined }) } }),
+    JSON.stringify({ decision: { ...speak(), characterIntent: judgment({ alternative: undefined }) } }),
     // null alternative inside a judgment
-    JSON.stringify({ decision: { ...speak(), intent: judgment({ alternative: null }) } }),
+    JSON.stringify({ decision: { ...speak(), characterIntent: judgment({ alternative: null }) } }),
     // empty strings inside a judgment
-    JSON.stringify({ decision: { ...speak(), intent: judgment({ leading: "" }) } }),
+    JSON.stringify({ decision: { ...speak(), characterIntent: judgment({ leading: "" }) } }),
     // invalid handle
     JSON.stringify({ decision: { ...speak(), addressCharacter: "P9" } }),
   ];

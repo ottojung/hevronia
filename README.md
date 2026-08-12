@@ -180,8 +180,9 @@ no username). A `yes` means only that
 Хевронія should pay attention, never that she should reply. If the planner
 throws or emits malformed output, it fails open: the error is logged and the
 turn continues to the realizer. Then the smart realizer (`HEVRONIA_SMART_MODEL`)
-owns the whole turn: it infers interpretation and intent, feels the situation,
-forms desires, chooses a pursuit, decides between silence and speech, picks the
+owns the whole turn: it infers interpretation, character intent and
+dream-level interpretation, feels the situation, forms desires, chooses short-
+and long-horizon strategies, decides between silence and speech, picks the
 addressee and optional Telegram reply attachment (via ephemeral P1/M1 handles
 constrained to the visible turn), and writes the actual message. Planner
 psychology is never injected into the realizer.
@@ -354,8 +355,9 @@ scenario by category with its behavior tags. Each turn shows the participant's
 message, a `Планер:` line for the cheap attention filter (`yes → передано
 реалізатору`, `no → повідомлення відфільтровано`, or `[error → передано
 реалізатору]`), a `Реалізатор:` block with Хевронія's individually labeled
-private fields (`interpretation`, `intent`, `feltState`, `activeDesire`,
-`desiredOutcome`, `opportunity`, `pursuit`) and her chosen addressee and reply
+private fields (`interpretation`, `characterIntent`, `dreamIntent`, `feltState`,
+`activeDesire`, `desiredOutcome`, `opportunity`, `fiveTurnStrategy`,
+`fiftyTurnStrategy`) and her chosen addressee and reply
 attachment, and then her realized Telegram reply. The three outcomes are
 distinguishable in the transcript: filtered by the planner, passed but silenced
 by the realizer, or passed and spoken. The same content — including every

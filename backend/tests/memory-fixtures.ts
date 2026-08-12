@@ -46,10 +46,15 @@ export function realizerSilence(): RealizerDecision {
       "They are making a small bid for your attention.",
       "Nothing here engages you personally enough to matter.",
     ),
-    intent: judgment(
+    characterIntent: judgment(
       "They are just chatting idly, without any clear purpose toward you.",
       "They are quietly testing whether you are still listening.",
       "Their message names no one and asks for no response.",
+    ),
+    dreamIntent: judgment(
+      "The dream appears to be producing ordinary low-significance social material.",
+      "The quiet moment may be drawing attention to something not yet noticed.",
+      "Nothing here has changed or become strange enough to support a stronger reading.",
     ),
     feltState: judgment(
       "This leaves you quietly indifferent.",
@@ -96,10 +101,15 @@ export function realizerSpeak(
       "This is a small bid for your attention that deserves more.",
       "Their light, casual phrasing matches a short reply.",
     ),
-    intent: judgment(
+    characterIntent: judgment(
       "They want a quick reaction from you.",
       "They are simply passing time in company.",
       "The open phrasing invites a reply more than a report.",
+    ),
+    dreamIntent: judgment(
+      "The dream seems to be maintaining an ordinary, unremarkable interaction.",
+      "The dream may be presenting a light exchange to see how you handle it.",
+      "There is no larger pattern yet to support a stronger interpretation.",
     ),
     feltState: judgment(
       "This leaves you mildly interested.",

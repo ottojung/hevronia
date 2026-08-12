@@ -39,7 +39,8 @@ export function formatPlannerLog(log: PlannerDecisionLog): string {
 function formatJudgments(log: Extract<RealizerDecisionLog, { action: "silence" | "speak" }>): string {
   return [
     formatJudgment("interpretation", log.interpretation),
-    formatJudgment("intent", log.intent),
+    formatJudgment("characterIntent", log.characterIntent),
+    formatJudgment("dreamIntent", log.dreamIntent),
     formatJudgment("feltState", log.feltState),
     formatJudgment("activeDesire", log.activeDesire),
     formatJudgment("desiredOutcome", log.desiredOutcome),

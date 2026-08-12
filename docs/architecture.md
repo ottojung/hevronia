@@ -126,10 +126,10 @@ cheap attention planner
 
 The cheap planner is a high-recall attention filter: it only decides whether the
 situation is worth a smart-model invocation. It cannot force speech. The smart
-realizer is the authoritative mind of the turn: it owns interpretation, intent
-inference, feelings, desires, outcome, opportunity, medium- and long-term
-strategies, addressee choice, reply attachment, the final speak/silence
-decision, and the wording.
+realizer is the authoritative mind of the turn: it owns interpretation,
+character-intent inference, dream-level interpretation, feelings, desires,
+outcome, opportunity, medium- and long-term strategies, addressee choice,
+reply attachment, the final speak/silence decision, and the wording.
 
 ## Module layout
 
@@ -273,10 +273,10 @@ failure nothing partial persists and unnamed people keep the `character X`
 fallback for that turn. Telegram metadata in the character list always comes
 from the latest visible message for that sender, never stale earlier ones.
 
-The planner is a gate, not her social mind. It does not interpret intent,
-assign feelings or desires, choose strategies, pick an addressee, or decide
-whether she should reply. A `yes` means only that the situation deserves a
-smart-model invocation.
+The planner is a gate, not her social mind. It does not infer character intent
+or dream-level interpretation, assign feelings or desires, choose strategies,
+pick an addressee, or decide whether she should reply. A `yes` means only that
+the situation deserves a smart-model invocation.
 
 **Planner failure fails open.** If the cheap planner throws, times out after
 the retry policy, or emits anything other than `yes` or `no`, the error is
@@ -314,18 +314,25 @@ plausibility. `whyRejected` names what is actually wrong with the alternative �
 the evidence or consideration that tells against it — rather than merely
 restating that the leading view is good or fits.
 
-The eight contrastive fields:
+The nine contrastive fields:
 
 - `interpretation` — what Хевронія thinks is happening / what the event means
   in context, weighed against the strongest competing interpretation;
-- `intent` — her best inference about what the relevant others are trying to
-  do, want, signal, obtain, or cause (distinct from her own desire), weighed
-  against the strongest competing theory of their intent;
+- `characterIntent` — her best supported guess about what the relevant other
+  character wants from her specifically: the response, belief, feeling, role,
+  or participation they are trying to produce in her, weighed against the
+  strongest competing theory of their motive;
+- `dreamIntent` — her more distant interpretation of what the dream, as a
+  construction of her sleeping mind, may be doing by producing the event or the
+  wider visible pattern: what it appears to be showing, repeating, testing,
+  pressing, reminding, or drawing her attention toward. It is inferential, may
+  be mundane, and does not by itself create a desire or a discrepancy
+  investigation;
 - `feltState` — her immediate emotional/felt reaction, weighed against another
   plausible characterization of the same reaction;
 - `activeDesire` — what she currently wants (her motive, not the others'
-  intent), weighed against the strongest competing account of what she wants
-  most;
+  character intent), weighed against the strongest competing account of what
+  she wants most;
 - `desiredOutcome` — the state, result, or experience she wants, distinct from
   what she will do, weighed against the strongest competing outcome;
 - `opportunity` — a concrete affordance the present situation itself gives her
