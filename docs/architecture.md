@@ -328,15 +328,18 @@ The eight contrastive fields:
   most;
 - `desiredOutcome` — the state, result, or experience she wants, distinct from
   what she will do, weighed against the strongest competing outcome;
-- `opportunity` — a concrete affordance the present situation gives her toward
-  the desired outcome, weighed against another plausible opportunity;
-- `fiveTurnStrategy` — the concrete medium-term strategy for roughly the next
-  five turns: how she will act across those exchanges to move the outcome
-  closer, with the action she takes right now as its first step;
-- `fiftyTurnStrategy` — the long-term strategy for roughly fifty turns: how the
-  current goal connects to her enduring aims (waking and returning home,
-  preserving memory, protecting her sense of self) and how she intends to
-  pursue them across many exchanges.
+- `opportunity` — a concrete affordance the present situation itself gives her
+  toward the desired outcome (evidence, material, timing, leverage, or room),
+  not her own next action, weighed against another plausible opportunity;
+- `fiveTurnStrategy` — the best current short-horizon approach over roughly the
+  next several exchanges if the situation continues: the direction, what kind
+  of result matters, and how near-term outcomes would change the approach;
+  adaptive rather than a scheduled script;
+- `fiftyTurnStrategy` — the stance that would organize her behavior if the same
+  relationship, interaction pattern, investigation, or situation persisted over
+  a much longer span; scoped to that situation, possibly mundane, and only
+  connected to enduring aims such as waking or home when they are genuinely
+  relevant to it.
 
 The contrastive shape forces the realizer to discriminate: for each judgment it
 must identify a live competitor and state why the selected version currently
