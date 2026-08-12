@@ -6,6 +6,8 @@ import type { LazyLongTermMemory } from "./long-term-memory/runtime.js";
 import type { GeneratedTurn } from "./generated-turn.js";
 import type { ConversationThreadId } from "./identifiers.js";
 import type { DeliveredHevroniaMessage, ObservedTelegramMessage, TelegramSenderIdentity } from "./telegram-event.js";
+import type { AttentionPlanner, PlannerDecisionLog } from "./attention-planner.js";
+import type { Realizer, RealizerDecisionLog } from "./realizer.js";
 
 export interface RespondInput {
   threadId: ConversationThreadId;
@@ -16,7 +18,8 @@ export interface RespondInput {
 
 export interface ConversationLayerOptions {
   dbPath?: string;
-  model?: BaseLanguageModel;
+  plannerModel?: BaseLanguageModel;
+  realizerModel?: BaseLanguageModel;
   summaryModel?: BaseLanguageModel;
   systemPrompt?: string;
   triggerTokens?: number;
@@ -24,9 +27,10 @@ export interface ConversationLayerOptions {
   trimTokensToSummarize?: number;
   tokenCounter?: TokenCounter;
   lazyMemory?: LazyLongTermMemory;
-  decisionMaker?: import("./social-decision.js").SocialDecisionMaker;
-  onSocialDecision?: (log: import("./social-decision.js").SocialDecisionLog) => void;
-  onPlannerError?: (rendered: string) => void;
+  planner?: AttentionPlanner;
+  realizer?: Realizer;
+  onPlannerDecision?: (log: PlannerDecisionLog) => void;
+  onRealizerDecision?: (log: RealizerDecisionLog) => void;
   conversationStore?: import("./conversation-store.js").ConversationStore;
   pendingConversationWrites?: import("./pending-conversation-writes.js").PendingConversationWrites;
 }

@@ -3,11 +3,9 @@ import { test } from "node:test";
 
 import {
   DEFAULT_CHEAP_MODEL,
-  DEFAULT_MODEL,
   DEFAULT_SMART_MODEL,
   cheapModelFromEnv,
   geminiKeyFromEnv,
-  modelFromEnv,
   openAiKeyFromEnv,
   smartModelFromEnv,
 } from "../src/model.js";
@@ -42,29 +40,6 @@ test("openAiKeyFromEnv error does not reveal any key value", () => {
     assert.ok(error instanceof Error);
     assert.ok(!error.message.includes(FAKE_KEY));
     assert.ok(!error.message.includes("sk-"));
-  }
-});
-
-test("modelFromEnv returns the default model when unset", () => {
-  delete process.env["HEVRONIA_MODEL"];
-  assert.equal(modelFromEnv(), DEFAULT_MODEL);
-});
-
-test("modelFromEnv returns the configured override", () => {
-  process.env["HEVRONIA_MODEL"] = "fake-model1";
-  try {
-    assert.equal(modelFromEnv(), "fake-model1");
-  } finally {
-    delete process.env["HEVRONIA_MODEL"];
-  }
-});
-
-test("modelFromEnv ignores a blank override and uses the default", () => {
-  process.env["HEVRONIA_MODEL"] = "   ";
-  try {
-    assert.equal(modelFromEnv(), DEFAULT_MODEL);
-  } finally {
-    delete process.env["HEVRONIA_MODEL"];
   }
 });
 
@@ -105,13 +80,11 @@ test("smartModelFromEnv returns the configured override", () => {
   }
 });
 
-test("the cheap and smart tiers and the response model share the default model", () => {
+test("the cheap and smart tiers resolve independently to their defaults", () => {
   delete process.env["HEVRONIA_CHEAP_MODEL"];
   delete process.env["HEVRONIA_SMART_MODEL"];
-  delete process.env["HEVRONIA_MODEL"];
-  assert.equal(cheapModelFromEnv(), DEFAULT_MODEL);
-  assert.equal(smartModelFromEnv(), DEFAULT_MODEL);
-  assert.equal(modelFromEnv(), DEFAULT_MODEL);
+  assert.equal(cheapModelFromEnv(), DEFAULT_CHEAP_MODEL);
+  assert.equal(smartModelFromEnv(), DEFAULT_SMART_MODEL);
 });
 
 test("geminiKeyFromEnv returns the configured key", () => {

@@ -4,18 +4,19 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { AIMessage } from "@langchain/core/messages";
+import { AIMessage, type BaseMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
 
-import { createConversationLayer } from "../src/layer.js";
+import { SYSTEM_PROMPT } from "../src/personality.js";
+import { createRealizer } from "../src/realizer.js";
 import {
   longTermMemoryUserIdFromTelegramSender,
   conversationThreadIdFromTelegramPrivateChat,
 } from "../src/identifiers.js";
-import type { SocialDecisionMaker, VisibleMessage } from "../src/social-decision.js";
+import type { VisibleMessage } from "../src/realizer-schema.js";
 import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../src/telegram-event.js";
 import { memoriesForCandidates, selectedParticipantIds } from "../src/participant-memory.js";
-import { staticMemory, silenceDecision } from "./memory-fixtures.js";
+import { realizerSpeak, staticMemory, stubPlanner, testLayer } from "./memory-fixtures.js";
 
 function message(id: number, sender: TelegramSenderIdentity, name: string, text: string): ObservedTelegramMessage {
   return { kind: "participant", messageId: id, sender, senderDisplayName: name,
@@ -52,7 +53,18 @@ test("memoriesForCandidates projects synchronously from the snapshot", () => {
   assert.ok(!contexts.some(({ participant }) => participant.kind !== "user" || participant.id === -500));
 });
 
-test("older-target planning and realization receive attributed target memory", async () => {
+test("memoriesForCandidates drops participants with no recalled memories", () => {
+  const snapshot = staticMemory(new Map([
+    [longTermMemoryUserIdFromTelegramSender(101).toPersistenceKey(),
+      [{ text: "Іра працювала над цим тижнями" }]],
+  ])).beginTurn().snapshot;
+  const contexts = memoriesForCandidates(snapshot, candidates);
+  assert.equal(contexts.length, 1);
+  assert.equal(contexts[0]?.participant.id, 101);
+  assert.equal(contexts[0]?.memories.length, 1);
+});
+
+test("planner and realizer both receive all relevant participant memories", async () => {
   const memory = staticMemory(new Map([
     [longTermMemoryUserIdFromTelegramSender(101).toPersistenceKey(),
       [{ text: "Іра працювала над цим тижнями" }]],
@@ -60,32 +72,28 @@ test("older-target planning and realization receive attributed target memory", a
       [{ text: "Макс любить еспресо" }]],
   ]));
   let plannerCall = 0;
-  const planner: SocialDecisionMaker = { decide: async (context) => {
+  const planner = stubPlanner((context) => {
     plannerCall += 1;
-    if (plannerCall < 3) return silenceDecision();
     const ira = context.participantMemories.find(({ participant }) => participant.id === 101);
     assert.equal(ira?.memories[0]?.text, "Іра працювала над цим тижнями");
     const max = context.participantMemories.find(({ participant }) => participant.id === 202);
     assert.equal(max?.memories[0]?.text, "Макс любить еспресо");
     assert.ok(!context.participantMemories.some(({ participant }) => participant.id === -500));
-    return { action: "speak", addressCharacter: "P1", replyToMessage: null,
-      interpretation: "This is a moment of personal accomplishment.",
-      feltState: "This leaves you feeling pleased for her.",
-      activeDesire: "You want to acknowledge the effort.",
-      desiredOutcome: "You want her to feel recognised.",
-      opportunity: "You notice she is still here to hear you.",
-      pursuit: "You decide to say something warm." };
-  } };
-  const model = fakeModel();
-  model.respond((messages) => {
-    const input = messages.map(({ content }) => String(content)).join("\n");
-    assert.match(input, /Іра працювала над цим тижнями/);
-    assert.doesNotMatch(input, /Макс любить еспресо/);
-    return new AIMessage("я знала шо ти це зробиш");
+    return true;
   });
+  const model = fakeModel();
+  const captured: string[] = [];
+  const replyHandler = (messages: BaseMessage[]) => {
+    captured.push(messages.map((item) => typeof item.content === "string"
+      ? item.content : JSON.stringify(item.content)).join("\n"));
+    return new AIMessage(JSON.stringify({ decision: realizerSpeak({ message: "я знала шо ти це зробиш" }) }));
+  };
+  model.respond(replyHandler);
+  model.respond(replyHandler);
+  model.respond(replyHandler);
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-participant-memory-"));
-  const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"), model,
-    summaryModel: fakeModel(), decisionMaker: planner, lazyMemory: memory });
+  const layer = testLayer(path.join(dir, "db.sqlite"),
+    { planner, realizer: createRealizer(model, SYSTEM_PROMPT), lazyMemory: memory });
   const threadId = conversationThreadIdFromTelegramPrivateChat(92);
   try {
     await layer.respond({ threadId,
@@ -98,6 +106,12 @@ test("older-target planning and realization receive attributed target memory", a
       message: message(3, { kind: "user", id: 202 }, "Макс", "хтось буде каву?"),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(turn.outcome.action, "speak");
+    assert.equal(plannerCall, 3);
+    assert.equal(captured.length, 3);
+    const last = captured[2] ?? "";
+    assert.match(last, /Іра працювала над цим тижнями/);
+    assert.match(last, /Макс любить еспресо/);
+    assert.doesNotMatch(last, /telegram-user:/);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });

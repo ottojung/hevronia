@@ -5,15 +5,16 @@ import { createAgent } from "langchain";
 
 import {
   createChatModel,
-  modelFromEnv,
   providerForModelName,
+  smartModelFromEnv,
 } from "../src/model.js";
 import { invokeWithRateLimitRetry } from "../src/model-retry.js";
 import {
-  socialDecisionResponseSchema,
-} from "../src/social-decision.js";
+  realizerResponseSchema,
+} from "../src/realizer-schema.js";
 
-const provider = providerForModelName(modelFromEnv());
+const modelName = smartModelFromEnv();
+const provider = providerForModelName(modelName);
 const key = provider === "gemini"
   ? process.env["MY_GEMINI_API_KEY"]
   : process.env["MY_OPENAI_API_KEY"];
@@ -22,18 +23,18 @@ if (key === undefined || key === "") {
   process.exit(0);
 }
 
-const model = createChatModel(modelFromEnv());
+const model = createChatModel(modelName);
 const agent = createAgent({
   model,
   tools: [],
   systemPrompt: "Return only the requested structured data.",
-  responseFormat: socialDecisionResponseSchema,
+  responseFormat: realizerResponseSchema,
 });
 
 const result = await invokeWithRateLimitRetry(() => agent.invoke({
   messages: [new AIMessage("test")],
 }));
-const parsed = socialDecisionResponseSchema.parse(result.structuredResponse);
+const parsed = realizerResponseSchema.parse(result.structuredResponse);
 assert.ok(parsed.decision.action === "silence" || parsed.decision.action === "speak");
 console.log(
   `${provider} accepted the provider schema and returned decision ${JSON.stringify(parsed.decision)}`,

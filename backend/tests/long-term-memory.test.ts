@@ -8,7 +8,9 @@ import { AIMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
 
 import { createConversationLayer } from "../src/layer.js";
-import type { SocialDecisionMaker } from "../src/social-decision.js";
+import { SYSTEM_PROMPT } from "../src/personality.js";
+import type { AttentionPlanner } from "../src/attention-planner.js";
+import { createRealizer } from "../src/realizer.js";
 import {
   createMem0Config,
   EMBEDDING_DIMENSION,
@@ -30,7 +32,10 @@ import {
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromTelegramSender,
 } from "../src/identifiers.js";
-import { FakeScheduler, FakeStore, deferred, fact, silenceDecision } from "./memory-fixtures.js";
+import {
+  FakeScheduler, FakeStore, deferred, fact, filteringPlanner, passingPlanner,
+  realizerSpeak, stubPlanner,
+} from "./memory-fixtures.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(1);
@@ -43,25 +48,13 @@ function observedMessage(text: string, messageId: number, senderId = 1,
     replyTo: null, directlyAddressed: true };
 }
 
-function replyingDecisionMaker(): SocialDecisionMaker {
-  return {
-    decide: async () => ({
-      action: "speak",
-      addressCharacter: "P1",
-      replyToMessage: null,
-      interpretation: "This person is sharing a personal concern.",
-      feltState: "This leaves you mildly attentive.",
-      activeDesire: "You want to understand better.",
-      desiredOutcome: "You want to know what is actually going on.",
-      opportunity: "You notice they are still here to talk.",
-      pursuit: "You decide to ask a direct question.",
-    }),
-  };
+function speakReply(model: ReturnType<typeof fakeModel>, text: string): void {
+  model.respond(new AIMessage(JSON.stringify({ decision: realizerSpeak({ message: text }) })));
 }
 
 function fixture(overrides: {
   lazyMemory?: LazyLongTermMemory;
-  decisionMaker?: SocialDecisionMaker;
+  planner?: AttentionPlanner;
 } = {}): {
   dir: string;
   model: ReturnType<typeof fakeModel>;
@@ -71,9 +64,9 @@ function fixture(overrides: {
   const model = fakeModel();
   const layer = createConversationLayer({
     dbPath: path.join(dir, "checkpoints.sqlite"),
-    model,
+    planner: overrides.planner ?? passingPlanner(),
+    realizer: createRealizer(model, SYSTEM_PROMPT),
     summaryModel: fakeModel(),
-    decisionMaker: overrides.decisionMaker ?? replyingDecisionMaker(),
     lazyMemory: overrides.lazyMemory,
   });
   return { dir, model, layer };
@@ -172,6 +165,23 @@ test("Mem0 production configuration carries the extraction policy and explicit c
   assert.doesNotMatch(LONG_TERM_MEMORY_POLICY, /\bUser\b/);
 });
 
+test("a non-Gemini cheap model routes memory extraction to the OpenAI provider", () => {
+  const config = createMem0Config("openai-key", "gemini-key", "gpt-5.6-mini");
+  assert.equal(config.llm.provider, "openai");
+  assert.equal(config.llm.config.apiKey, "openai-key");
+  assert.equal(config.llm.config.model, "gpt-5.6-mini");
+  assert.ok(!("temperature" in config.llm.config));
+  assert.equal(config.embedder.config.apiKey, "openai-key");
+});
+
+test("a Gemini cheap model keeps extraction on the Gemini provider with temperature 0", () => {
+  const config = createMem0Config("openai-key", "gemini-key", "gemini-3.5-flash-lite");
+  assert.equal(config.llm.provider, "google");
+  assert.equal(config.llm.config.apiKey, "gemini-key");
+  assert.equal(config.llm.config.model, "gemini-3.5-flash-lite");
+  assert.equal(config.llm.config["temperature"], 0);
+});
+
 test("the extraction policy version is bumped to reflect subject-relative memories", async () => {
   assert.equal(MEMORY_POLICY_VERSION, 2);
   const client: Mem0Client = {
@@ -199,7 +209,7 @@ test("an unresolved long-term-memory background job cannot delay respond", async
     shutdownDrainTimeoutMs: 5 });
   const { dir, model, layer } = fixture({ lazyMemory: memory });
   try {
-    model.respond(new AIMessage("valid reply"));
+    speakReply(model, "valid reply");
     const turn = await layer.respond({ threadId,
       message: observedMessage("hello", 1), hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     if (turn.outcome.action !== "speak") assert.fail("expected a speak");
@@ -224,11 +234,11 @@ test("the current turn uses only the snapshot captured at turn start", async () 
   memory.warmUser(longTermMemoryUserIdFromTelegramSender(1));
   await scheduler.fireAll();
   const seen: string[][] = [];
-  const planner: SocialDecisionMaker = { decide: async (context) => {
+  const planner = stubPlanner((context) => {
     seen.push(context.participantMemories.flatMap(({ memories }) => memories.map(({ text }) => text)));
-    return silenceDecision();
-  } };
-  const { dir, layer } = fixture({ lazyMemory: memory, decisionMaker: planner });
+    return false;
+  });
+  const { dir, layer } = fixture({ lazyMemory: memory, planner });
   try {
     await layer.respond({ threadId, message: observedMessage("hello", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
@@ -251,11 +261,11 @@ test("newly learned memory appears on the next turn", async () => {
   store.rememberImpl = () => [fact("l1", "Favourite colour is purple.")];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const seen: string[][] = [];
-  const planner: SocialDecisionMaker = { decide: async (context) => {
+  const planner = stubPlanner((context) => {
     seen.push(context.participantMemories.flatMap(({ memories }) => memories.map(({ text }) => text)));
-    return silenceDecision();
-  } };
-  const { dir, layer } = fixture({ lazyMemory: memory, decisionMaker: planner });
+    return false;
+  });
+  const { dir, layer } = fixture({ lazyMemory: memory, planner });
   try {
     await layer.respond({ threadId,
       message: observedMessage("my favourite colour is purple", 1),
@@ -277,7 +287,7 @@ test("a silent turn still observes the user's message for future memory", async 
   store.searchImpl = () => [];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, layer } = fixture({ lazyMemory: memory,
-    decisionMaker: { decide: async () => silenceDecision() } });
+    planner: filteringPlanner() });
   try {
     const turn = await layer.respond({ threadId, message: observedMessage("ambient", 1, 111),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
@@ -297,7 +307,7 @@ test("an undelivered reply still observes the user's message", async () => {
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, model, layer } = fixture({ lazyMemory: memory });
   try {
-    model.respond(new AIMessage("delivered reply"));
+    speakReply(model, "delivered reply");
     const turn = await layer.respond({ threadId, message: observedMessage("hello", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     if (turn.outcome.action === "silence") assert.fail("expected a speak");
@@ -334,7 +344,7 @@ test("one incoming message is never ingested twice", async () => {
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, model, layer } = fixture({ lazyMemory: memory });
   try {
-    model.respond(new AIMessage("reply"));
+    speakReply(model, "reply");
     const turn = await layer.respond({ threadId, message: observedMessage("single", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     if (turn.outcome.action === "speak") turn.outcome.persistDelivery(500);
@@ -353,7 +363,7 @@ test("chat senders receive no person-scoped memory work", async () => {
   store.searchImpl = () => [];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, layer } = fixture({ lazyMemory: memory,
-    decisionMaker: { decide: async () => silenceDecision() } });
+    planner: filteringPlanner() });
   try {
     await layer.respond({ threadId, message: observedMessage("з каналу", 1, 0, "chat"),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
@@ -372,7 +382,7 @@ test("bot-authored text is not person-memory evidence but still reaches canonica
   store.searchImpl = () => [];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, layer } = fixture({ lazyMemory: memory,
-    decisionMaker: { decide: async () => silenceDecision() } });
+    planner: filteringPlanner() });
   try {
     await layer.respond({ threadId, message: observedMessage("з бота", 1, 101),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: true });
@@ -394,7 +404,7 @@ test("human-authored text remains person-memory evidence at the boundary", async
   store.searchImpl = () => [];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, layer } = fixture({ lazyMemory: memory,
-    decisionMaker: { decide: async () => silenceDecision() } });
+    planner: filteringPlanner() });
   try {
     await layer.respond({ threadId, message: observedMessage("з людини", 1, 101),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
@@ -415,7 +425,7 @@ test("successful delivery still persists only the delivered event, not memory co
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, model, layer } = fixture({ lazyMemory: memory });
   try {
-    model.respond(new AIMessage("Assistant recommendation: buy the purple one."));
+    speakReply(model, "Assistant recommendation: buy the purple one.");
     const turn = await layer.respond({ threadId, message: observedMessage("user text", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     await scheduler.fireAll();
@@ -440,7 +450,7 @@ test("search and ingestion failures degrade gracefully through the layer", async
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
   const { dir, model, layer } = fixture({ lazyMemory: memory });
   try {
-    model.respond(new AIMessage("valid reply"));
+    speakReply(model, "valid reply");
     const reply = await layer.respond({ threadId, message: observedMessage("hello", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     if (reply.outcome.action !== "speak") assert.fail("expected a speak");

@@ -22,12 +22,34 @@ updates the cache for future turns.
                            └─────────────┬─────────────┘
                                          │ synchronous snapshot only
                                          ↓
-Telegram → canonical bounded history → social decision → realization → Telegram
-   │
-   └──────── background queue ───────→ Mem0 search/add
+Telegram → canonical bounded history → cheap attention planner → smart realizer → Telegram
+   │                                                                                │
+   └──────── background queue ───────→ Mem0 search/add ────────────────────────────┘
                                          │
                                          └── updates cache for future turns
 ```
+
+The turn is a two-stage pipeline:
+
+```text
+incoming Telegram event
+        ↓
+canonical bounded history + immutable cached-memory snapshot
+        ↓
+cheap attention planner
+        ├── filter → silence
+        └── pass
+             ↓
+        smart realizer
+        ├── silence
+        └── speak → Telegram
+```
+
+The cheap planner is a high-recall attention filter: it only decides whether the
+situation is worth a smart-model invocation. It cannot force speech. The smart
+realizer is the authoritative mind of the turn: it owns interpretation, intent
+inference, feelings, desires, outcome, opportunity, pursuit, addressee choice,
+reply attachment, the final speak/silence decision, and the wording.
 
 ## Module layout
 
@@ -37,7 +59,11 @@ Telegram → canonical bounded history → social decision → realization → T
 - `backend/src/respond.ts` — the conversational entry point and the
   non-blocking `warmParticipant` proxy.
 - `backend/src/layer.ts` — canonical event ingestion, bounded conversation
-  context, social planning, ephemeral realization, and delivery completion.
+  context, the cheap attention planner, the smart realizer, and delivery
+  completion.
+- `backend/src/attention-planner.ts` — the cheap high-recall attention filter.
+- `backend/src/realizer.ts` / `backend/src/realizer-schema.ts` — the smart
+  realizer that owns social cognition and final wording.
 - `backend/src/long-term-memory/` — the persistent Mem0 store, the lazy
   in-process runtime, the background queue, and the conservative extraction
   policy.
@@ -59,8 +85,8 @@ architecture evolves.
 ## Model-facing boundary
 
 The language models never see the conversation as users messaging an assistant.
-`backend/src/dream-render.ts` is the single renderer shared by the social-decision
-planner, the realization model, the summary model, and the tests: every canonical
+`backend/src/dream-render.ts` is the single renderer shared by the attention
+planner, the smart realizer, the summary model, and the tests: every canonical
 event becomes a dream event appearing through Telegram.
 
 - Participant messages render as products of Хевронія's sleeping mind: "Your
@@ -72,8 +98,8 @@ event becomes a dream event appearing through Telegram.
   character's mind or converts a claim into a fact.
 - Stable identities use dream-character language: a person-like sender is
   "character 42", and a chat/channel sender is a source "channel 500" with the
-  sign of the internal Telegram id hidden. Before the history, the planner and
-  the realizer both receive a distinct character list: "Character 42, currently
+  sign of the internal Telegram id hidden. Before the history, both the planner
+  and the realizer receive a distinct character list: "Character 42, currently
   displayed by Telegram as “Оля”." Internal sender keys and Telegram message
   IDs never reach a model, and no model input labels a dream character as a
   user.
@@ -81,30 +107,69 @@ event becomes a dream event appearing through Telegram.
   make this Telegram message appear:" or, for a reply, "You previously chose to
   reply to character 42 with:". Reply relationships are described naturally,
   never by message ID.
-- The planner is mechanical and structured. Its schema is `silence` or `speak`
-  with an independent `addressCharacter` handle (P1, P2, ...) and an
-  independent `replyToMessage` handle (M1, M2, ...), plus six complete
-  second-person subjective sentences: `interpretation`, `feltState`,
-  `activeDesire`, `desiredOutcome`, `opportunity`, and `pursuit`. Each turn the
-  runtime builds per-turn P/M handle maps, annotates the matching dream
-  observation with "Planner reply-message handle: M1" in place, and lists
-  "Planner character handles: P1 = character 42" and "Planner reply-message
-  handles: M1 = the first eligible visible message" as clearly mechanical
-  planner-only sections. An unknown or invalid handle safely produces silence.
-  The handles are never persisted and never shown to the realization model.
-- The realizer receives the same canonical `SYSTEM_PROMPT`, the dream character
-  list, the dream-visible conversation, and the six subjective sentences
-  concatenated verbatim in order as one subjective paragraph — never the JSON,
-  the schema field names, or the planner handles — plus a tiny output protocol
-  ("Make the Telegram message you choose to speak appear. Return only its
-  visible text."). It does not re-plan: the planner already chose whether and
-  how to speak, and the current topic has no privileged status.
-- `addressCharacter` and `replyToMessage` are delivery metadata resolved after
-  realization: the message is sent to the chosen social context, and only when
-  `replyToMessage` is set is Telegram's reply mechanism used to attach it to
-  that message. Neither is persisted as planner psychology; the canonical
-  delivered event records only whether it was an ordinary message or a Telegram
-  reply.
+
+### The cheap attention planner
+
+The planner (`backend/src/attention-planner.ts`) is a high-recall attention
+pre-filter running on `HEVRONIA_CHEAP_MODEL` with low thinking effort. It
+answers exactly one question: is there any plausible reason for Хевронія to
+consider responding? Its output is literally `yes` or `no`, parsed strictly
+anything else is a planner failure.
+
+The planner deliberately errs toward `yes`: direct or indirect references,
+reply relationships, continuation of something Хевронія said, unresolved
+threads, changes in a situation she was in, attempts to get her attention,
+socially striking events, relevant memory, and genuine ambiguity all pass. It
+filters only ordinary background chatter.
+
+The planner is a gate, not her social mind. It does not interpret intent,
+assign feelings or desires, choose a pursuit, pick an addressee, or decide
+whether she should reply. A `yes` means only that the situation deserves a
+smart-model invocation.
+
+**Planner failure fails open.** If the cheap planner throws, times out after
+the retry policy, or emits anything other than `yes` or `no`, the error is
+logged and the turn continues to the smart realizer as though the planner had
+returned `yes`. The planner is a cost/latency optimization; its failure must
+not create an irreversible false negative.
+
+### The smart realizer
+
+The realizer (`backend/src/realizer.ts`) runs on `HEVRONIA_SMART_MODEL` and is
+the authoritative Хевронія model for the turn. It receives the full canonical
+personality prompt, the bounded dream-rendered conversation, the dream
+character list, all relevant cached participant memories, and the available
+character and reply-message handles.
+
+It returns a structured decision, either `silence` or `speak`. Its private
+fields are kept distinct:
+
+- `interpretation` — what Хевронія thinks is happening / what the event means
+  in context;
+- `intent` — her best inference about what the relevant others are trying to
+  do, want, signal, obtain, or cause (distinct from her own desire);
+- `feltState` — her immediate emotional/felt reaction;
+- `activeDesire` — what she currently wants (her motive, not the others'
+  intent);
+- `desiredOutcome` — the state she wants to bring about, distinct from the
+  action;
+- `opportunity` — what the situation makes possible;
+- `pursuit` — the action/strategy she chooses (ask, answer, tease, object,
+  challenge, redirect, acknowledge, refuse, or intentionally saying nothing),
+  separate from the final wording.
+
+For `speak`, the realizer additionally chooses an `addressCharacter` handle (if
+any), an independent `replyToMessage` handle (if any Telegram reply
+attachment is wanted), and the `message` — the actual Telegram text. The realizer
+owns the final speak/silence decision; a planner `yes` does not obligate it to
+speak.
+
+Character and reply-message handles are ephemeral per-turn labels (P1, M1, ...)
+that are annotated in place on matching dream observations. The realizer sees
+the handle mapping and must select only handles available on that turn; the
+schema constrains emitted handles to those candidates, and an invalid or
+unresolvable handle fails safely without misdelivery. Handles are never
+persisted.
 
 ## Long-term memory
 

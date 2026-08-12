@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 
 import { Memory, type MemoryConfig } from "mem0ai/oss";
 
-import { cheapModelFromEnv } from "../model.js";
+import { cheapModelFromEnv, openAiTemperature, providerForModelName } from "../model.js";
 import { LONG_TERM_MEMORY_POLICY, MEMORY_POLICY_VERSION } from "./policy.js";
 import type { ConversationThreadId, LongTermMemoryUserId } from "../identifiers.js";
 import { memoryRecordsFromItems, type MemoryRecord } from "./store-mapping.js";
@@ -38,12 +38,23 @@ export interface LongTermMemoryStore {
   deleteAll(userId: LongTermMemoryUserId): Promise<void>;
 }
 
-export function createMem0Config(openAiApiKey: string, geminiApiKey: string): MemoryConfig {
+export function createMem0Config(
+  openAiApiKey: string,
+  geminiApiKey: string,
+  model: string = MEMORY_MODEL,
+): MemoryConfig {
+  const memoryProvider = providerForModelName(model);
+  const provider = memoryProvider === "gemini" ? "google" : "openai";
+  const llmConfig = memoryProvider === "gemini"
+    ? { apiKey: geminiApiKey, model, temperature: 0 }
+    : { apiKey: openAiApiKey, model, ...openAiTemperature(0) };
   return {
     llm: {
-      // Extraction runs on the Gemini provider; embeddings stay on OpenAI.
-      provider: "google",
-      config: { apiKey: geminiApiKey, model: MEMORY_MODEL, temperature: 0 },
+      // Extraction runs on the cheap model (MEMORY_MODEL), but on the
+      // provider that owns that model: a non-Gemini cheap tier must not be
+      // sent to the Google provider. Embeddings stay on OpenAI.
+      provider,
+      config: llmConfig,
     },
     embedder: {
       provider: "openai",

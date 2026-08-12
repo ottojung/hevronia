@@ -4,8 +4,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { fakeModel } from "@langchain/core/testing";
-
 import { parseCli, ConversationCliError } from "../scripts/conversations/cli.js";
 import { scenarios, smokeScenarioIds } from "../scripts/conversations/catalog.js";
 import { runScenariosConcurrently } from "../scripts/conversations/orchestrator.js";
@@ -19,10 +17,8 @@ import {
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromTelegramSender,
 } from "../src/identifiers.js";
-import { createConversationLayer } from "../src/layer.js";
-import type { SocialDecisionMaker } from "../src/social-decision.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
-import { silenceDecision } from "./memory-fixtures.js";
+import { stubPlanner, testLayer } from "./memory-fixtures.js";
 
 const representativeIds = [
   "normal-stranger", "low-effort-stranger", "playful-banter", "absurd-humor",
@@ -95,6 +91,14 @@ test("CLI parses explicit IDs and round overrides", () => {
   if (explicit.action === "run") {
     assert.equal(explicit.rounds, 3);
     assert.deepEqual(explicit.scenarios.map(({ id }) => id), ["normal-stranger", "subtle-rudeness"]);
+    for (const scenario of explicit.scenarios) assert.equal(scenario.rounds, 3);
+  }
+  const noOverride = parseCli(["normal-stranger"]);
+  assert.equal(noOverride.action, "run");
+  if (noOverride.action === "run") {
+    const catalogDefault = scenarios.find((scenario) => scenario.id === "normal-stranger");
+    assert.ok(catalogDefault);
+    assert.equal(noOverride.scenarios[0]?.rounds, catalogDefault.rounds);
   }
 });
 
@@ -314,20 +318,18 @@ test("seeded long-term memory reaches the planner context", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-seeded-memory-"));
   const memory = new PreseededLazyMemory(["Марина prefers unsweetened coffee."]);
   let recalled = "";
-  const planner: SocialDecisionMaker = { decide: async (context) => {
+  const planner = stubPlanner((context) => {
     recalled = context.participantMemories.flatMap(({ memories }) =>
       memories.map(({ text }) => text)).join();
-    return silenceDecision();
-  } };
+    return false;
+  });
   const threadId = conversationThreadIdFromTelegramPrivateChat(7_003);
   const message: ObservedTelegramMessage = {
     kind: "participant", messageId: 1, sender: { kind: "user", id: 7_001 },
     senderDisplayName: "Марина", chatKind: "private", text: "привіт",
     messageThreadId: null, replyTo: null, directlyAddressed: true,
   };
-  const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
-    model: fakeModel(), summaryModel: fakeModel(), decisionMaker: planner,
-    lazyMemory: memory });
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner, lazyMemory: memory });
   try {
     await layer.respond({ threadId, message, hevroniaSender: { kind: "user", id: 7_002 }, senderIsBot: false });
     assert.equal(recalled, "Марина prefers unsweetened coffee.");

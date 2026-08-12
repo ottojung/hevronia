@@ -1,21 +1,29 @@
-import type { SocialDecision, SocialDecisionLog, SpeakDecision } from "./social-decision.js";
+import type { ResolvedRealizerDecision } from "./speak-resolution.js";
+import type { RealizerDecision } from "./realizer-schema.js";
+import type { RealizerDecisionLog } from "./realizer.js";
 
-export function toSpeakLog(speak: SpeakDecision): SocialDecisionLog {
-  return {
-    action: "speak",
-    addressName: speak.address?.character.subject ?? null,
-    ...speak.subjective,
-  };
-}
-
-export function toSilenceLog(decision: Extract<SocialDecision, { action: "silence" }>): SocialDecisionLog {
-  return {
-    action: "silence",
+export function toRealizerDecisionLog(
+  decision: RealizerDecision,
+  resolved: ResolvedRealizerDecision | undefined,
+): RealizerDecisionLog {
+  const common = {
     interpretation: decision.interpretation,
+    intent: decision.intent,
     feltState: decision.feltState,
     activeDesire: decision.activeDesire,
     desiredOutcome: decision.desiredOutcome,
     opportunity: decision.opportunity,
     pursuit: decision.pursuit,
+  };
+  if (decision.action === "silence") {
+    return { action: "silence", ...common };
+  }
+  return {
+    action: "speak",
+    addressLabel: resolved?.address?.character.subject ?? null,
+    replyToLabel: resolved?.replyTo === undefined || resolved.replyTo === null
+      ? null
+      : `${resolved.replyTo.handle} → ${resolved.replyTo.message.senderDisplayName}`,
+    ...common,
   };
 }

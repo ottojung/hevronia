@@ -3,8 +3,9 @@ import { notebookSubject } from "../telegram-event.js";
 export function renderParticipantMemoryContexts(
   contexts: readonly import("../participant-memory.js").ParticipantMemoryContext[],
 ): string {
-  if (contexts.length === 0) return "";
-  const blocks = contexts.map((context) => {
+  const withMemories = contexts.filter(({ memories }) => memories.length > 0);
+  if (withMemories.length === 0) return "";
+  const blocks = withMemories.map((context) => {
     const label = notebookSubject({ kind: "user", id: context.participant.id });
     const lines = context.memories.map(({ text }) => `- ${text}`);
     return [

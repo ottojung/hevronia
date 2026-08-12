@@ -21,12 +21,6 @@ export function smartModelFromEnv(): string {
   return configuredModelEnv("HEVRONIA_SMART_MODEL") ?? DEFAULT_SMART_MODEL;
 }
 
-export const DEFAULT_MODEL = smartModelFromEnv();
-
-export function modelFromEnv(): string {
-  return configuredModelEnv("HEVRONIA_MODEL") ?? DEFAULT_MODEL;
-}
-
 export function providerForModelName(model: string): ModelProvider {
   return model.trim().toLowerCase().startsWith("gemini") ? "gemini" : "openai";
 }
@@ -53,11 +47,16 @@ export function geminiKeyFromEnv(): string {
   return apiKey;
 }
 
+export interface ChatModelOptions {
+  temperature?: number;
+  /** Reduces thinking effort for cheap, recall-oriented stages. */
+  lowThinking?: boolean;
+}
+
 export function createChatModel(
   modelName: string,
-  options: { temperature?: number } = {},
+  options: ChatModelOptions = {},
 ): BaseLanguageModel {
-  const temperature = options.temperature === undefined ? {} : { temperature: options.temperature };
   // LangChain's own retry is disabled (maxRetries: 0): rate-limit and
   // transient failures are retried once, with a bounded fixed delay, by the
   // shared model-retry wrapper instead of by exponential backoff.
@@ -66,17 +65,27 @@ export function createChatModel(
       apiKey: geminiKeyFromEnv(),
       model: modelName,
       maxRetries: 0,
-      ...temperature,
+      ...(options.lowThinking === true ? { thinkingConfig: { thinkingLevel: "LOW" } } : {}),
+      ...(options.temperature === undefined ? {} : { temperature: options.temperature }),
     });
   }
   return new ChatOpenAI({
     apiKey: openAiKeyFromEnv(),
     model: modelName,
     maxRetries: 0,
-    ...temperature,
+    ...(options.lowThinking === true ? { reasoning: { effort: "low" } } : {}),
+    ...openAiTemperature(options.temperature),
   });
 }
 
-export function isGeminiChatModel(model: BaseLanguageModel): boolean {
+// OpenAI reasoning models (o-series, gpt-5.x) accept only the default
+// temperature and reject any explicit value. The deterministic 0 is dropped
+// instead of sent; any other value still passes through for classic models.
+export function openAiTemperature(temperature: number | undefined): { temperature?: number } {
+  if (temperature === undefined || temperature === 0) return {};
+  return { temperature };
+}
+
+export function isGeminiChatModel(model: BaseLanguageModel): model is ChatGoogleGenerativeAI {
   return model instanceof ChatGoogleGenerativeAI;
 }

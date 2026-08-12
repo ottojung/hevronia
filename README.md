@@ -15,11 +15,11 @@ Telegram private/group chat
     └── user_id   → lazy in-process memory cache snapshot (top 8)
                               │
                               ▼
-                   social decision → realization → OpenAI → response
+        cheap attention planner → smart realizer → response
                               │
                               ▼
-             background queue → Mem0 search/add → SQLite vectors
-             backend/.data/mem0/vectors-v1.db  →  updates cache for later turns
+         background queue → Mem0 search/add → SQLite vectors
+         backend/.data/mem0/vectors-v1.db  →  updates cache for later turns
 ```
 
 ## Repository structure
@@ -67,8 +67,7 @@ MY_GEMINI_API_KEY
   integration and to Mem0's OpenAI embedder. `OPENAI_API_KEY` is neither
   expected nor used.
 - `MY_GEMINI_API_KEY` is used whenever a Gemini model is selected — for the
-  chat model and for Mem0's extraction LLM — so it is required at startup
-  regardless of which model `HEVRONIA_MODEL` names.
+  chat models and for Mem0's extraction LLM — so it is required at startup.
 
 Models are selected through two tiers, read from the environment:
 
@@ -77,12 +76,14 @@ HEVRONIA_CHEAP_MODEL (optional, defaults to gemini-3.5-flash-lite)
 HEVRONIA_SMART_MODEL (optional, defaults to gemini-3.5-flash-lite)
 ```
 
-- `HEVRONIA_SMART_MODEL` is the default response model (the fallback used when
-  `HEVRONIA_MODEL` is unset).
-- `HEVRONIA_CHEAP_MODEL` is the default for the participant simulator and for
-  Mem0's long-term-memory extraction.
+- `HEVRONIA_SMART_MODEL` is the smart realizer — the authoritative Хевронія
+  model that does all social cognition and final wording — and also the
+  summarizer.
+- `HEVRONIA_CHEAP_MODEL` is the cheap attention planner (with low thinking
+  effort), the participant simulator, and Mem0's long-term-memory extraction.
+  Memory extraction uses the cheap model's own provider, so a non-Gemini cheap
+  model is served by the OpenAI provider rather than the Google one.
 
-`HEVRONIA_MODEL` (optional) overrides the response model directly, and
 `HEVRONIA_SIMULATOR_MODEL` (optional) overrides the simulator's participant
 model. A model name starting with `gemini` uses the Gemini provider
 (`MY_GEMINI_API_KEY`); any other name uses the OpenAI provider
@@ -90,8 +91,7 @@ model. A model name starting with `gemini` uses the Gemini provider
 pipeline:
 
 ```bash
-HEVRONIA_MODEL=gpt-5.6-luna npm run conversations -- --smoke
-HEVRONIA_MODEL=gemini-3.5-flash npm run conversations -- --smoke
+HEVRONIA_CHEAP_MODEL=gpt-5.6-mini HEVRONIA_SMART_MODEL=gpt-5.6-luna npm run conversations -- --smoke
 ```
 
 Every model call (planner, realizer, summarizer, and simulator) is retried when
@@ -167,15 +167,19 @@ chat/channel sources) instead of internal keys, and Telegram message IDs are
 never shown to a model. No Hevronia-facing model input labels a dream character
 as a user. Raw canonical JSON, `telegram-user:` / `telegram-chat:` prefixes,
 candidate indexes, message IDs, and memory-store vocabulary never reach the
-social-decision, realization, or summary models. The planner is mechanical and
-structured: it decides `silence` or `speak`, independently selects an
-`addressCharacter` handle (P1, P2, ...) and an optional `replyToMessage` handle
-(M1, M2, ...) annotated in place on the matching dream observation, and fills
-six complete second-person subjective sentences (`interpretation`, `feltState`,
-`activeDesire`, `desiredOutcome`, `opportunity`, `pursuit`). The realizer
-receives the canonical system prompt, the dream character list and conversation,
-and those six sentences concatenated verbatim as one subjective paragraph — it
-never sees the planner JSON or its handles, and it does not re-plan.
+attention planner, realizer, or summary models.
+
+The turn is two-stage. A cheap attention planner (`HEVRONIA_CHEAP_MODEL`, low
+thinking effort) answers only whether the situation is worth a smart-model
+invocation, returning literally `yes` or `no`. A `yes` means only that Хевронія
+should pay attention, never that she should reply. If the planner throws or
+emits anything other than `yes`/`no`, it fails open: the error is logged and the
+turn continues to the realizer. Then the smart realizer (`HEVRONIA_SMART_MODEL`)
+owns the whole turn: it infers interpretation and intent, feels the situation,
+forms desires, chooses a pursuit, decides between silence and speech, picks the
+addressee and optional Telegram reply attachment (via ephemeral P1/M1 handles
+constrained to the visible turn), and writes the actual message. Planner
+psychology is never injected into the realizer.
 
 LangGraph owns thread-scoped conversational continuity under
 `telegram-private:<chat id>` or `telegram-group:<chat id>` and persists it in the ignored
@@ -205,7 +209,7 @@ controls whether a message becomes memory evidence, and Хевронія's gener
 text is never person-scoped memory evidence. Bot-authored text participates in
 the conversation but is not person-scoped memory evidence.
 
-Each incoming message is persisted and compacted before the social decision.
+Each incoming message is persisted and compacted before the attention planner.
 Silence is a first-class outcome. Generated outgoing text is persisted only after
 Telegram confirms delivery; undelivered replies never enter conversation history.
 Forum topics append `:topic:<message thread id>` to the thread identity, so topics
@@ -334,11 +338,16 @@ afterwards, so progress stays readable. Once every scenario has finished, each
 complete transcript is printed as one uninterrupted block in catalog order,
 the total run time is printed at the end, and the run index summarizes every
 scenario by category with its behavior tags. Each turn shows the participant's
-message, a `Планер:` line with Хевронія's private social decision (whom she
-speaks to, whether she attaches a Telegram reply, and the six subjective
-sentences), and then her realized Telegram reply. The same content — including
-every `Планер:` decision — is saved to the markdown transcript files, and the
-run's `index.md` carries a `**Duration:**` line alongside the commit and
+message, a `Планер:` line for the cheap attention filter (`yes → передано
+реалізатору`, `no → повідомлення відфільтровано`, or `[error → передано
+реалізатору]`), a `Реалізатор:` block with Хевронія's individually labeled
+private fields (`interpretation`, `intent`, `feltState`, `activeDesire`,
+`desiredOutcome`, `opportunity`, `pursuit`) and her chosen addressee and reply
+attachment, and then her realized Telegram reply. The three outcomes are
+distinguishable in the transcript: filtered by the planner, passed but silenced
+by the realizer, or passed and spoken. The same content — including every
+`Планер:` and `Реалізатор:` record — is saved to the markdown transcript files,
+and the run's `index.md` carries a `**Duration:**` line alongside the commit and
 simulator model.
 
 Scenarios may seed durable long-term memory about their participant via the

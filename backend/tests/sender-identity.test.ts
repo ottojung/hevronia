@@ -4,14 +4,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { fakeModel } from "@langchain/core/testing";
-
-import { createConversationLayer } from "../src/layer.js";
 import type { LazyLongTermMemory } from "../src/long-term-memory/runtime.js";
 import { createObservedTelegramMessage, telegramSenderIdentity } from "../src/telegram-observation.js";
 import { renderDreamEvent } from "../src/dream-render.js";
 import { conversationThreadIdFromTelegramGroupChat } from "../src/identifiers.js";
-import { silenceDecision } from "./memory-fixtures.js";
+import { filteringPlanner, testLayer } from "./memory-fixtures.js";
 
 test("user and send-as-chat identities remain distinct and chat senders skip memory work", async () => {
   assert.deepEqual(telegramSenderIdentity(777), { kind: "user", id: 777 });
@@ -48,9 +45,8 @@ test("user and send-as-chat identities remain distinct and chat senders skip mem
     close: async () => undefined,
   };
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-sender-"));
-  const layer = createConversationLayer({ dbPath: path.join(dir, "db.sqlite"),
-    model: fakeModel(), summaryModel: fakeModel(), lazyMemory: memory,
-    decisionMaker: { decide: async () => silenceDecision() } });
+  const layer = testLayer(path.join(dir, "db.sqlite"),
+    { lazyMemory: memory, planner: filteringPlanner() });
   try {
     const threadId = conversationThreadIdFromTelegramGroupChat(-10);
     await layer.respond({ threadId, message: user,
