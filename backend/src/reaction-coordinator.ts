@@ -2,12 +2,8 @@ import type { ReactionContext } from "./reaction-context.js";
 import { spawnReactionAttempt, type ReactionThread } from "./reaction-attempt.js";
 
 export type { ReactionContext } from "./reaction-context.js";
-export type { CoordinatorLifecycle, ReactionFailureHandler } from "./reaction-context.js";
+export type { CoordinatorLifecycle } from "./reaction-context.js";
 export type { ReactionAttempt, ReactionThread } from "./reaction-attempt.js";
-
-export interface StartReactionOptions {
-  onCurrentReactionFailure?: import("./reaction-context.js").ReactionFailureHandler;
-}
 
 /**
  * The properties that this class carries are:
@@ -15,21 +11,27 @@ export interface StartReactionOptions {
  * - every reaction attempt, including superseded ones, stays tracked until its
  *   task physically settles;
  * - a reaction started under an obsolete revision never runs;
- * - a replacement reaction waits for any committed delivery to be reconciled;
+ * - a replacement reaction waits for any committed delivery to be reconciled,
+ *   and that waiting start is itself tracked;
+ * - settle() resolves only when all already-scheduled reaction work, including
+ *   pending replacement starts, has reached quiescence;
  * - shutdown aborts everything and does not close until all tasks settle;
- * - genuine current-reaction failures are handed to an explicit handler;
- *   expected cancellation and stale failures are never treated as errors.
+ * - errors never produce Telegram dialogue; genuine current-reaction failures
+ *   are logged, and expected cancellation and stale failures are low-noise.
  *
  * The proof of those properties is guaranteed by:
- * - `invalidate`: bumps the revision, aborts the current attempt, and stops
- *   considering it current while leaving it in `inFlight`.
+ * - `invalidate`: bumps the revision, aborts the current attempt (logging its
+ *   captured revision), and stops considering it current while leaving it in
+ *   `inFlight`.
  * - `start`: refuses to run when the lifecycle is not open or the revision has
- *   advanced, and re-checks after waiting for a committed delivery.
+ *   advanced, registers a `pendingStart` while waiting on a committed delivery,
+ *   and re-checks revision and lifecycle before spawning.
  * - `spawnReactionAttempt`: keeps the attempt in `inFlight` until its task
- *   settles and applies the failure boundary.
- * - `settle`: awaits every physically in-flight task.
+ *   settles and applies the silent-on-error failure boundary.
+ * - `settle`: repeatedly awaits every in-flight task and every pending start
+ *   until no scheduled work remains.
  * - `abortAllAndSettle`: sets the lifecycle to closing, bumps revisions, aborts
- *   every attempt, awaits all of them, and only then clears the threads.
+ *   every in-flight attempt, and only then clears the threads.
  */
 export class ReactionCoordinator {
   readonly #threads = new Map<string, ReactionThread>();
@@ -42,7 +44,10 @@ export class ReactionCoordinator {
   #threadFor(threadKey: string): ReactionThread {
     let thread = this.#threads.get(threadKey);
     if (thread === undefined) {
-      thread = { revision: 0, current: undefined, inFlight: new Set(), committedDelivery: undefined };
+      thread = {
+        revision: 0, current: undefined, inFlight: new Set(),
+        pendingStart: undefined, committedDelivery: undefined,
+      };
       this.#threads.set(threadKey, thread);
     }
     return thread;
@@ -50,17 +55,19 @@ export class ReactionCoordinator {
 
   /**
    * Marks the thread as superseded: increments its revision and aborts any
-   * active reaction. The aborted attempt remains tracked until its task
-   * physically settles. Returns the new revision the caller should start under.
+   * active reaction, logging the cancelled attempt's own revision. The aborted
+   * attempt remains tracked until its task physically settles. Returns the new
+   * revision the caller should start under.
    */
   invalidate(threadKey: string): number {
     const thread = this.#threadFor(threadKey);
+    const current = thread.current;
     thread.revision += 1;
-    if (thread.current !== undefined) {
-      thread.current.controller.abort();
+    if (current !== undefined) {
+      current.controller.abort();
       thread.current = undefined;
       console.log(
-        `Cancelled reaction thread=${threadKey} revision=${thread.revision} reason=newer-message`,
+        `Cancelled reaction thread=${threadKey} revision=${current.revision} reason=newer-message`,
       );
     }
     return thread.revision;
@@ -68,57 +75,70 @@ export class ReactionCoordinator {
 
   /**
    * Runs `run` as the reaction for the given thread revision, if that revision
-   * is still current. Waits for any committed delivery to be reconciled first.
+   * is still current. Waits for any committed delivery to be reconciled first;
+   * that wait is tracked as a pending start so `settle()` covers it.
    */
   async start(
     threadKey: string,
     revision: number,
     run: (ctx: ReactionContext) => Promise<void>,
-    options: StartReactionOptions = {},
   ): Promise<void> {
     const thread = this.#threadFor(threadKey);
     if (this.#lifecycle !== "open" || thread.revision !== revision) return;
-    if (thread.committedDelivery !== undefined) {
-      // A committed Telegram send is still being reconciled; wait for its
-      // outcome (persisted or failed) before acquiring the replacement context.
-      await thread.committedDelivery;
-      if (this.#threads.get(threadKey)?.revision !== revision) return;
+    let pending: Promise<void> | undefined;
+    try {
+      if (thread.committedDelivery !== undefined) {
+        // A committed Telegram send is still being reconciled; wait for its
+        // outcome (persisted or failed) before acquiring the replacement
+        // context. The wait itself is scheduled reaction work.
+        pending = new Promise<void>((resolve) => {
+          void thread.committedDelivery?.then(() => resolve());
+        });
+        thread.pendingStart = pending;
+        await pending;
+        if (this.#threads.get(threadKey)?.revision !== revision) return;
+        if (this.#lifecycle !== "open") return;
+      }
+      spawnReactionAttempt({ threadKey, revision, thread, lifecycle: () => this.#lifecycle, run });
+    } finally {
+      if (pending !== undefined && thread.pendingStart === pending) {
+        thread.pendingStart = undefined;
+      }
     }
-    if (this.#lifecycle !== "open") return;
-    spawnReactionAttempt({
-      threadKey,
-      revision,
-      thread,
-      lifecycle: () => this.#lifecycle,
-      run,
-      onCurrentReactionFailure: options.onCurrentReactionFailure,
-    });
-  }
-
-  /** Waits for every physically in-flight reaction, including obsolete ones. */
-  async settle(): Promise<void> {
-    const tasks: Promise<void>[] = [];
-    for (const thread of this.#threads.values()) {
-      for (const attempt of thread.inFlight) tasks.push(attempt.task);
-    }
-    await Promise.all(tasks);
   }
 
   /**
-   * Aborts every active reaction and waits for all of them to settle before
-   * the lifecycle becomes closed.
+   * Waits until every reaction attempt that had been scheduled before this
+   * call has physically settled, including replacement starts that were
+   * waiting on a committed delivery and any attempts they subsequently spawn.
+   */
+  async settle(): Promise<void> {
+    for (;;) {
+      const tasks: Promise<void>[] = [];
+      for (const thread of this.#threads.values()) {
+        for (const attempt of thread.inFlight) tasks.push(attempt.task);
+        if (thread.pendingStart !== undefined) tasks.push(thread.pendingStart);
+      }
+      if (tasks.length === 0) return;
+      await Promise.all(tasks);
+    }
+  }
+
+  /**
+   * Aborts every active reaction and waits for all of them, plus any pending
+   * replacement starts, to settle before the lifecycle becomes closed.
    */
   async abortAllAndSettle(): Promise<void> {
     this.#lifecycle = "closing";
     for (const [threadKey, thread] of this.#threads) {
       thread.revision += 1;
-      if (thread.current !== undefined) {
-        thread.current.controller.abort();
+      thread.current = undefined;
+      for (const attempt of thread.inFlight) {
+        attempt.controller.abort();
         console.log(
-          `Cancelled reaction thread=${threadKey} revision=${thread.revision} reason=shutdown`,
+          `Cancelled reaction thread=${threadKey} revision=${attempt.revision} reason=shutdown`,
         );
       }
-      for (const attempt of thread.inFlight) attempt.controller.abort();
     }
     await this.settle();
     this.#threads.clear();

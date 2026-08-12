@@ -21,7 +21,9 @@ export type PlannerGateResult =
  * Runs the cheap planner, applies its naming proposals under a staleness guard
  * (so an obsolete planner can never begin durable natural-name writes), and
  * decides whether the ordinary event should be filtered. Planner failures fail
- * open; a cancelled planner never fails open.
+ * open to the realizer, log the failure, and make zero natural-name
+ * assignments: the existing name map is returned unchanged and no `@username`
+ * fallback is synthesized from a failed planner.
  */
 export async function runPlannerGate(
   planner: AttentionPlanner,
@@ -43,20 +45,22 @@ export async function runPlannerGate(
     plannerFailed = true;
     onPlannerDecision?.({ outcome: "failure", errorDetail: errorDetail(error) });
     // Fail open: a genuine attention pre-filter failure must never create an
-    // irreversible false negative, so continue to the smart realizer.
+    // irreversible false negative, so continue to the smart realizer with the
+    // natural-name map exactly as it was — no planner answer exists, so no
+    // durable naming write may happen.
   }
 
-  // A stale planner result must never mutate durable first-write-wins natural
-  // names, and the mutation step re-checks before every write.
-  ctx?.throwIfStale();
-  const applied = await applyProposedNames(
-    naturalNameStore, namingChoices, plannerDecision.naturalNames,
-    context.naturalNames, () => ctx?.throwIfStale(),
-  );
-  context.naturalNames = applied.merged;
-  ctx?.throwIfStale();
-
   if (!plannerFailed) {
+    // A stale planner result must never mutate durable first-write-wins natural
+    // names, and the mutation step re-checks before every write.
+    ctx?.throwIfStale();
+    const applied = await applyProposedNames(
+      naturalNameStore, namingChoices, plannerDecision.naturalNames,
+      context.naturalNames, () => ctx?.throwIfStale(),
+    );
+    context.naturalNames = applied.merged;
+    ctx?.throwIfStale();
+
     const canFilter = !(inputChatKind === "private" || inputDirectlyAddressed);
     if (!plannerDecision.attention && canFilter) {
       onPlannerDecision?.({
@@ -68,5 +72,5 @@ export async function runPlannerGate(
       outcome: "pass", attention: plannerDecision.attention, naturalNames: applied.newNames,
     });
   }
-  return { outcome: "continue", context, plannerFailed, newNames: applied.newNames };
+  return { outcome: "continue", context, plannerFailed, newNames: {} };
 }

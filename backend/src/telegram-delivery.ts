@@ -1,5 +1,4 @@
 import type { GeneratedTurn } from "./generated-turn.js";
-import type { DeliveredHevroniaMessage, ReplyRelationship, TelegramSenderIdentity } from "./telegram-event.js";
 
 export interface TelegramTurnDelivery {
   showTyping(): Promise<void>;
@@ -19,14 +18,6 @@ export type TelegramDeliveryResult =
 export interface DeliveryCommit {
   begin(): void;
   complete(): void;
-}
-
-export interface FallbackDeliveryInput {
-  text: string;
-  sender: TelegramSenderIdentity;
-  chatKind: "private" | "group" | "supergroup";
-  messageThreadId: number | null;
-  replyTo: ReplyRelationship;
 }
 
 /**
@@ -63,26 +54,5 @@ export async function deliverGeneratedTurn(
   }
   speak.persistDelivery(deliveredMessageId);
   commit?.complete();
-  return { status: "delivered", persistence: "queued" };
-}
-
-/**
- * Delivers the fallback message. The optional `guard` runs immediately before
- * the send so a stale or cancelled reaction never sends fallback; once the
- * send is confirmed, the fallback is persisted canonically.
- */
-export async function deliverFallbackMessage(
-  input: FallbackDeliveryInput,
-  delivery: TelegramTurnDelivery,
-  persist: (message: DeliveredHevroniaMessage) => void,
-  guard: () => void = () => undefined,
-): Promise<TelegramDeliveryResult> {
-  guard();
-  const deliveredMessageId = await delivery.reply(input.text, input.replyTo.targetMessageId);
-  persist({
-    kind: "hevronia", messageId: deliveredMessageId, sender: input.sender,
-    senderDisplayName: "Хевронія", senderUsername: null, chatKind: input.chatKind,
-    text: input.text, messageThreadId: input.messageThreadId, replyTo: input.replyTo,
-  });
   return { status: "delivered", persistence: "queued" };
 }

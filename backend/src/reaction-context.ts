@@ -22,8 +22,3 @@ export interface ReactionContext {
 }
 
 export type CoordinatorLifecycle = "open" | "closing" | "closed";
-
-/** Invoked for genuine current-reaction failures that may produce fallback. */
-export interface ReactionFailureHandler {
-  (error: unknown, ctx: ReactionContext): void | Promise<void>;
-}

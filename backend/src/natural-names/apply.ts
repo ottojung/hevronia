@@ -43,7 +43,13 @@ function resolveProposedName(
   choice: MissingNaturalNameChoice,
   value: string | null | undefined,
 ): string | undefined {
-  if (value !== null && value !== undefined) return value;
-  if (choice.username !== null && choice.username !== "") return `@${choice.username}`;
+  if (typeof value === "string") return value;
+  // An explicit `null` means the planner found no reasonable alias: the
+  // application may fall back to the exact @username when one exists. An
+  // absent value (`undefined`) means no planner answer exists at all and must
+  // never cause a durable write.
+  if (value === null && choice.username !== null && choice.username !== "") {
+    return `@${choice.username}`;
+  }
   return undefined;
 }

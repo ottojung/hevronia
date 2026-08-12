@@ -45,7 +45,6 @@ export interface ConversationLayer {
   observe(
     input: RespondInput,
     delivery: import("./telegram-delivery.js").TelegramTurnDelivery,
-    onCurrentReactionFailure?: import("./reaction-coordinator.js").ReactionFailureHandler,
   ): Promise<void>;
   recordDeliveredMessage(
     threadId: ConversationThreadId,
