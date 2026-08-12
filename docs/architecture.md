@@ -67,12 +67,30 @@ into the planner, the realizer, and the underlying LangChain model
 invocations, and the model-retry layer stops immediately on abort and never
 retries a cancelled request. A cancelled planner never fails open into the
 realizer, a cancelled realizer never delivers, and shutdown or a newer message
-never triggers fallback text. Delivery runs under the same revision guards —
-before typing, after typing, immediately before the send, and before persisting
-the canonical outgoing event — so a stale reaction can neither send nor persist
-an obsolete reply. The deterministic `respond()` path (observe + one reaction,
+never triggers fallback text.
+
+Before Telegram delivery begins, a reaction may be superseded freely. Once a
+Telegram send has begun, its outcome must be reconciled with canonical history:
+a confirmed outgoing message is persisted even if a newer incoming event
+arrived while the network request was in flight. The coordinator tracks a
+per-thread committed delivery and the replacement reaction waits for its
+outcome (persisted or failed) before acquiring the newest context, so the
+canonical history always matches Telegram-confirmed reality. Delivery runs
+under revision guards up to that commit boundary (before typing, after typing,
+immediately before the send); after the send is committed, a confirmed result
+is never discarded. The deterministic `respond()` path (observe + one reaction,
 returning the generated turn) remains the API for tests and the simulation
 harness.
+
+Obsolete reactions remain lifecycle-tracked until their underlying tasks
+physically settle, even after they cease to be the current reaction. Shutdown
+aborts every in-flight attempt and does not close persistence resources until
+all of them have settled.
+
+Genuine current-reaction failures may produce the normal Telegram fallback;
+expected cancellation and stale failures do not. A fallback is itself
+revision-guarded before its send and, once Telegram confirms it, persisted
+canonically.
 
 The turn is a two-stage pipeline:
 
