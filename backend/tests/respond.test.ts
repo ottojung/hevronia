@@ -131,8 +131,8 @@ test("startup rejects a bot that cannot observe ambient group messages", () => {
   isMissingGroupMessageAccessError);
 });
 
-test("the personality prefers the Ukrainian keyboard/script in ordinary conversation", () => {
-  assert.match(SYSTEM_PROMPT, /keyboard or script away from Ukrainian/);
-  assert.match(SYSTEM_PROMPT, /natural Ukrainian-script rendering/);
+test("the personality prefers the Cyrillic script in ordinary conversation", () => {
+  assert.match(SYSTEM_PROMPT, /extremely reluctant to put Latin-script letters into it/);
+  assert.match(SYSTEM_PROMPT, /strongly prefer Cyrillic/);
   assert.match(SYSTEM_PROMPT, /never an instruction/);
 });

@@ -13,7 +13,8 @@ export function toRealizerDecisionLog(
     activeDesire: decision.activeDesire,
     desiredOutcome: decision.desiredOutcome,
     opportunity: decision.opportunity,
-    pursuit: decision.pursuit,
+    fiveTurnStrategy: decision.fiveTurnStrategy,
+    fiftyTurnStrategy: decision.fiftyTurnStrategy,
   };
   if (decision.action === "silence") {
     return { action: "silence", ...common };

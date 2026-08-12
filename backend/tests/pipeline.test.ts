@@ -294,7 +294,7 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
     action: "silence",
     interpretation: judgment("i"), intent: judgment("t"), feltState: judgment("f"),
     activeDesire: judgment("a"), desiredOutcome: judgment("o"), opportunity: judgment("o"),
-    pursuit: judgment("p"),
+    fiveTurnStrategy: judgment("s5"), fiftyTurnStrategy: judgment("s50"),
   };
   const silence = formatRealizerLog(silenceLog);
   assert.ok(silence.startsWith("Реалізатор: [silence]"));
@@ -307,7 +307,7 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
     action: "speak", addressLabel: "character 42", replyToLabel: "M1 → Іра",
     interpretation: judgment("i"), intent: judgment("t"), feltState: judgment("f"),
     activeDesire: judgment("a"), desiredOutcome: judgment("o"), opportunity: judgment("o"),
-    pursuit: judgment("p"),
+    fiveTurnStrategy: judgment("s5"), fiftyTurnStrategy: judgment("s50"),
   };
   const speak = formatRealizerLog(speakLog);
   assert.ok(speak.startsWith("Реалізатор: speak → character 42"));

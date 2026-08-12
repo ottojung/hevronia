@@ -71,10 +71,15 @@ export function realizerSilence(): RealizerDecision {
       "You could acknowledge them and test how they respond.",
       "Without an active desire, that opportunity is not worth taking.",
     ),
-    pursuit: judgment(
-      "You decide that staying silent serves you best.",
-      "You could offer a one-word acknowledgment.",
+    fiveTurnStrategy: judgment(
+      "You decide that staying silent serves you best for the next several turns.",
+      "You could offer a one-word acknowledgment and see what follows.",
       "Saying nothing costs nothing and keeps the calm you want.",
+    ),
+    fiftyTurnStrategy: judgment(
+      "You want to remain a quiet presence who engages when something genuinely matters.",
+      "You could keep the contact going regardless of its value.",
+      "Sustained contact with no personal value serves none of your enduring aims.",
     ),
   };
 }
@@ -116,10 +121,15 @@ export function realizerSpeak(
       "You could steer the topic toward something that interests you more.",
       "A short reply serves your light aim without commandeering the chat.",
     ),
-    pursuit: judgment(
-      "You decide to say something short.",
+    fiveTurnStrategy: judgment(
+      "You decide to say something short now and see how it lands.",
       "You decide to stay silent and let the moment pass.",
       "A short reply acknowledges them without overinvesting.",
+    ),
+    fiftyTurnStrategy: judgment(
+      "You are not building anything long-term with this person yet.",
+      "You could invest in a deeper long-term connection with them.",
+      "There is no established relationship weight to justify a long-term investment.",
     ),
     message: "ага",
     ...overrides,

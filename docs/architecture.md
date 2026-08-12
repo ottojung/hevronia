@@ -102,8 +102,9 @@ cheap attention planner
 The cheap planner is a high-recall attention filter: it only decides whether the
 situation is worth a smart-model invocation. It cannot force speech. The smart
 realizer is the authoritative mind of the turn: it owns interpretation, intent
-inference, feelings, desires, outcome, opportunity, pursuit, addressee choice,
-reply attachment, the final speak/silence decision, and the wording.
+inference, feelings, desires, outcome, opportunity, medium- and long-term
+strategies, addressee choice, reply attachment, the final speak/silence
+decision, and the wording.
 
 ## Module layout
 
@@ -248,7 +249,7 @@ fallback for that turn. Telegram metadata in the character list always comes
 from the latest visible message for that sender, never stale earlier ones.
 
 The planner is a gate, not her social mind. It does not interpret intent,
-assign feelings or desires, choose a pursuit, pick an addressee, or decide
+assign feelings or desires, choose strategies, pick an addressee, or decide
 whether she should reply. A `yes` means only that the situation deserves a
 smart-model invocation.
 
@@ -288,7 +289,7 @@ plausibility. `whyRejected` names what is actually wrong with the alternative �
 the evidence or consideration that tells against it — rather than merely
 restating that the leading view is good or fits.
 
-The seven contrastive fields:
+The eight contrastive fields:
 
 - `interpretation` — what Хевронія thinks is happening / what the event means
   in context, weighed against the strongest competing interpretation;
@@ -300,19 +301,22 @@ The seven contrastive fields:
 - `activeDesire` — what she currently wants (her motive, not the others'
   intent), weighed against the strongest competing account of what she wants
   most;
-- `desiredOutcome` — the state she wants to bring about, distinct from the
-  action, weighed against the strongest competing outcome;
-- `opportunity` — what the situation makes possible in relation to her desire,
-  weighed against another plausible opportunity;
-- `pursuit` — the action/strategy she chooses (ask, answer, tease, object,
-  challenge, redirect, acknowledge, refuse, or intentionally saying nothing),
-  separate from the final wording, weighed against the strongest competing
-  action she seriously could have chosen instead.
+- `desiredOutcome` — the state, result, or experience she wants, distinct from
+  what she will do, weighed against the strongest competing outcome;
+- `opportunity` — a concrete affordance the present situation gives her toward
+  the desired outcome, weighed against another plausible opportunity;
+- `fiveTurnStrategy` — the concrete medium-term strategy for roughly the next
+  five turns: how she will act across those exchanges to move the outcome
+  closer, with the action she takes right now as its first step;
+- `fiftyTurnStrategy` — the long-term strategy for roughly fifty turns: how the
+  current goal connects to her enduring aims (waking and returning home,
+  preserving memory, protecting her sense of self) and how she intends to
+  pursue them across many exchanges.
 
 The contrastive shape forces the realizer to discriminate: for each judgment it
 must identify a live competitor and state why the selected version currently
 wins, instead of emitting the first plausible interpretation, motive, feeling,
-desire, outcome, opportunity, or action that occurs to it.
+desire, outcome, opportunity, or strategy that occurs to it.
 
 For `speak`, the realizer additionally chooses an `addressCharacter` handle (if
 any), an independent `replyToMessage` handle (if any Telegram reply

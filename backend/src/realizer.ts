@@ -24,7 +24,8 @@ export type RealizerDecisionLog =
       activeDesire: SubjectiveJudgment;
       desiredOutcome: SubjectiveJudgment;
       opportunity: SubjectiveJudgment;
-      pursuit: SubjectiveJudgment;
+      fiveTurnStrategy: SubjectiveJudgment;
+      fiftyTurnStrategy: SubjectiveJudgment;
     }
   | {
       action: "speak";
@@ -36,7 +37,8 @@ export type RealizerDecisionLog =
       activeDesire: SubjectiveJudgment;
       desiredOutcome: SubjectiveJudgment;
       opportunity: SubjectiveJudgment;
-      pursuit: SubjectiveJudgment;
+      fiveTurnStrategy: SubjectiveJudgment;
+      fiftyTurnStrategy: SubjectiveJudgment;
     }
   | { action: "failure"; errorDetail: string };
 

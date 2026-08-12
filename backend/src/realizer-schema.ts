@@ -36,7 +36,8 @@ const subjectiveFields = {
   activeDesire: subjectiveJudgmentSchema,
   desiredOutcome: subjectiveJudgmentSchema,
   opportunity: subjectiveJudgmentSchema,
-  pursuit: subjectiveJudgmentSchema,
+  fiveTurnStrategy: subjectiveJudgmentSchema,
+  fiftyTurnStrategy: subjectiveJudgmentSchema,
 };
 
 const silenceVariant = z.object({

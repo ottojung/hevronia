@@ -44,7 +44,8 @@ function formatJudgments(log: Extract<RealizerDecisionLog, { action: "silence" |
     formatJudgment("activeDesire", log.activeDesire),
     formatJudgment("desiredOutcome", log.desiredOutcome),
     formatJudgment("opportunity", log.opportunity),
-    formatJudgment("pursuit", log.pursuit),
+    formatJudgment("fiveTurnStrategy", log.fiveTurnStrategy),
+    formatJudgment("fiftyTurnStrategy", log.fiftyTurnStrategy),
   ].join("\n");
 }
 

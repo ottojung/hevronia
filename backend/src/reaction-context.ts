@@ -10,4 +10,13 @@ export interface ReactionContext {
   readonly signal: AbortSignal;
   isCurrent(): boolean;
   throwIfStale(): void;
+  /**
+   * Enters the delivery commit phase for the thread: from this point a
+   * Telegram send is committed and its confirmed result must be reconciled
+   * with canonical history regardless of later revisions. Marks this attempt
+   * as committed and returns a `complete()` callback the caller invokes once
+   * the send outcome is persisted (or has failed), so a waiting replacement
+   * reaction can proceed.
+   */
+  beginCommittedDelivery(): { complete(): void };
 }

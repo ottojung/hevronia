@@ -57,9 +57,13 @@ export async function reactTurn(
       // abort above never fails open.
     }
 
+    // A stale planner result must never mutate durable first-write-wins
+    // natural names, and the mutation step itself re-checks before every write.
+    ctx?.throwIfStale();
     const applied = await applyProposedNames(
       dependencies.naturalNameStore, state.namingChoices,
       plannerDecision.naturalNames, state.naturalNames,
+      () => ctx?.throwIfStale(),
     );
     context.naturalNames = applied.merged;
 

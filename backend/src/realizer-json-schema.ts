@@ -35,14 +35,15 @@ export function buildRealizerJsonSchema(
     activeDesire: subjectiveJudgmentJson(strict),
     desiredOutcome: subjectiveJudgmentJson(strict),
     opportunity: subjectiveJudgmentJson(strict),
-    pursuit: subjectiveJudgmentJson(strict),
+    fiveTurnStrategy: subjectiveJudgmentJson(strict),
+    fiftyTurnStrategy: subjectiveJudgmentJson(strict),
   };
   const silenceVariant = {
     type: "object",
     ...objectKeywords,
     properties: { action: { type: "string", enum: ["silence"] }, ...subjectiveFields },
     required: ["action", "interpretation", "intent", "feltState", "activeDesire",
-      "desiredOutcome", "opportunity", "pursuit"],
+      "desiredOutcome", "opportunity", "fiveTurnStrategy", "fiftyTurnStrategy"],
   };
   const speakVariant = {
     type: "object",
@@ -56,7 +57,7 @@ export function buildRealizerJsonSchema(
     },
     required: ["action", "addressCharacter", "replyToMessage", "message",
       "interpretation", "intent", "feltState", "activeDesire",
-      "desiredOutcome", "opportunity", "pursuit"],
+      "desiredOutcome", "opportunity", "fiveTurnStrategy", "fiftyTurnStrategy"],
   };
   return {
     type: "object",
