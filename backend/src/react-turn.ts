@@ -93,7 +93,6 @@ export async function reactTurn(
     ctx?.throwIfStale();
     if (decision.action === "silence") {
       dependencies.onRealizerDecision?.(toRealizerDecisionLog(decision, undefined));
-      console.log(`Realizer chose silence thread=${ctx?.threadKey ?? "-"} revision=${ctx?.revision ?? 0}`);
       return { status: "silence" };
     }
 
