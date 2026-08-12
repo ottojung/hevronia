@@ -1,8 +1,11 @@
-import { dreamSubject, type NaturalNames } from "./telegram-event.js";
-import type { DeliveredHevroniaMessage, ObservedTelegramMessage } from "./telegram-event.js";
+import {
+  dreamSubject,
+  type NaturalNames,
+  type DeliveredHevroniaMessage,
+  type ObservedTelegramMessage,
+} from "./telegram-event.js";
 
 const EMPTY_NAMES: NaturalNames = new Map();
-
 export function renderOwnMessage(
   event: DeliveredHevroniaMessage,
   naturalNames: NaturalNames = EMPTY_NAMES,

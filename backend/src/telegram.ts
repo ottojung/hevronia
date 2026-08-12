@@ -8,7 +8,6 @@ import { logBotIdentity, tokenFromEnv } from "./telegram-config.js";
 import { createObservedTelegramMessage, hasDirectMention, telegramDisplayName, telegramSenderIdentity } from "./telegram-observation.js";
 import { installTelegramRetry } from "./telegram-retry.js";
 import { isConversationThreadPersistenceError } from "./pending-conversation-writes.js";
-import type { TelegramSenderIdentity } from "./telegram-event.js";
 
 export async function startBot(): Promise<void> {
   const bot = new Bot(tokenFromEnv());
@@ -70,12 +69,10 @@ export async function startBot(): Promise<void> {
       if (isConversationThreadPersistenceError(error)) return;
       const fallbackText = "Щось я зараз зависла. Спробуй ще раз за хвилину.";
       const fallbackThreadId = conversationThreadIdFromTelegramChat(ctx.chat.type, ctx.chat.id, messageThreadId);
-      const fallbackTargetSender: TelegramSenderIdentity = telegramSenderIdentity(
-        ctx.from.id, ctx.message.sender_chat?.id,
-      );
       await deliverFallbackMessage({ text: fallbackText, sender: { kind: "user", id: me.id },
         chatKind: ctx.chat.type, messageThreadId: messageThreadId ?? null,
-        replyTo: { targetMessageId: messageId, targetSender: fallbackTargetSender,
+        replyTo: { targetMessageId: messageId,
+          targetSender: telegramSenderIdentity(ctx.from.id, ctx.message.sender_chat?.id),
           targetSenderDisplayName: telegramDisplayName(ctx.from.first_name, ctx.from.last_name),
           targetSenderUsername: ctx.message.from?.username ?? null,
           targetText: ctx.message.text, targetIsHevronia: false } }, {

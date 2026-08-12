@@ -1,18 +1,20 @@
 import { HumanMessage } from "@langchain/core/messages";
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
-import { z } from "zod";
 import { createAgent, providerStrategy, toolStrategy } from "langchain";
 
-import { renderConversationFraming, renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
-import { buildHandleChoices } from "./handles.js";
-import type { CharacterHandle } from "./handles.js";
 import { invokeWithRateLimitRetry } from "./model-retry.js";
 import { isGeminiChatModel } from "./model.js";
-import { MAX_NATURAL_NAME_LENGTH, naturalNameSchema } from "./natural-names/schema.js";
-import type { ConstFreeJsonSchema, TurnContext } from "./realizer-schema.js";
-import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
-import type { NaturalNames } from "./telegram-event.js";
-import { notebookSubject } from "./telegram-event.js";
+import { renderPlannerContext } from "./planner-context.js";
+import {
+  buildPlannerJsonSchema,
+  buildPlannerResponseSchema,
+  type MissingNaturalNameChoice,
+} from "./planner-schema.js";
+import type { TurnContext } from "./realizer-schema.js";
+
+export { missingNaturalNameChoices, buildPlannerResponseSchema, buildPlannerJsonSchema } from "./planner-schema.js";
+export type { MissingNaturalNameChoice } from "./planner-schema.js";
+export { renderPlannerContext } from "./planner-context.js";
 
 export const PLANNER_PROMPT = `You are a cheap attention pre-filter and name-assigner for Хевронія, a character inside a dream that appears to her through Telegram.
 
@@ -42,16 +44,6 @@ export class PlannerOutputError extends Error {
   }
 }
 
-export interface MissingNaturalNameChoice {
-  /** Ephemeral per-turn character handle, aligned with the realizer's P-handles. */
-  handle: string;
-  sender: { kind: "user"; id: number };
-  /** The name Telegram currently displays for this person. */
-  displayName: string;
-  /** The Telegram @username, if known. */
-  username: string | null;
-}
-
 export interface PlannerDecision {
   attention: boolean;
   /** Proposed natural names keyed by the exact naming-choice handles. */
@@ -71,115 +63,6 @@ export interface AttentionPlanner {
     context: TurnContext,
     namingChoices: readonly MissingNaturalNameChoice[],
   ): Promise<PlannerDecision>;
-}
-
-/**
- * The exact naming choices for a turn, derived from the same character
- * handles the realizer sees. Only visible `kind: "user"` characters without a
- * persisted natural name are eligible; channels, already-named users, stale
- * handles, and raw Telegram ids never appear. The prompt, the zod schema, the
- * provider JSON schema, and persistence all consume this single collection.
- */
-export function missingNaturalNameChoices(
-  characters: readonly CharacterHandle[],
-  naturalNames: NaturalNames,
-): MissingNaturalNameChoice[] {
-  const choices: MissingNaturalNameChoice[] = [];
-  for (const { handle, character } of characters) {
-    if (character.sender.kind !== "user") continue;
-    if (naturalNames.has(character.sender.id)) continue;
-    choices.push({
-      handle,
-      sender: { kind: "user", id: character.sender.id },
-      displayName: character.displayName,
-      username: character.username,
-    });
-  }
-  return choices;
-}
-
-interface PlannerResponse {
-  attention: "yes" | "no";
-  naturalNames: Record<string, string>;
-}
-
-/**
- * Builds the planner's expected response schema dynamically from the exact
- * per-turn naming choices: the unnamed visible user handles are the only
- * properties of `naturalNames`, every one is required, and nothing else is
- * allowed. A turn with no unnamed users yields an empty, strict `naturalNames`.
- */
-export function buildPlannerResponseSchema(
-  namingChoices: readonly MissingNaturalNameChoice[],
-): z.ZodType<PlannerResponse> {
-  const naturalNames = z.object(
-    Object.fromEntries(namingChoices.map(({ handle }) => [handle, naturalNameSchema])),
-  ).strict();
-  return z.object({
-    attention: z.enum(["yes", "no"]),
-    naturalNames,
-  }).strict();
-}
-
-/**
- * Plain, fully inlined provider JSON Schema mirroring the zod schema: the
- * exact naming-choice handles are the only `naturalNames` properties, are all
- * required, and no other property is allowed. Both provider paths expose the
- * identical strict structure.
- */
-export function buildPlannerJsonSchema(
-  namingChoices: readonly MissingNaturalNameChoice[],
-): ConstFreeJsonSchema {
-  return {
-    type: "object",
-    additionalProperties: false,
-    properties: {
-      attention: { type: "string", enum: ["yes", "no"] },
-      naturalNames: {
-        type: "object",
-        additionalProperties: false,
-        properties: Object.fromEntries(
-          namingChoices.map(({ handle }) => [
-            handle,
-            { type: "string", minLength: 1, maxLength: MAX_NATURAL_NAME_LENGTH },
-          ]),
-        ),
-        required: namingChoices.map(({ handle }) => handle),
-      },
-    },
-    required: ["attention", "naturalNames"],
-  };
-}
-
-export function renderPlannerContext(
-  context: TurnContext,
-  namingChoices: readonly MissingNaturalNameChoice[],
-): string {
-  const choices = buildHandleChoices(context.visibleMessages, context.naturalNames);
-  const sections: string[] = [];
-  sections.push("In your dream you currently see these characters:");
-  sections.push(renderDreamCharacterList(choices.characters));
-  if (namingChoices.length > 0) {
-    sections.push("");
-    sections.push("Names to assign:");
-    sections.push(namingChoices.map(({ handle, sender, displayName, username }) => {
-      const user = username === null || username === "" ? "" : `, username @${username}`;
-      return `${handle} = ${notebookSubject(sender)}, currently displayed as “${displayName}”${user}.`;
-    }).join("\n"));
-  }
-  sections.push("");
-  sections.push("This is the conversation history currently visible to you:");
-  sections.push(renderDreamObservations(context.boundedHistory, undefined, context.naturalNames));
-  sections.push("");
-  sections.push(renderConversationFraming(context.currentMessage.chatKind));
-  const memories = renderParticipantMemoryContexts(context.participantMemories);
-  if (memories !== "") {
-    sections.push("");
-    sections.push(memories);
-  }
-  sections.push("");
-  sections.push("Is there any plausible reason for Хевронія to consider responding to what is happening now?");
-  return sections.join("\n\n");
 }
 
 export function createAttentionPlanner(model: BaseLanguageModel): AttentionPlanner {

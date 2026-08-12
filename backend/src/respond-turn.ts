@@ -2,24 +2,18 @@ import type { ConversationStore } from "./conversation-store.js";
 import type { RespondInput } from "./conversation-types.js";
 import type {
   AttentionPlanner,
-  MissingNaturalNameChoice,
   PlannerDecision,
   PlannerDecisionLog,
 } from "./attention-planner.js";
-import { toRealizerDecisionLog } from "./decision-log.js";
 import { errorDetail } from "./error-detail.js";
 import { GeneratedTurn } from "./generated-turn.js";
 import type { LazyLongTermMemory } from "./long-term-memory/runtime.js";
+import { applyProposedNames } from "./natural-names/apply.js";
 import type { NaturalNameStore } from "./natural-names/store.js";
 import { PendingConversationWrites } from "./pending-conversation-writes.js";
 import type { Realizer, RealizerDecisionLog } from "./realizer.js";
-import type { RealizerDecision, TurnContext } from "./realizer-schema.js";
-import {
-  UnresolvableRealizerDecisionError,
-  deliveredEvent,
-  replyRelationshipFor,
-  resolveRealizerDecision,
-} from "./speak-resolution.js";
+import type { TurnContext } from "./realizer-schema.js";
+import { finalizeTurn } from "./finalize-turn.js";
 import { acquireTurnContext } from "./turn-memory.js";
 
 export interface RespondTurnDependencies {
@@ -32,26 +26,6 @@ export interface RespondTurnDependencies {
   lazyMemory?: LazyLongTermMemory;
   onPlannerDecision?: (log: PlannerDecisionLog) => void;
   onRealizerDecision?: (log: RealizerDecisionLog) => void;
-}
-
-/**
- * Persists every proposed natural name with first-write-wins semantics and
- * returns the merged name map the realizer should see, including any name a
- * concurrent proposal stored first.
- */
-async function persistProposedNames(
-  store: NaturalNameStore,
-  choices: readonly MissingNaturalNameChoice[],
-  proposed: Readonly<Record<string, string>>,
-  existing: ReadonlyMap<number, string>,
-): Promise<ReadonlyMap<number, string>> {
-  const merged = new Map(existing);
-  for (const choice of choices) {
-    const name = proposed[choice.handle];
-    if (name === undefined) continue;
-    merged.set(choice.sender.id, await store.assignIfAbsent(choice.sender.id, name));
-  }
-  return merged;
 }
 
 export async function respondTurn(
@@ -87,7 +61,7 @@ export async function respondTurn(
       // name is persisted from a failed planner.
     }
 
-    context.naturalNames = await persistProposedNames(
+    context.naturalNames = await applyProposedNames(
       dependencies.naturalNameStore, memory.namingChoices,
       plannerDecision.naturalNames, memory.naturalNames,
     );
@@ -108,40 +82,7 @@ export async function respondTurn(
       });
     }
 
-    let decision: RealizerDecision;
-    try {
-      decision = await dependencies.realizer.realize(context);
-    } catch (error) {
-      dependencies.onRealizerDecision?.({ action: "failure", errorDetail: errorDetail(error) });
-      throw error;
-    }
-
-    if (decision.action === "silence") {
-      dependencies.onRealizerDecision?.(toRealizerDecisionLog(decision, undefined));
-      return GeneratedTurn.fromSilence();
-    }
-
-    const resolved = resolveRealizerDecision(decision, context.visibleMessages);
-    if (resolved === undefined) {
-      dependencies.onRealizerDecision?.({
-        action: "failure",
-        errorDetail: errorDetail(new UnresolvableRealizerDecisionError(
-          decision.addressCharacter, decision.replyToMessage,
-        )),
-      });
-      return GeneratedTurn.fromSilence();
-    }
-
-    dependencies.onRealizerDecision?.(toRealizerDecisionLog(decision, resolved));
-    const replyTo = replyRelationshipFor(resolved.replyTo);
-    return GeneratedTurn.fromSpeak(decision.message, replyTo, (messageId) => {
-      const delivered = deliveredEvent(
-        messageId, input.hevroniaSender, decision.message, input.message, replyTo,
-      );
-      dependencies.canonicalWrites.enqueue(
-        input.threadId, () => dependencies.store.append(input.threadId, delivered),
-      );
-    });
+    return finalizeTurn(dependencies, input, context);
   } finally {
     memoryTurn?.release();
   }

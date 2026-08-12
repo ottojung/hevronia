@@ -1,11 +1,6 @@
-import Database from "better-sqlite3";
+import BetterSqlite3 from "better-sqlite3";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
-export const DEFAULT_NATURAL_NAMES_DB_PATH = fileURLToPath(
-  new URL("../../.data/natural-names.sqlite", import.meta.url),
-);
 
 /**
  * The properties that this class carries are:
@@ -28,7 +23,7 @@ export interface NaturalNameStore {
 
 export function createNaturalNameStore(dbPath: string): NaturalNameStore {
   mkdirSync(dirname(dbPath), { recursive: true });
-  const db = new Database(dbPath);
+  const db = new BetterSqlite3(dbPath);
   db.exec(
     "CREATE TABLE IF NOT EXISTS natural_names (user_id INTEGER PRIMARY KEY, name TEXT NOT NULL)",
   );
@@ -38,19 +33,18 @@ export function createNaturalNameStore(dbPath: string): NaturalNameStore {
   return {
     async assignIfAbsent(userId: number, name: string): Promise<string> {
       upsert.run(userId, name);
-      const row = selectOne.get(userId) as { name: string } | undefined;
-      if (row === undefined) return name;
-      return row.name;
+      const row = nameRow(selectOne.get(userId));
+      return row === undefined ? name : row.name;
     },
     async get(userId: number): Promise<string | undefined> {
-      const row = selectOne.get(userId) as { name: string } | undefined;
+      const row = nameRow(selectOne.get(userId));
       return row?.name;
     },
     async getMany(userIds: readonly number[]): Promise<ReadonlyMap<number, string>> {
       const result = new Map<number, string>();
       for (const userId of userIds) {
-        const row = selectMany.get(userId) as { user_id: number; name: string } | undefined;
-        if (row !== undefined) result.set(row.user_id, row.name);
+        const row = userRow(selectMany.get(userId));
+        if (row !== undefined) result.set(row.userId, row.name);
       }
       return result;
     },
@@ -58,4 +52,17 @@ export function createNaturalNameStore(dbPath: string): NaturalNameStore {
       db.close();
     },
   };
+}
+
+function nameRow(value: unknown): { name: string } | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  if (!("name" in value)) return undefined;
+  return typeof value.name === "string" ? { name: value.name } : undefined;
+}
+
+function userRow(value: unknown): { userId: number; name: string } | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  if (!("user_id" in value) || !("name" in value)) return undefined;
+  if (typeof value.user_id !== "number" || typeof value.name !== "string") return undefined;
+  return { userId: value.user_id, name: value.name };
 }

@@ -1,5 +1,9 @@
-import { dreamSubject, notebookSubject, type NaturalNames } from "./telegram-event.js";
-import type { TelegramSenderIdentity } from "./telegram-event.js";
+import {
+  dreamSubject,
+  notebookSubject,
+  type NaturalNames,
+  type TelegramSenderIdentity,
+} from "./telegram-event.js";
 import type { VisibleMessage } from "./realizer-schema.js";
 
 export interface DreamCharacter {
