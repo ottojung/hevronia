@@ -20,10 +20,10 @@ const geminiApiKey = geminiKeyFromEnv();
 
 const firstMemory = createMem0Store(openAiApiKey, geminiApiKey);
 try {
-  await firstMemory.rememberUserMessage(
+  await firstMemory.rememberUserMessages(
     userId,
     threadId,
-    "Мій улюблений тестовий фрукт — манго.",
+    ["Мій улюблений тестовий фрукт — манго."],
   );
   console.log("Mem0 add succeeded");
 
