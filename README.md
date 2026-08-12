@@ -171,9 +171,12 @@ attention planner, realizer, or summary models.
 
 The turn is two-stage. A cheap attention planner (`HEVRONIA_CHEAP_MODEL`, low
 thinking effort) answers only whether the situation is worth a smart-model
-invocation, returning literally `yes` or `no`. A `yes` means only that Хевронія
-should pay attention, never that she should reply. If the planner throws or
-emits anything other than `yes`/`no`, it fails open: the error is logged and the
+invocation (`attention: yes` / `no`), and additionally assigns natural names to
+visible people whose notebook has none yet. Naming is narrow: an obvious
+Cyrillic rendering of the Telegram username when one exists (… → «Боб»), else
+the exact `@username`, and never an invented nickname. A `yes` means only that
+Хевронія should pay attention, never that she should reply. If the planner
+throws or emits malformed output, it fails open: the error is logged and the
 turn continues to the realizer. Then the smart realizer (`HEVRONIA_SMART_MODEL`)
 owns the whole turn: it infers interpretation and intent, feels the situation,
 forms desires, chooses a pursuit, decides between silence and speech, picks the

@@ -90,7 +90,7 @@ planner, the smart realizer, the summary model, and the tests: every canonical
 event becomes a dream event appearing through Telegram.
 
 - Participant messages render as products of Хевронія's sleeping mind: "Your
-  sleeping mind made Боб say:" and, for replies, "Your sleeping mind made Мес
+  sleeping mind made Боб say:" and, for replies, "Your sleeping mind made Аня
   reply to Боб with:" or "...reply to one of your earlier messages with:". When
   no natural name exists, the stable label falls back to "character 42".
   Chat/channel senders appear as Telegram sources ("Your sleeping mind made the
@@ -120,6 +120,13 @@ the Telegram user id. `assignIfAbsent()` is concurrency-safe via
 `INSERT OR IGNORE` and first write wins; established names are never
 overwritten by later planner proposals. Only `{ kind: "user" }` identities
 receive natural names; channels keep their `channel N` treatment.
+
+A natural name is either a short Cyrillic conversational alias («Боб»,
+«Супербоб», «Анна», «Аня») or — for an opaque username — the exact `@username`
+unchanged. The planner never invents unrelated nicknames: the per-turn value
+schema accepts only a Cyrillic alias or, when a username exists, exactly
+`@<username>`, so arbitrary Latin handles and modified usernames are
+structurally impossible.
 
 The four layers:
 
@@ -165,9 +172,21 @@ from precisely that set (`backend/src/planner-schema.ts`): the unnamed visible
 user handles are the only `naturalNames` properties, all are required, and no
 other handle, channel, or raw id is possible. The prompt, the zod schema, and
 the OpenAI and Gemini provider schemas all derive from the same per-turn choice
-collection. Valid names are persisted before any filtering decision; on planner
+collection.
+
+The naming rule is deliberately narrow. The Telegram username is the primary
+source: if it has a nice, obvious Cyrillic conversational rendering the planner
+uses that rendering (`@SuperBob3000` → «Супербоб» or «Боб»); otherwise it keeps
+the exact `@username` unchanged (`@wt_t1g3y137` stays `@wt_t1g3y137`). No
+unrelated nicknames are invented, and a user without a username is named from
+the display name only when the Cyrillic rendering is obvious. Each handle's
+value schema enforces this: a Cyrillic alias or, when a username exists,
+exactly `@<username>`.
+
+Valid names are persisted before any filtering decision; on planner
 failure nothing partial persists and unnamed people keep the `character X`
-fallback for that turn.
+fallback for that turn. Telegram metadata in the character list always comes
+from the latest visible message for that sender, never stale earlier ones.
 
 The planner is a gate, not her social mind. It does not interpret intent,
 assign feelings or desires, choose a pursuit, pick an addressee, or decide
