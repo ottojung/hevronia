@@ -9,6 +9,7 @@ import { scenarios, smokeScenarioIds } from "../scripts/conversations/catalog.js
 import { runScenariosConcurrently } from "../scripts/conversations/orchestrator.js";
 import { runScenario } from "../scripts/conversations/runner.js";
 import { scenarioHeaderLines } from "../scripts/conversations/scenario-execution.js";
+import { EmptySimulatorMessageError } from "../scripts/conversations/simulator.js";
 import { PreseededLazyMemory } from "../scripts/conversations/preseeded-lazy-memory.js";
 import { completedScenarioResult } from "../scripts/conversations/types.js";
 import { HEVRONIA_ID, PARTICIPANT_ID, participantIdentityFor } from "../scripts/conversations/identities.js";
@@ -271,6 +272,31 @@ test("runner stops gracefully when the generator ends the conversation", async (
     { speaker: "participant", text: "привіт" },
     { speaker: "hevronia", ended: true },
   ]);
+});
+
+test("an empty simulator message ends the conversation normally, not as a failure", async () => {
+  const firstScenario = scenarios[0];
+  if (firstScenario === undefined) assert.fail("catalog is empty");
+  const layer: ConversationLayer = {
+    respond: () => Promise.resolve(GeneratedTurn.fromSilence()),
+    recordDeliveredMessage: () => undefined,
+    getMessages: () => Promise.resolve([]),
+    warmParticipant: () => undefined,
+    observe: async () => undefined,
+    settle: async () => undefined,
+    close: () => Promise.resolve(),
+  };
+  let printCalls = 0;
+  const result = await runScenario(firstScenario, 5, {
+    createLayer: () => layer,
+    simulator: { nextMessage: async () => { throw new EmptySimulatorMessageError(); } },
+    print: () => { printCalls += 1; },
+  });
+  if (result.status !== "completed") assert.fail("expected a completed scenario");
+  assert.equal(result.roundsCompleted, 0);
+  assert.equal(result.stoppingReason, "participant produced no message");
+  assert.deepEqual(result.transcript, []);
+  assert.equal(printCalls, 1);
 });
 
 test("scenario execution is concurrent: scenario B begins before scenario A finishes", async () => {

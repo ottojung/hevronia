@@ -4,6 +4,7 @@ import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../../src/
 import type { ConversationScenario, ScenarioDependencies, ScenarioResult, ScenarioStoppingReason, TranscriptEntry } from "./types.js";
 import { completedScenarioResult, failedScenarioResult } from "./types.js";
 import { PARTICIPANT_ID, HEVRONIA_ID, CHAT_ID, participantIdentityFor } from "./identities.js";
+import { isEmptySimulatorMessageError } from "./simulator.js";
 
 export function errorDetail(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
@@ -34,7 +35,19 @@ export async function runScenario(
     layer = await dependencies.createLayer();
     const identity = participantIdentityFor(scenario.id);
     for (let round = 0; round < rounds; round += 1) {
-      const participantText = await dependencies.simulator.nextMessage(scenario, transcript);
+      let participantText: string;
+      try {
+        participantText = await dependencies.simulator.nextMessage(scenario, transcript);
+      } catch (error) {
+        // An empty simulator message means the participant naturally stopped
+        // talking; that is a regular end of the conversation, not a failure.
+        if (isEmptySimulatorMessageError(error)) {
+          stoppingReason = "participant produced no message";
+          dependencies.print(`${identity.displayName}: [conversation ended]`);
+          break;
+        }
+        throw error;
+      }
       transcript.push({ speaker: "participant", text: participantText });
       dependencies.print(`${identity.displayName}: ${participantText}`);
       messageId += 1;

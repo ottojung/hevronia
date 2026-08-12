@@ -3,7 +3,7 @@ import { HumanMessage, SystemMessage, isBaseMessage } from "@langchain/core/mess
 import { cheapModelFromEnv, createChatModel } from "../../src/model.js";
 import { invokeWithRateLimitRetry } from "../../src/model-retry.js";
 import { extractText } from "../../src/text.js";
-import type { ConversationScenario, ParticipantGrammar, Simulator, TranscriptEntry } from "./types.js";
+import type { ParticipantGrammar, Simulator, TranscriptEntry } from "./types.js";
 
 export const DEFAULT_SIMULATOR_MODEL = cheapModelFromEnv();
 

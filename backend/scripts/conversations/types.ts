@@ -52,7 +52,8 @@ export interface ScenarioDependencies {
 export type ScenarioStoppingReason =
   | "round limit reached"
   | "stopped after several consecutive silences"
-  | "generator produced no message";
+  | "generator produced no message"
+  | "participant produced no message";
 
 export type ScenarioResult =
   | {
