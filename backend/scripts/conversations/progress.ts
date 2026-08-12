@@ -1,4 +1,5 @@
 import type { ConversationScenario, ScenarioResult } from "./types.js";
+import { fitProgressRegression, type RegressionFit } from "./regression.js";
 
 export function totalExpectedRounds(scenarios: readonly ConversationScenario[]): number {
   return scenarios.reduce((sum, scenario) => sum + scenario.rounds, 0);
@@ -13,12 +14,29 @@ export function formatElapsed(ms: number): string {
 }
 
 /**
+ * Like `formatElapsed` but allows negative values, used for an ETA that may
+ * fall below zero when the run is slower than the fitted rate predicted.
+ */
+export function formatElapsedSigned(ms: number): string {
+  const sign = ms < 0 ? "-" : "";
+  const totalSeconds = Math.round(Math.abs(ms) / 1_000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${sign}${seconds}s`;
+  return `${sign}${minutes}m ${seconds}s`;
+}
+
+/**
  * Cumulative progress for a conversation run: finished scenarios over the
- * total, completed rounds over the total expected rounds, and an ETA that
- * linearly extrapolates the observed time per completed round onto the
- * remaining expected rounds. Scenarios run concurrently, so the live line
- * reports only overall progress and never pretends to show a single running
- * scenario.
+ * total, completed rounds over the total expected rounds, and an ETA from a
+ * least-squares linear regression of completed rounds against elapsed time.
+ * The coefficients are recomputed every time a model response completes a
+ * round (`advance`) or a scenario finishes (`finish`); between recomputes the
+ * projected finish time is fixed, so the ETA decreases as time passes and only
+ * moves up when the coefficients are refreshed. An ETA below zero simply means
+ * the run is slower than the fitted rate predicted. Scenarios run
+ * concurrently, so the live line reports only overall progress and never
+ * pretends to show a single running scenario.
  */
 export class ConversationProgress {
   private readonly totalScenarios: number;
@@ -26,6 +44,8 @@ export class ConversationProgress {
   private finished = 0;
   private completedRounds = 0;
   private readonly activeRounds = new Map<string, number>();
+  private readonly points: Array<{ elapsed: number; rounds: number }> = [];
+  private fit: RegressionFit | undefined;
 
   constructor(
     scenarios: readonly ConversationScenario[],
@@ -44,6 +64,7 @@ export class ConversationProgress {
     if (this.activeRounds.has(scenarioId)) {
       this.activeRounds.set(scenarioId, roundsCompleted);
     }
+    this.recordPoint();
   }
 
   line(): string {
@@ -55,6 +76,7 @@ export class ConversationProgress {
     this.activeRounds.delete(scenario.id);
     this.finished += 1;
     this.completedRounds += result.roundsCompleted;
+    this.recordPoint();
     const outcome = result.status === "completed"
       ? `done (${result.roundsCompleted}/${scenario.rounds} rounds)`
       : `failed (${result.roundsCompleted}/${scenario.rounds} rounds) — ${result.failure}`;
@@ -71,12 +93,18 @@ export class ConversationProgress {
     return formatElapsed(Math.max(this.now() - this.startedAt, 0));
   }
 
+  private recordPoint(): void {
+    const elapsed = Math.max(this.now() - this.startedAt, 0);
+    const rounds = this.completedRounds + this.totalActiveRounds();
+    this.points.push({ elapsed, rounds });
+    this.fit = fitProgressRegression(this.points, this.totalRounds);
+  }
+
   private eta(finished: number, completedRounds: number): string {
     if (finished >= this.totalScenarios) return "~0s";
-    const remainingRounds = Math.max(this.totalRounds - completedRounds, 0);
-    if (remainingRounds === 0) return "~0s";
-    if (completedRounds <= 0) return "~?";
+    if (this.totalRounds - completedRounds <= 0) return "~0s";
+    if (this.fit === undefined) return "~?";
     const elapsed = Math.max(this.now() - this.startedAt, 0);
-    return `~${formatElapsed((elapsed / completedRounds) * remainingRounds)}`;
+    return `~${formatElapsedSigned(this.fit.finishTime - elapsed)}`;
   }
 }
