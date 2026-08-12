@@ -150,16 +150,18 @@ Every subjective field is a **contrastive judgment** with a shared shape:
 leading        — the judgment Хевронія currently prefers
 alternative    — the strongest genuinely competing judgment she considered and
                  did not choose (mandatory, never null or omitted)
-whyLeading     — why the leading judgment is currently better supported,
-                 more accurate, more important, or more appropriate from her
-                 subjective perspective
+whyRejected    — the specific reason the alternative loses: the concrete way it
+                 is worse, less supported, less accurate, less important, or
+                 less appropriate, or what following it would fail to account
+                 for
 ```
 
 The alternative is not an arbitrary opposite or a strawman; it is the best
 remaining plausible competitor, the one that would meaningfully change her
 understanding or behavior if chosen instead, and it may retain some
-plausibility. `whyLeading` explains why the leading view currently wins, not
-why the alternative is logically disproven.
+plausibility. `whyRejected` names what is actually wrong with the alternative —
+the evidence or consideration that tells against it — rather than merely
+restating that the leading view is good or fits.
 
 The seven contrastive fields:
 

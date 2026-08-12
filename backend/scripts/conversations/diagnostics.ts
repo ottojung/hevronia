@@ -11,7 +11,7 @@ function formatJudgment(label: string, judgment: SubjectiveJudgment): string {
     `  ${label}:`,
     `    leading: ${singleLine(judgment.leading)}`,
     `    alternative: ${singleLine(judgment.alternative)}`,
-    `    whyLeading: ${singleLine(judgment.whyLeading)}`,
+    `    whyRejected: ${singleLine(judgment.whyRejected)}`,
   ].join("\n");
 }
 

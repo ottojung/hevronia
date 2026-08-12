@@ -30,8 +30,8 @@ export function testLayer(
   });
 }
 
-function judgment(leading: string, alternative: string, whyLeading: string): SubjectiveJudgment {
-  return { leading, alternative, whyLeading };
+function judgment(leading: string, alternative: string, whyRejected: string): SubjectiveJudgment {
+  return { leading, alternative, whyRejected };
 }
 
 export function realizerSilence(): RealizerDecision {

@@ -37,8 +37,8 @@ function realizerWithResponse(content: string) {
   return createRealizer(model, SYSTEM_PROMPT);
 }
 
-function judgment(overrides: { leading?: unknown; alternative?: unknown; whyLeading?: unknown } = {}) {
-  return { leading: "l", alternative: "a", whyLeading: "w", ...overrides };
+function judgment(overrides: { leading?: unknown; alternative?: unknown; whyRejected?: unknown } = {}) {
+  return { leading: "l", alternative: "a", whyRejected: "w", ...overrides };
 }
 
 test("provider schema root is an object, not a top-level union", () => {
@@ -91,8 +91,8 @@ test("all seven fields carry a full contrastive judgment in both speak and silen
       assert.ok(value.leading.length >= 1, `leading of ${field}`);
       assert.equal(typeof value.alternative, "string");
       assert.ok(value.alternative.length >= 1, `alternative of ${field}`);
-      assert.equal(typeof value.whyLeading, "string");
-      assert.ok(value.whyLeading.length >= 1, `whyLeading of ${field}`);
+      assert.equal(typeof value.whyRejected, "string");
+      assert.ok(value.whyRejected.length >= 1, `whyRejected of ${field}`);
     }
   }
 });
@@ -113,16 +113,16 @@ test("the schema rejects a null alternative", () => {
   assert.equal(result.success, false);
 });
 
-test("the schema rejects a judgment without whyLeading", () => {
+test("the schema rejects a judgment without whyRejected", () => {
   const speak = realizerSpeak();
-  const result = parseDecision({ ...speak, intent: judgment({ whyLeading: undefined }) });
+  const result = parseDecision({ ...speak, intent: judgment({ whyRejected: undefined }) });
   assert.equal(result.success, false);
 });
 
 test("the schema rejects empty judgment strings", () => {
   const speak = realizerSpeak();
-  const judgmentParts: readonly ("leading" | "alternative" | "whyLeading")[] =
-    ["leading", "alternative", "whyLeading"];
+  const judgmentParts: readonly ("leading" | "alternative" | "whyRejected")[] =
+    ["leading", "alternative", "whyRejected"];
   for (const key of judgmentParts) {
     const result = parseDecision({ ...speak, intent: judgment({ [key]: "   " }) });
     assert.equal(result.success, false, key);
@@ -178,9 +178,9 @@ test("the OpenAI provider schema nests the required judgment fields", () => {
   const serialized = JSON.stringify(buildOpenAiRealizerJsonSchema(context.visibleMessages));
   assert.ok(serialized.includes('"leading"'));
   assert.ok(serialized.includes('"alternative"'));
-  assert.ok(serialized.includes('"whyLeading"'));
-  assert.ok(serialized.includes('"required":["leading","alternative","whyLeading"]'));
-  const judgments = (serialized.match(/"required":\["leading","alternative","whyLeading"\]/g) ?? []);
+  assert.ok(serialized.includes('"whyRejected"'));
+  assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
+  const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
   assert.equal(judgments.length, 14);
 });
 
@@ -188,9 +188,9 @@ test("the Gemini provider schema nests the required judgment fields", () => {
   const serialized = JSON.stringify(buildGeminiRealizerJsonSchema(context.visibleMessages));
   assert.ok(serialized.includes('"leading"'));
   assert.ok(serialized.includes('"alternative"'));
-  assert.ok(serialized.includes('"whyLeading"'));
-  assert.ok(serialized.includes('"required":["leading","alternative","whyLeading"]'));
-  const judgments = (serialized.match(/"required":\["leading","alternative","whyLeading"\]/g) ?? []);
+  assert.ok(serialized.includes('"whyRejected"'));
+  assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
+  const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
   assert.equal(judgments.length, 14);
 });
 

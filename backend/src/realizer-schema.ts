@@ -14,7 +14,7 @@ export interface ConstFreeJsonSchema {
 
 /**
  * A contrastive subjective judgment: the leading view, the strongest genuinely
- * competing view, and why the leading view currently wins. All three parts are
+ * competing view, and why that alternative loses. All three parts are
  * mandatory so the realizer discriminates between live alternatives instead of
  * emitting the first plausible interpretation, motive, feeling, desire,
  * outcome, opportunity, or action that occurs to it.
@@ -22,12 +22,12 @@ export interface ConstFreeJsonSchema {
 export const subjectiveJudgmentSchema = z.object({
   leading: z.string().trim().min(1),
   alternative: z.string().trim().min(1),
-  whyLeading: z.string().trim().min(1),
+  whyRejected: z.string().trim().min(1),
 }).strict();
 
 export type SubjectiveJudgment = z.infer<typeof subjectiveJudgmentSchema>;
 
-export const subjectiveJudgmentKeys: readonly string[] = ["leading", "alternative", "whyLeading"];
+export const subjectiveJudgmentKeys: readonly string[] = ["leading", "alternative", "whyRejected"];
 
 const subjectiveFields = {
   interpretation: subjectiveJudgmentSchema,

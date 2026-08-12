@@ -282,7 +282,7 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   assert.ok(failure.includes("передано реалізатору"));
   assert.ok(failure.includes("boom"));
 
-  const judgment = (leading: string) => ({ leading, alternative: "alt", whyLeading: "why" });
+  const judgment = (leading: string) => ({ leading, alternative: "alt", whyRejected: "why" });
   const silenceLog: RealizerDecisionLog = {
     action: "silence",
     interpretation: judgment("i"), intent: judgment("t"), feltState: judgment("f"),
@@ -294,7 +294,7 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   assert.ok(silence.includes("  interpretation:"));
   assert.ok(silence.includes("    leading: i"));
   assert.ok(silence.includes("    alternative: alt"));
-  assert.ok(silence.includes("    whyLeading: why"));
+  assert.ok(silence.includes("    whyRejected: why"));
 
   const speakLog: RealizerDecisionLog = {
     action: "speak", addressLabel: "character 42", replyToLabel: "M1 → Іра",
@@ -307,5 +307,5 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   assert.ok(speak.includes("  replyTo: M1 → Іра"));
   assert.ok(speak.includes("    leading: i"));
   assert.ok(speak.includes("    alternative: alt"));
-  assert.ok(speak.includes("    whyLeading: why"));
+  assert.ok(speak.includes("    whyRejected: why"));
 });
