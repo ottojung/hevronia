@@ -29,6 +29,51 @@ Telegram → canonical bounded history → cheap attention planner → smart rea
                                          └── updates cache for future turns
 ```
 
+### Reactions are cancellable and always operate on the latest state
+
+A Telegram text update does not wait for the whole cognition pipeline. Each
+canonical conversation thread (including forum topics) has a per-thread
+reaction coordinator (`backend/src/reaction-coordinator.ts`) that tracks a
+monotonic revision and an `AbortController` for the active reaction:
+
+```text
+Telegram event
+      ↓
+invalidate older reaction for this thread (abort + bump revision)
+      ↓
+canonical persistence + background memory observation
+      ↓
+start reaction asynchronously (handler returns)
+      ↓
+cheap planner
+      ↓
+smart realizer
+      ↓
+revision / cancellation check
+      ↓
+Telegram delivery
+```
+
+A new event immediately invalidates the previous reaction before persistence,
+so an obsolete thought can never reach Telegram while the newer event is still
+being written. Once the new event is durably persisted, a fresh reaction starts
+from the newest canonical history. There is no debounce, quiet window, or
+batching delay: if messages keep arriving, the previous reaction is cancelled
+and replaced; if Хевронія finishes before the next message exists, her reply is
+valid.
+
+Cancellation is expected control flow, not a failure. `AbortSignal`s propagate
+into the planner, the realizer, and the underlying LangChain model
+invocations, and the model-retry layer stops immediately on abort and never
+retries a cancelled request. A cancelled planner never fails open into the
+realizer, a cancelled realizer never delivers, and shutdown or a newer message
+never triggers fallback text. Delivery runs under the same revision guards —
+before typing, after typing, immediately before the send, and before persisting
+the canonical outgoing event — so a stale reaction can neither send nor persist
+an obsolete reply. The deterministic `respond()` path (observe + one reaction,
+returning the generated turn) remains the API for tests and the simulation
+harness.
+
 The turn is a two-stage pipeline:
 
 ```text
@@ -45,6 +90,15 @@ cheap attention planner
         └── speak → Telegram
 ```
 
+> Incoming Telegram observations are canonical facts in chronological history.
+> The system does not partition them into answered/unanswered or old/new
+> model-visible groups. Хевронія determines conversational continuity from the
+> ordinary history, including her own previously delivered messages.
+>
+> A new event does not wait for a quiet period. It immediately invalidates an
+> unfinished reaction and starts a replacement reaction from the newest
+> persisted state.
+
 The cheap planner is a high-recall attention filter: it only decides whether the
 situation is worth a smart-model invocation. It cannot force speech. The smart
 realizer is the authoritative mind of the turn: it owns interpretation, intent
@@ -55,12 +109,15 @@ reply attachment, the final speak/silence decision, and the wording.
 
 - `backend/src/telegram.ts` — Telegram transport only (grammY, long polling)
   plus best-effort participant discovery from `my_chat_member`,
-  `chat_member`, and `new_chat_members` events.
-- `backend/src/respond.ts` — the conversational entry point and the
+  `chat_member`, and `new_chat_members` events. The message handler observes
+  the event and returns; delivery happens inside the detached reaction.
+- `backend/src/respond.ts` — the deterministic entry point and the
   non-blocking `warmParticipant` proxy.
-- `backend/src/layer.ts` — canonical event ingestion, bounded conversation
-  context, the cheap attention planner, the smart realizer, and delivery
-  completion.
+- `backend/src/layer.ts` — the conversation layer: per-thread reaction
+  coordinator, canonical observation, deterministic `respond`, and lifecycle.
+- `backend/src/reaction-coordinator.ts` / `react-turn.ts` / `react-turn-types.ts`
+  / `reaction-cancelled.ts` — per-thread revision/abort coordination, the
+  observation/reaction split, and cancellation semantics.
 - `backend/src/attention-planner.ts` — the cheap high-recall attention filter.
 - `backend/src/realizer.ts` / `backend/src/realizer-schema.ts` — the smart
   realizer that owns social cognition and final wording.
@@ -358,6 +415,14 @@ retrieved only after Mem0 has learned the correction. The refresh marks the
 newest ingested message as the pending topical query and coalesces: at most one
 scheduled/running topical search exists per user, a not-yet-ingested message
 can never become the query, and a running search is never cancelled.
+
+While an ingestion job for the same user and conversation thread is still
+queued and has not started, further messages coalesce into it in arrival order
+instead of enqueuing more jobs; the job drains the batch through a single Mem0
+extraction that preserves each message as a separate chronological user-role
+message. An already-running ingestion job is never cancelled by a later
+message, and jobs for different threads or users never merge. This is purely a
+background optimization: it adds no reaction latency.
 
 ### The background queue
 
