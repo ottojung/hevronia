@@ -6,7 +6,9 @@ import { test } from "node:test";
 
 import { conversationThreadIdFromTelegramPrivateChat } from "../src/identifiers.js";
 import { createLazyLongTermMemory } from "../src/long-term-memory/runtime.js";
-import { ReactionCancelledError } from "../src/reaction-cancelled.js";
+import { applyProposedNames } from "../src/natural-names/apply.js";
+import { createNaturalNameStore } from "../src/natural-names/store.js";
+import { isReactionCancelledError, ReactionCancelledError } from "../src/reaction-cancelled.js";
 import type { AttentionPlanner } from "../src/attention-planner.js";
 import type { Realizer } from "../src/realizer.js";
 import type { TurnContext } from "../src/realizer-schema.js";
@@ -15,6 +17,7 @@ import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 import {
   FakeScheduler,
   FakeStore,
+  passingPlanner,
   realizerSilence,
   realizerSpeak,
   testLayer,
@@ -403,4 +406,281 @@ test("each incoming message is observed by long-term memory once regardless of c
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("a confirmed outgoing send is persisted even when a newer message arrives mid-send", async () => {
+  const dir = tempDir("commit-race");
+  const { planner, gates } = makePlanner();
+  const { realizer, gates: realizerGates } = makeRealizer();
+  const sent: string[] = [];
+  const replyGates: Array<{ resolve: () => void }> = [];
+  const delivery: TelegramTurnDelivery = {
+    showTyping: async () => undefined,
+    reply: async (text) => {
+      sent.push(text);
+      const gate = deferred();
+      replyGates.push({ resolve: () => gate.resolve() });
+      await gate.promise;
+      return sent.length;
+    },
+  };
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner, realizer });
+  try {
+    await layer.observe(respondInput(1, "A"), delivery);
+    await waitFor(() => gates.length === 1);
+    gates[0]?.unblock();
+    await waitFor(() => realizerGates.length === 1);
+    realizerGates[0]?.unblock(); // A speaks; reply() begins and blocks
+    await waitFor(() => replyGates.length === 1);
+    await layer.observe(respondInput(2, "B"), delivery);
+    await tick();
+    assert.equal(gates.length, 1, "the replacement reaction waits for the committed send");
+    replyGates[0]?.resolve(); // Telegram confirms A's send
+    await waitFor(() => gates.length === 2);
+    gates[1]?.unblock();
+    await waitFor(() => realizerGates.length === 2);
+    realizerGates[1]?.unblock();
+    await waitFor(() => replyGates.length === 2);
+    replyGates[1]?.resolve();
+    await layer.settle();
+    const stored = await layer.getMessages(threadId);
+    const texts = stored.map((item) => JSON.parse(String(item.content)).text ?? "");
+    assert.deepEqual(texts, ["A", "B", "реакція", "реакція"],
+      "the confirmed send is canonical, exactly once, in chronological order");
+    const historySeenByB = gates[1]?.context.boundedHistory.map((item) =>
+      JSON.parse(String(item.content)).text) ?? [];
+    assert.deepEqual(historySeenByB, ["A", "B", "реакція"],
+      "B's reaction starts after A's confirmed delivery is canonical");
+    assert.deepEqual(sent, ["реакція", "реакція"]);
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a reaction cancelled before the send commit never calls Telegram reply", async () => {
+  const dir = tempDir("pre-commit");
+  const { planner, gates } = makePlanner();
+  const { realizer, gates: realizerGates } = makeRealizer();
+  const { delivery, sent, typingGates } = makeBlockingTypingDelivery();
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner, realizer });
+  try {
+    await layer.observe(respondInput(1, "A"), delivery);
+    await waitFor(() => gates.length === 1);
+    gates[0]?.unblock();
+    await waitFor(() => realizerGates.length === 1);
+    realizerGates[0]?.unblock(); // A reaches showTyping and blocks
+    await waitFor(() => typingGates.length === 1);
+    await layer.observe(respondInput(2, "B"), delivery);
+    await waitFor(() => gates.length === 2);
+    gates[1]?.unblock();
+    await waitFor(() => realizerGates.length === 2);
+    realizerGates[1]?.unblock();
+    await waitFor(() => typingGates.length === 2);
+    for (const gate of typingGates) gate.resolve(); // blocked typing resolves
+    await layer.settle();
+    assert.deepEqual(sent, ["реакція"], "A never reaches the send; only B's reply is sent");
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a failed Telegram send persists nothing and triggers genuine fallback", async () => {
+  const dir = tempDir("send-failure");
+  const failures: unknown[] = [];
+  const realizer = { realize: async () => realizerSpeak({ message: "х" }) };
+  const delivery: TelegramTurnDelivery = {
+    showTyping: async () => undefined,
+    reply: async () => { throw new Error("Telegram unavailable"); },
+  };
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner: passingPlanner(), realizer });
+  try {
+    await layer.observe(respondInput(1, "A"), delivery, async (error) => { failures.push(error); });
+    await layer.settle();
+    assert.equal(failures.length, 1);
+    const stored = await layer.getMessages(threadId);
+    assert.equal(stored.filter((item) => JSON.parse(String(item.content)).text === "х").length, 0,
+      "a failed send persists no outgoing event");
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a genuine current-reaction failure delivers a persisted fallback", async () => {
+  const dir = tempDir("fallback-genuine");
+  const failures: unknown[] = [];
+  const fallbackSent: string[] = [];
+  const realizer = { realize: async () => { throw new Error("realizer boom"); } };
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner: passingPlanner(), realizer });
+  try {
+    await layer.observe(respondInput(1, "A"), {
+      showTyping: async () => undefined,
+      reply: async (text) => { fallbackSent.push(text); return 900; },
+    }, async (error, ctx) => {
+      failures.push(error);
+      try {
+        ctx.throwIfStale();
+      } catch {
+        return;
+      }
+      const id = await (async () => {
+        const text = "Щось я зараз зависла. Спробуй ще раз за хвилину.";
+        fallbackSent.push(text);
+        return 900;
+      })();
+      layer.recordDeliveredMessage(threadId, {
+        kind: "hevronia", messageId: id, sender: { kind: "user", id: 999 },
+        senderDisplayName: "Хевронія", senderUsername: null, chatKind: "group",
+        text: "Щось я зараз зависла. Спробуй ще раз за хвилину.",
+        messageThreadId: null, replyTo: null,
+      });
+    });
+    await layer.settle();
+    assert.equal(failures.length, 1);
+    assert.equal(fallbackSent.length, 1);
+    const stored = await layer.getMessages(threadId);
+    const texts = stored.map((item) => JSON.parse(String(item.content)).text ?? "");
+    assert.deepEqual(texts, ["A", "Щось я зараз зависла. Спробуй ще раз за хвилину."]);
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a stale detached failure after cancellation sends no fallback", async () => {
+  const dir = tempDir("fallback-stale");
+  const failures: unknown[] = [];
+  const realizerGates: Array<{ unblock: () => void }> = [];
+  const realizer: Realizer = {
+    realize: async () => {
+      const gate = deferred();
+      realizerGates.push({ unblock: () => gate.resolve() });
+      await gate.promise;
+      throw new Error("realizer boom after cancel");
+    },
+  };
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner: passingPlanner(), realizer });
+  try {
+    await layer.observe(respondInput(1, "A"), makeDelivery().delivery,
+      async (error) => { failures.push(error); });
+    await waitFor(() => realizerGates.length === 1);
+    await layer.observe(respondInput(2, "B"), makeDelivery().delivery,
+      async (error) => { failures.push(error); });
+    await waitFor(() => realizerGates.length === 2);
+    for (const gate of realizerGates) gate.unblock();
+    await layer.settle();
+    assert.equal(failures.length, 1, "only the current reaction's failure triggers fallback");
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shutdown waits for an obsolete reaction that ignores its signal", async () => {
+  const dir = tempDir("forgotten-task");
+  const { planner, gates } = makeIgnoringPlanner();
+  const realizer = { realize: async () => realizerSilence() };
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner, realizer });
+  await layer.observe(respondInput(1, "A"), makeDelivery().delivery);
+  await waitFor(() => gates.length === 1);
+  await layer.observe(respondInput(2, "B"), makeDelivery().delivery);
+  await waitFor(() => gates.length === 2);
+  gates[1]?.unblock(); // B settles; A is still physically running
+  await tick();
+  await tick();
+  let closed = false;
+  const closing = layer.close().then(() => { closed = true; });
+  await tick();
+  assert.equal(closed, false, "close must wait for the obsolete reaction to settle");
+  gates[0]?.unblock();
+  await closing;
+  assert.equal(closed, true);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("shutdown cancellation produces no fallback", async () => {
+  const dir = tempDir("shutdown-fallback");
+  const failures: unknown[] = [];
+  const realizerGates: Array<{ unblock: () => void }> = [];
+  const realizer: Realizer = {
+    realize: async (_context, signal) => {
+      const gate = deferred();
+      realizerGates.push({ unblock: () => gate.resolve() });
+      signal?.addEventListener("abort", () => gate.resolve(), { once: true });
+      await gate.promise;
+      if (signal?.aborted) throw new ReactionCancelledError();
+      throw new Error("boom");
+    },
+  };
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner: passingPlanner(), realizer });
+  await layer.observe(respondInput(1, "A"), makeDelivery().delivery,
+    async (error) => { failures.push(error); });
+  await waitFor(() => realizerGates.length === 1);
+  await layer.close(); // aborts the blocked realizer; cancellation is silent
+  assert.equal(failures.length, 0);
+  rmSync(dir, { recursive: true, force: true });
+});
+
+test("a stale planner naming proposal cannot begin durable assignment after invalidation", async () => {
+  const dir = tempDir("stale-naming");
+  const gates: Array<{ signal: AbortSignal | undefined; unblock: () => void }> = [];
+  let call = 0;
+  const ignoringPlanner: AttentionPlanner = {
+    consider: async (_context, _choices, signal): Promise<import("../src/attention-planner.js").PlannerDecision> => {
+      const gate = deferred();
+      gates.push({ signal, unblock: () => gate.resolve() });
+      await gate.promise;
+      call += 1;
+      return call === 1
+        ? { attention: true, naturalNames: { P1: "Стелла" } }
+        : { attention: true, naturalNames: {} };
+    },
+  };
+  const realizer = { realize: async () => realizerSilence() };
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner: ignoringPlanner, realizer });
+  try {
+    await layer.observe(respondInput(1, "A"), makeDelivery().delivery);
+    await waitFor(() => gates.length === 1);
+    await layer.observe(respondInput(2, "B"), makeDelivery().delivery);
+    await waitFor(() => gates.length === 2);
+    gates[0]?.unblock(); // A's stale planner resolves with a naming proposal
+    gates[1]?.unblock();
+    await layer.settle();
+    const names = createNaturalNameStore(path.join(dir, "natural-names.sqlite"));
+    try {
+      assert.equal(await names.get(88), undefined, "the stale proposal must not be persisted");
+    } finally {
+      await names.close();
+    }
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("applyProposedNames stops before a stale second assignment", async () => {
+  const written: string[] = [];
+  const store: import("../src/natural-names/store.js").NaturalNameStore = {
+    assignIfAbsent: async (_userId, name) => { written.push(name); return name; },
+    get: async () => undefined,
+    getMany: async () => new Map(),
+    close: async () => undefined,
+  };
+  const choices: import("../src/planner-schema.js").MissingNaturalNameChoice[] = [
+    { handle: "P1", sender: { kind: "user", id: 1 }, displayName: "A", username: null },
+    { handle: "P2", sender: { kind: "user", id: 2 }, displayName: "B", username: null },
+  ];
+  let guardCalls = 0;
+  try {
+    await applyProposedNames(store, choices, { P1: "Оля", P2: "Макс" }, new Map(), () => {
+      guardCalls += 1;
+      if (guardCalls >= 2) throw new ReactionCancelledError();
+    });
+    assert.fail("expected cancellation");
+  } catch (error) {
+    assert.equal(isReactionCancelledError(error), true);
+  }
+  assert.deepEqual(written, ["Оля"], "the first atomic write may remain; the second must not start");
 });
