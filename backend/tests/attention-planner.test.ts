@@ -174,3 +174,24 @@ test("the planner context lists the exact names-to-assign handles", () => {
   assert.ok(rendered.includes("P2 = character 63"));
   assert.ok(rendered.includes("“Display”"));
 });
+
+test("one source of truth: the same choices drive the prompt and the schema", () => {
+  const choices = [choice("P2", 63), choice("P4", 94)];
+  const rendered = renderPlannerContext(context, choices);
+  const schema = buildPlannerResponseSchema(choices);
+  assert.ok(rendered.includes("P2 = character 63"));
+  assert.ok(rendered.includes("P4 = character 94"));
+  assert.ok(rendered.includes("Names to assign:"));
+  const parsed = schema.safeParse({ attention: "yes", naturalNames: { P2: "Мес", P4: "Боб" } });
+  assert.equal(parsed.success, true);
+  if (parsed.success) {
+    assert.deepEqual(Object.keys(parsed.data.naturalNames), ["P2", "P4"]);
+  }
+  for (const handle of ["P1", "P3", "P999"]) {
+    assert.ok(!rendered.includes(`Names to assign:\n${handle}`));
+    assert.equal(schema.safeParse({
+      attention: "yes",
+      naturalNames: { P2: "Мес", P4: "Боб", [handle]: "Хто" },
+    }).success, false, `${handle} must not be an allowed naming property`);
+  }
+});

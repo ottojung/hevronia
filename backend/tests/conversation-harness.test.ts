@@ -11,14 +11,19 @@ import { runScenario } from "../scripts/conversations/runner.js";
 import { scenarioHeaderLines } from "../scripts/conversations/scenario-execution.js";
 import { PreseededLazyMemory } from "../scripts/conversations/preseeded-lazy-memory.js";
 import { completedScenarioResult } from "../scripts/conversations/types.js";
+import { HEVRONIA_ID, PARTICIPANT_ID, participantIdentityFor } from "../scripts/conversations/identities.js";
 import type { ConversationLayer } from "../src/conversation-types.js";
 import { GeneratedTurn } from "../src/generated-turn.js";
 import {
   conversationThreadIdFromTelegramPrivateChat,
   longTermMemoryUserIdFromTelegramSender,
 } from "../src/identifiers.js";
+import type { Realizer } from "../src/realizer.js";
+import { renderRealizerContext, visibleMessages } from "../src/turn-context.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
-import { stubPlanner, testLayer } from "./memory-fixtures.js";
+import {
+  realizerSilence, stubPlanner, stubPlannerDecision, testLayer,
+} from "./memory-fixtures.js";
 
 const representativeIds = [
   "normal-stranger", "low-effort-stranger", "playful-banter", "absurd-humor",
@@ -333,6 +338,101 @@ test("seeded long-term memory reaches the planner context", async () => {
   try {
     await layer.respond({ threadId, message, hevroniaSender: { kind: "user", id: 7_002 }, senderIsBot: false });
     assert.equal(recalled, "Марина prefers unsweetened coffee.");
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("shared simulated identities are Telegram-like rather than clean first names", () => {
+  const normal = participantIdentityFor("normal-stranger");
+  assert.equal(normal.displayName, "SuperBob3000");
+  assert.equal(normal.username, "super_bob3000");
+  assert.notEqual(normal.displayName, "Боб");
+  for (const scenario of scenarios) {
+    const identity = participantIdentityFor(scenario.id);
+    assert.ok(identity.displayName.length > 0);
+    assert.notEqual(identity.displayName, scenario.participantName,
+      `${scenario.id} should not arrive with a clean first-name display`);
+  }
+});
+
+test("a simulated Telegram identity is naturalized and not re-offered on later turns", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-naturalize-"));
+  const identity = participantIdentityFor("normal-stranger");
+  const seenChoices: number[][] = [];
+  const seenNames: Map<number, string>[] = [];
+  const planner = stubPlannerDecision((_context, namingChoices): import("../src/attention-planner.js").PlannerDecision => {
+    const first = seenChoices.length === 0;
+    seenChoices.push(namingChoices.map(({ sender }) => sender.id));
+    return first
+      ? { attention: true, naturalNames: { P1: "Боб" } }
+      : { attention: true, naturalNames: {} };
+  });
+  const realizer: Realizer = {
+    realize: async (context) => {
+      seenNames.push(new Map(context.naturalNames));
+      return realizerSilence();
+    },
+  };
+  const threadId = conversationThreadIdFromTelegramPrivateChat(7_003);
+  const sender: import("../src/telegram-event.js").TelegramSenderIdentity = { kind: "user", id: PARTICIPANT_ID };
+  const message = (id: number): ObservedTelegramMessage => ({
+    kind: "participant", messageId: id, sender, senderDisplayName: identity.displayName,
+    senderUsername: identity.username, chatKind: "private", text: "привіт",
+    messageThreadId: null, replyTo: null, directlyAddressed: true,
+  });
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner, realizer });
+  try {
+    await layer.respond({ threadId, message: message(1),
+      hevroniaSender: { kind: "user", id: HEVRONIA_ID }, senderIsBot: false });
+    await layer.respond({ threadId, message: message(2),
+      hevroniaSender: { kind: "user", id: HEVRONIA_ID }, senderIsBot: false });
+    assert.deepEqual(seenChoices, [[PARTICIPANT_ID], []]);
+    assert.equal(seenNames[0]?.get(PARTICIPANT_ID), "Боб");
+    assert.equal(seenNames[1]?.get(PARTICIPANT_ID), "Боб");
+    const history = await layer.getMessages(threadId);
+    const rendered = renderRealizerContext({
+      boundedHistory: history,
+      currentMessage: message(2),
+      visibleMessages: visibleMessages(history),
+      participantMemories: [],
+      naturalNames: seenNames[1] ?? new Map(),
+    });
+    assert.match(rendered, /Your sleeping mind made Боб say:/);
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("an opaque identity exercises invented naming with a stubbed nickname", async () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-nickname-"));
+  const identity = participantIdentityFor("long-boring-conversation");
+  const planner = stubPlannerDecision((_context, namingChoices) => ({
+    attention: true,
+    naturalNames: Object.fromEntries(namingChoices.map(({ handle }) => [handle, "Вівця"])),
+  }));
+  const realizer: Realizer = { realize: async () => realizerSilence() };
+  const threadId = conversationThreadIdFromTelegramPrivateChat(7_003);
+  const message: ObservedTelegramMessage = {
+    kind: "participant", messageId: 1, sender: { kind: "user", id: PARTICIPANT_ID },
+    senderDisplayName: identity.displayName, senderUsername: identity.username,
+    chatKind: "private", text: "привіт", messageThreadId: null, replyTo: null, directlyAddressed: true,
+  };
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner, realizer });
+  try {
+    await layer.respond({ threadId, message,
+      hevroniaSender: { kind: "user", id: HEVRONIA_ID }, senderIsBot: false });
+    const history = await layer.getMessages(threadId);
+    const rendered = renderRealizerContext({
+      boundedHistory: history,
+      currentMessage: message,
+      visibleMessages: visibleMessages(history),
+      participantMemories: [],
+      naturalNames: new Map([[PARTICIPANT_ID, "Вівця"]]),
+    });
+    assert.match(rendered, /Your sleeping mind made Вівця say:/);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });

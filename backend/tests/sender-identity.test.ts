@@ -7,6 +7,7 @@ import { test } from "node:test";
 import type { LazyLongTermMemory } from "../src/long-term-memory/runtime.js";
 import { createObservedTelegramMessage, telegramSenderIdentity } from "../src/telegram-observation.js";
 import { renderDreamEvent } from "../src/dream-render.js";
+import { deserializeTelegramEvent } from "../src/telegram-event.js";
 import { conversationThreadIdFromTelegramGroupChat } from "../src/identifiers.js";
 import { filteringPlanner, testLayer } from "./memory-fixtures.js";
 
@@ -82,4 +83,22 @@ test("reply relationships preserve a chat target identity", () => {
   assert.doesNotMatch(rendered, /message 2/);
   assert.doesNotMatch(rendered, /message 3/);
   assert.doesNotMatch(rendered, /channel -500/);
+});
+
+test("username fields are captured where present and parse as null on old canonical events", () => {
+  const withUsername = createObservedTelegramMessage({ messageId: 2,
+    sender: { kind: "user", id: 52 }, senderDisplayName: "SuperBob3000",
+    senderUsername: "super_bob3000", chatKind: "group", text: "привіт",
+    messageThreadId: null, mentionsHevronia: false, replyTo: { targetMessageId: 1,
+      targetSender: { kind: "user", id: 53 }, targetSenderDisplayName: "Аня",
+      targetSenderUsername: "anya", targetText: "та ні", targetsHevronia: false } });
+  assert.equal(withUsername.senderUsername, "super_bob3000");
+  assert.equal(withUsername.replyTo?.targetSenderUsername, "anya");
+  const oldJson = JSON.stringify({ kind: "participant", messageId: 3,
+    sender: { kind: "user", id: 52 }, senderDisplayName: "SuperBob3000",
+    chatKind: "group", text: "старе", messageThreadId: null, replyTo: null,
+    directlyAddressed: false });
+  const parsed = deserializeTelegramEvent(oldJson);
+  assert.equal(parsed.senderUsername, null);
+  assert.equal(parsed.senderDisplayName, "SuperBob3000");
 });

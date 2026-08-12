@@ -402,3 +402,60 @@ test("visible messages stay internal and keep their message ids for resolution",
   assert.deepEqual(candidates.map(({ messageId }) => messageId), [912345]);
   assert.equal(candidates[0]?.text, "як справи?");
 });
+
+test("natural names replace notebook labels in dream rendering", () => {
+  const names = new Map<number, string>([[52, "Боб"], [63, "Мес"]]);
+  assert.match(renderDreamEvent(participant(1, 52, "SuperBob3000", "привіт"), undefined, names),
+    /Your sleeping mind made Боб say:\n\nпривіт/);
+  const mesReply = participant(2, 63, "137^WT&^t1g3y", "привіт боб!", {
+    replyTo: { targetMessageId: 1, targetSender: { kind: "user", id: 52 },
+      targetSenderDisplayName: "SuperBob3000", targetSenderUsername: null,
+      targetText: "привіт", targetIsHevronia: false } });
+  assert.match(renderDreamEvent(mesReply, undefined, names),
+    /Your sleeping mind made Мес reply to Боб with:/);
+  const own = ownMessage(3, "і тобі привіт", { targetMessageId: 2,
+    targetSender: { kind: "user", id: 52 }, targetSenderDisplayName: "SuperBob3000",
+    targetSenderUsername: null, targetText: "привіт боб!", targetIsHevronia: false });
+  assert.match(renderDreamEvent(own, undefined, names),
+    /You previously chose to reply to Боб with:/);
+  assert.match(renderDreamEvent(participant(4, 52, "SuperBob3000", "привіт")),
+    /Your sleeping mind made character 52 say:/);
+});
+
+test("raw incoming message text is not rewritten by naturalization", () => {
+  const names = new Map<number, string>([[52, "Боб"]]);
+  const rendered = renderDreamEvent(
+    participant(1, 52, "SuperBob3000", "@SuperBob3000 ти де?"), undefined, names,
+  );
+  assert.ok(rendered.includes("@SuperBob3000 ти де?"));
+  assert.match(rendered, /Your sleeping mind made Боб say:/);
+});
+
+test("the realizer context carries natural name, notebook identity, Telegram metadata, and handles", () => {
+  const names = new Map<number, string>([[52, "Боб"]]);
+  const event: ObservedTelegramMessage = { kind: "participant", messageId: 1,
+    sender: { kind: "user", id: 52 }, senderDisplayName: "SuperBob3000",
+    senderUsername: "super_bob3000", chatKind: "group", text: "привіт",
+    messageThreadId: null, replyTo: null, directlyAddressed: false };
+  const history = [new HumanMessage({ content: serializeTelegramEvent(event) })];
+  const rendered = renderRealizerContext({
+    boundedHistory: history,
+    currentMessage: event,
+    visibleMessages: [{ messageId: 1, sender: { kind: "user", id: 52 },
+      senderDisplayName: "SuperBob3000", senderUsername: "super_bob3000", text: "привіт" }],
+    participantMemories: [],
+    naturalNames: names,
+  });
+  assert.match(rendered, /Боб, who is character 52 in your notebook\.\nTelegram currently displays them as “SuperBob3000”\.\nTheir Telegram username is @super_bob3000\./);
+  assert.match(rendered, /Your sleeping mind made Боб say:/);
+  assert.match(rendered, /Character handles \(addressCharacter must be one of these\):\n\nP1 = Боб \(character 52 in your notebook\)/);
+  assert.match(rendered, /Reply-message handles \(replyToMessage must be one of these, or null\):\n\nM1 = the first eligible visible message/);
+});
+
+test("recalled memory keeps the character N label even when the person has a natural name", () => {
+  const rendered = renderParticipantMemoryContexts([
+    { participant: { kind: "user", id: 52 }, memories: [{ text: "Боб любить каву" }] },
+  ]);
+  assert.match(rendered, /“character 52”/);
+  assert.doesNotMatch(rendered, /“Боб”/);
+});
