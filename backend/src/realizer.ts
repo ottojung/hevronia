@@ -6,6 +6,7 @@ import { buildGeminiRealizerJsonSchema, buildOpenAiRealizerJsonSchema } from "./
 import { invokeWithRateLimitRetry } from "./model-retry.js";
 import { isGeminiChatModel } from "./model.js";
 import { REALIZER_MODE } from "./realizer-prompt.js";
+import { throwIfAborted } from "./reaction-cancelled.js";
 import {
   buildRealizerResponseSchema,
   type RealizerDecision,
@@ -40,7 +41,7 @@ export type RealizerDecisionLog =
   | { action: "failure"; errorDetail: string };
 
 export interface Realizer {
-  realize(context: TurnContext): Promise<RealizerDecision>;
+  realize(context: TurnContext, signal?: AbortSignal): Promise<RealizerDecision>;
 }
 
 export function createRealizer(
@@ -48,7 +49,8 @@ export function createRealizer(
   personality: string,
 ): Realizer {
   return {
-    async realize(context: TurnContext): Promise<RealizerDecision> {
+    async realize(context: TurnContext, signal?: AbortSignal): Promise<RealizerDecision> {
+      throwIfAborted(signal);
       const schema = buildRealizerResponseSchema(context.visibleMessages);
       const agent = isGeminiChatModel(model)
         ? createAgent({
@@ -67,9 +69,12 @@ export function createRealizer(
               buildOpenAiRealizerJsonSchema(context.visibleMessages),
             ),
           });
-      const result = await invokeWithRateLimitRetry(() => agent.invoke({
-        messages: [new HumanMessage(renderRealizerContext(context))],
-      }));
+      const result = await invokeWithRateLimitRetry(
+        () => agent.invoke({
+          messages: [new HumanMessage(renderRealizerContext(context))],
+        }, { signal }),
+        { signal },
+      );
       const response = schema.parse(result.structuredResponse);
       return response.decision;
     },

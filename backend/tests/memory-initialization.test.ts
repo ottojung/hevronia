@@ -14,7 +14,7 @@ import {
 function fakeStore(): LongTermMemoryStore {
   return {
     search: async () => [],
-    rememberUserMessage: async () => [],
+    rememberUserMessages: async () => [],
     deleteAll: async () => undefined,
   };
 }
@@ -25,6 +25,8 @@ function fakeConversationLayer(close = async () => undefined): ConversationLayer
     recordDeliveredMessage: async () => undefined,
     getMessages: async () => [],
     warmParticipant: () => undefined,
+    observe: async () => undefined,
+    settle: async () => undefined,
     close,
   };
 }

@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { GoogleGenerativeAIFetchError } from "@google/generative-ai";
 import { RateLimitError } from "openai";
 
+import { isReactionCancelledError } from "../src/reaction-cancelled.js";
 import {
   invokeWithRateLimitRetry,
   isRateLimitError,
@@ -99,4 +100,52 @@ test("transient transport failures are retried like rate limits", async () => {
   }, { baseDelayMs: 0 });
   assert.equal(result, "ok");
   assert.equal(attempts, 2);
+});
+
+test("an already-aborted signal cancels before any invocation", async () => {
+  const controller = new AbortController();
+  controller.abort();
+  let attempts = 0;
+  try {
+    await invokeWithRateLimitRetry(async () => { attempts += 1; return "ok"; },
+      { signal: controller.signal });
+    assert.fail("expected cancellation");
+  } catch (error) {
+    assert.equal(isReactionCancelledError(error), true);
+  }
+  assert.equal(attempts, 0);
+});
+
+test("an abort during the retry wait stops retrying immediately", async () => {
+  const controller = new AbortController();
+  let attempts = 0;
+  const pending = invokeWithRateLimitRetry(async () => {
+    attempts += 1;
+    throw openAiRateLimit();
+  }, { signal: controller.signal, baseDelayMs: 60_000 });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  controller.abort();
+  try {
+    await pending;
+    assert.fail("expected cancellation");
+  } catch (error) {
+    assert.equal(isReactionCancelledError(error), true);
+  }
+  assert.equal(attempts, 1, "a cancelled request is never retried");
+});
+
+test("an AbortError from the operation is not retried", async () => {
+  let attempts = 0;
+  try {
+    await invokeWithRateLimitRetry(async () => {
+      attempts += 1;
+      const error = new Error("cancelled");
+      error.name = "AbortError";
+      throw error;
+    }, { baseDelayMs: 0 });
+    assert.fail("expected cancellation");
+  } catch (error) {
+    assert.equal(isReactionCancelledError(error), true);
+  }
+  assert.equal(attempts, 1);
 });

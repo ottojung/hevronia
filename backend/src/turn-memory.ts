@@ -7,8 +7,8 @@ import { longTermMemoryUserIdFromTelegramSender } from "./identifiers.js";
 import type { LazyLongTermMemory, LongTermMemorySnapshot } from "./long-term-memory/runtime.js";
 import { memoryUserIdForSender } from "./long-term-memory/operations.js";
 import type { NaturalNameStore } from "./natural-names/store.js";
-import type { MissingNaturalNameChoice } from "./attention-planner.js";
-import { missingNaturalNameChoices } from "./attention-planner.js";
+import type { MissingNaturalNameChoice } from "./planner-schema.js";
+import { missingNaturalNameChoices } from "./planner-schema.js";
 import type { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { memoriesForCandidates, selectedParticipantIds } from "./participant-memory.js";
 import type { ParticipantMemoryContext } from "./participant-memory.js";
@@ -16,7 +16,7 @@ import type { VisibleMessage } from "./realizer-schema.js";
 import type { NaturalNames } from "./telegram-event.js";
 import { visibleMessages } from "./turn-context.js";
 
-export interface TurnMemoryContext {
+export interface ReactionContextState {
   history: BaseMessage[];
   candidates: VisibleMessage[];
   participantMemories: ParticipantMemoryContext[];
@@ -24,14 +24,18 @@ export interface TurnMemoryContext {
   namingChoices: readonly MissingNaturalNameChoice[];
 }
 
-export async function acquireTurnContext(
+/**
+ * Observes an incoming event: long-term-memory observation plus canonical
+ * persistence. This happens exactly once per incoming message, independently
+ * of any planner/realizer reaction, so restarting or cancelling cognition never
+ * re-observes the message.
+ */
+export async function observeIncoming(
   store: ConversationStore,
   canonicalWrites: PendingConversationWrites,
   lazyMemory: LazyLongTermMemory | undefined,
-  snapshot: LongTermMemorySnapshot | undefined,
   input: RespondInput,
-  naturalNameStore: NaturalNameStore,
-): Promise<TurnMemoryContext> {
+): Promise<void> {
   const userId = memoryUserIdForSender(input.message.sender);
   if (userId !== undefined && !input.senderIsBot) {
     lazyMemory?.observeUserMessage(
@@ -41,11 +45,26 @@ export async function acquireTurnContext(
   await canonicalWrites.submitAndWait(
     input.threadId, () => store.append(input.threadId, input.message),
   );
+}
+
+/**
+ * Acquires the reaction context from the already-persisted canonical state:
+ * bounded history, visible messages, natural names, naming choices, and
+ * participant memories. Never persists and never re-observes the incoming
+ * message.
+ */
+export async function acquireReactionContext(
+  store: ConversationStore,
+  canonicalWrites: PendingConversationWrites,
+  lazyMemory: LazyLongTermMemory | undefined,
+  snapshot: LongTermMemorySnapshot | undefined,
+  input: RespondInput,
+  naturalNameStore: NaturalNameStore,
+): Promise<ReactionContextState> {
+  await canonicalWrites.waitForThread(input.threadId);
   const history = await store.getMessages(input.threadId);
   const candidates = visibleMessages(history);
-  const naturalNames = await naturalNameStore.getMany(
-    uniqueUserIds(candidates),
-  );
+  const naturalNames = await naturalNameStore.getMany(uniqueUserIds(candidates));
   const namingChoices = missingNaturalNameChoices(
     buildHandleChoices(candidates, naturalNames).characters,
     naturalNames,

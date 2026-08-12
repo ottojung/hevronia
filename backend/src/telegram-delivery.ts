@@ -18,19 +18,29 @@ export interface FallbackDeliveryInput {
   replyTo: ReplyRelationship;
 }
 
+/**
+ * Delivers a generated turn. The optional `guard` runs before typing, after
+ * typing, immediately before the Telegram send, and before scheduling the
+ * canonical outgoing event, so a stale or cancelled reaction can never send or
+ * persist an obsolete reply.
+ */
 export async function deliverGeneratedTurn(
   turn: GeneratedTurn,
   delivery: TelegramTurnDelivery,
+  guard: () => void = () => undefined,
 ): Promise<TelegramDeliveryResult> {
   if (turn.outcome.action === "silence" || turn.outcome.action === "ended") {
     return { status: "silence" };
   }
   const speak = turn.outcome;
+  guard();
   await delivery.showTyping();
+  guard();
   const deliveredMessageId = await delivery.reply(
     speak.replyText,
     speak.replyTo?.targetMessageId ?? null,
   );
+  guard();
   speak.persistDelivery(deliveredMessageId);
   return { status: "delivered", persistence: "queued" };
 }

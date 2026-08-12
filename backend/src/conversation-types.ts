@@ -39,12 +39,20 @@ export interface ConversationLayerOptions {
 }
 
 export interface ConversationLayer {
+  /** Deterministic single reaction: observe + react, returning the generated turn. */
   respond(input: RespondInput): Promise<GeneratedTurn>;
+  /** Production path: invalidate older reactions, persist, and react detached with delivery. */
+  observe(
+    input: RespondInput,
+    delivery: import("./telegram-delivery.js").TelegramTurnDelivery,
+  ): Promise<void>;
   recordDeliveredMessage(
     threadId: ConversationThreadId,
     message: DeliveredHevroniaMessage,
   ): void;
   getMessages(threadId: ConversationThreadId): Promise<BaseMessage[]>;
   warmParticipant(sender: TelegramSenderIdentity): void;
+  /** Waits for all active reactions to settle (test/harness aid). */
+  settle(): Promise<void>;
   close(): Promise<void>;
 }

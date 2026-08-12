@@ -10,6 +10,7 @@ import {
   buildPlannerResponseSchema,
   type MissingNaturalNameChoice,
 } from "./planner-schema.js";
+import { throwIfAborted } from "./reaction-cancelled.js";
 import type { TurnContext } from "./realizer-schema.js";
 
 export { missingNaturalNameChoices, buildPlannerResponseSchema, buildPlannerJsonSchema } from "./planner-schema.js";
@@ -73,6 +74,7 @@ export interface AttentionPlanner {
   consider(
     context: TurnContext,
     namingChoices: readonly MissingNaturalNameChoice[],
+    signal?: AbortSignal,
   ): Promise<PlannerDecision>;
 }
 
@@ -81,7 +83,9 @@ export function createAttentionPlanner(model: BaseLanguageModel): AttentionPlann
     async consider(
       context: TurnContext,
       namingChoices: readonly MissingNaturalNameChoice[],
+      signal?: AbortSignal,
     ): Promise<PlannerDecision> {
+      throwIfAborted(signal);
       // Nothing to name and the event is unambiguously directed at Хевронія:
       // skip the model entirely, because the gate must never turn a private
       // chat or a direct address into an irreversible false negative.
@@ -104,9 +108,12 @@ export function createAttentionPlanner(model: BaseLanguageModel): AttentionPlann
             systemPrompt: PLANNER_PROMPT,
             responseFormat: providerStrategy(buildPlannerJsonSchema(namingChoices)),
           });
-      const result = await invokeWithRateLimitRetry(() => agent.invoke({
-        messages: [new HumanMessage(renderPlannerContext(context, namingChoices))],
-      }));
+      const result = await invokeWithRateLimitRetry(
+        () => agent.invoke({
+          messages: [new HumanMessage(renderPlannerContext(context, namingChoices))],
+        }, { signal }),
+        { signal },
+      );
       const response = schema.parse(result.structuredResponse);
       return {
         attention: response.attention === "yes",

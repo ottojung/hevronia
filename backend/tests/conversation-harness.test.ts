@@ -146,6 +146,8 @@ test("runner alternates messages, persists increasing reply IDs, records silence
     recordDeliveredMessage: () => undefined,
     getMessages: () => Promise.resolve([]),
     warmParticipant: () => undefined,
+    observe: async () => undefined,
+    settle: async () => undefined,
     close: () => { closeCount += 1; return Promise.resolve(); },
   };
   const transcriptLengths: number[] = [];
@@ -175,6 +177,8 @@ test("runner respects round limit and gives each run an empty simulator transcri
     respond: () => Promise.resolve(GeneratedTurn.fromSilence()),
     recordDeliveredMessage: () => undefined, getMessages: () => Promise.resolve([]),
     warmParticipant: () => undefined,
+    observe: async () => undefined,
+    settle: async () => undefined,
     close: () => Promise.resolve(),
   });
   const dependencies = {
@@ -211,6 +215,8 @@ test("runner returns a failed result that keeps the partial transcript", async (
     recordDeliveredMessage: () => undefined,
     getMessages: () => Promise.resolve([]),
     warmParticipant: () => undefined,
+    observe: async () => undefined,
+    settle: async () => undefined,
     close: () => { closeCount += 1; return Promise.resolve(); },
   };
   const result = await runScenario(firstScenario, 5, {
@@ -249,6 +255,8 @@ test("runner stops gracefully when the generator ends the conversation", async (
     recordDeliveredMessage: () => undefined,
     getMessages: () => Promise.resolve([]),
     warmParticipant: () => undefined,
+    observe: async () => undefined,
+    settle: async () => undefined,
     close: () => Promise.resolve(),
   };
   const result = await runScenario(firstScenario, 5, {

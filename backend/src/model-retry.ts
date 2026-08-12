@@ -1,4 +1,5 @@
 import { isTransientError, sleep } from "./retry.js";
+import { isReactionCancelledError, sleepAbortable, throwIfAborted } from "./reaction-cancelled.js";
 import {
   isRateLimitError,
   rateLimitRetryDelayMs,
@@ -10,6 +11,7 @@ export const MODEL_RATE_LIMIT_BASE_DELAY_MS = 2_000;
 
 export interface ModelRateLimitRetryOptions {
   baseDelayMs?: number;
+  signal?: AbortSignal;
 }
 
 /**
@@ -17,23 +19,37 @@ export interface ModelRateLimitRetryOptions {
  * provider rate-limits us or a transient transport failure occurs. Other
  * failures are never retried, and the wait is the provider's suggested delay
  * (capped at 24 hours) or a fixed base, never exponential and with no attempt
- * limit.
+ * limit. An aborted signal cancels the operation immediately: before the call,
+ * during it, or while waiting for a retry — a cancelled request is never
+ * retried.
  */
 export async function invokeWithRateLimitRetry<T>(
   operation: () => Promise<T>,
   options: ModelRateLimitRetryOptions = {},
 ): Promise<T> {
+  const { signal } = options;
   const baseDelayMs = options.baseDelayMs ?? MODEL_RATE_LIMIT_BASE_DELAY_MS;
+  throwIfAborted(signal);
   for (let attempt = 1; ; attempt += 1) {
     try {
-      return await operation();
+      const result = await operation();
+      throwIfAborted(signal);
+      return result;
     } catch (error) {
+      if (signal !== undefined && (signal.aborted || isReactionCancelledError(error))) {
+        throw error;
+      }
       if (!isRetryableModelError(error)) throw error;
       const delayMs = rateLimitRetryDelayMs(error, baseDelayMs);
       console.warn(
         `Model provider request failed transiently; retrying in ${delayMs}ms (attempt ${attempt})`,
       );
-      await sleep(delayMs);
+      if (signal === undefined) {
+        await sleep(delayMs);
+      } else {
+        await sleepAbortable(delayMs, signal);
+      }
+      throwIfAborted(signal);
     }
   }
 }

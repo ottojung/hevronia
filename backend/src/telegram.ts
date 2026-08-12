@@ -1,13 +1,14 @@
 import { Bot } from "grammy";
 
-import { recordDeliveredMessage, respond } from "./respond.js";
+import { recordDeliveredMessage } from "./respond.js";
 import { conversationThreadIdFromTelegramChat } from "./identifiers.js";
 import { installMembershipWarmup } from "./telegram-membership.js";
-import { deliverFallbackMessage, deliverGeneratedTurn } from "./telegram-delivery.js";
+import { deliverFallbackMessage } from "./telegram-delivery.js";
 import { logBotIdentity, tokenFromEnv } from "./telegram-config.js";
 import { createObservedTelegramMessage, hasDirectMention, telegramDisplayName, telegramSenderIdentity } from "./telegram-observation.js";
 import { installTelegramRetry } from "./telegram-retry.js";
 import { isConversationThreadPersistenceError } from "./pending-conversation-writes.js";
+import { getConversationLayer } from "./memory.js";
 
 export async function startBot(): Promise<void> {
   const bot = new Bot(tokenFromEnv());
@@ -51,18 +52,15 @@ export async function startBot(): Promise<void> {
         },
         mentionsHevronia: hasDirectMention(ctx.message.text, ctx.message.entities, me.id, me.username),
       });
-      const turn = await respond({ threadId, message,
+      // Observe and react asynchronously: the handler returns after canonical
+      // persistence while the reaction continues detached under per-thread
+      // cancellation.
+      await getConversationLayer().observe({ threadId, message,
         hevroniaSender: { kind: "user", id: me.id },
-        senderIsBot: ctx.from.is_bot });
-      const result = await deliverGeneratedTurn(turn, {
+        senderIsBot: ctx.from.is_bot }, {
         showTyping: async () => { await ctx.replyWithChatAction("typing"); },
         reply: sendReply,
       });
-      if (result.status === "silence") {
-        console.log(`Observed message=${messageId}; chose silence`);
-        return;
-      }
-      console.log(`Handled message=${messageId}; persistence=${result.persistence}`);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       console.error(`Failed to handle message=${messageId}: ${detail}`);
