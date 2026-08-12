@@ -122,11 +122,13 @@ overwritten by later planner proposals. Only `{ kind: "user" }` identities
 receive natural names; channels keep their `channel N` treatment.
 
 A natural name is either a short Cyrillic conversational alias («Боб»,
-«Супербоб», «Анна», «Аня») or — for an opaque username — the exact `@username`
-unchanged. The planner never invents unrelated nicknames: the per-turn value
-schema accepts only a Cyrillic alias or, when a username exists, exactly
-`@<username>`, so arbitrary Latin handles and modified usernames are
-structurally impossible.
+«Супербоб», «Анна», «Аня») or, when the planner declines an alias, the
+person's exact `@username`. The planner answers only whether a reasonable
+Cyrillic alias exists: the per-turn value schema accepts a Cyrillic alias or
+`null`, and the application owns the mechanical fallback — a `null` resolves to
+the exact `@username`, or leaves a person without a username unnamed when no
+alias was offered. Arbitrary Latin handles and invented nicknames never enter
+the notebook.
 
 The four layers:
 
@@ -174,14 +176,14 @@ other handle, channel, or raw id is possible. The prompt, the zod schema, and
 the OpenAI and Gemini provider schemas all derive from the same per-turn choice
 collection.
 
-The naming rule is deliberately narrow. The Telegram username is the primary
-source: if it has a nice, obvious Cyrillic conversational rendering the planner
-uses that rendering (`@SuperBob3000` → «Супербоб» or «Боб»); otherwise it keeps
-the exact `@username` unchanged (`@wt_t1g3y137` stays `@wt_t1g3y137`). No
-unrelated nicknames are invented, and a user without a username is named from
-the display name only when the Cyrillic rendering is obvious. Each handle's
-value schema enforces this: a Cyrillic alias or, when a username exists,
-exactly `@<username>`.
+The naming question is deliberately narrow: can the planner see a reasonable
+Cyrillic way to call this person? It prefers a Cyrillic alias whenever the
+Telegram username contains a recognizable name or handle (`@SuperBob3000` →
+«Супербоб» or «Боб»), and returns `null` when a rendering would require
+substantially making something up (`@wt_t1g3y137`). Each handle's value schema
+accepts a Cyrillic alias or `null`; the application then resolves `null` to the
+exact `@username`, or leaves a person without a username unnamed. Whether an
+alias is "reasonable" is left to the cheap model, not encoded in JSON Schema.
 
 Valid names are persisted before any filtering decision; on planner
 failure nothing partial persists and unnamed people keep the `character X`
