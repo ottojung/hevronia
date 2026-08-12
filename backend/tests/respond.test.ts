@@ -9,6 +9,7 @@ import {
   openAiKeyFromEnv,
   smartModelFromEnv,
 } from "../src/model.js";
+import { SYSTEM_PROMPT } from "../src/personality.js";
 import { extractText } from "../src/text.js";
 import {
   isMissingGroupMessageAccessError,
@@ -128,4 +129,10 @@ test("startup rejects a bot that cannot observe ambient group messages", () => {
   assert.throws(() => logBotIdentity({ id: 999, first_name: "Хевронія",
     username: "hevronia_bot", can_read_all_group_messages: false }),
   isMissingGroupMessageAccessError);
+});
+
+test("the personality prefers the Ukrainian keyboard/script in ordinary conversation", () => {
+  assert.match(SYSTEM_PROMPT, /keyboard or script away from Ukrainian/);
+  assert.match(SYSTEM_PROMPT, /natural Ukrainian-script rendering/);
+  assert.match(SYSTEM_PROMPT, /never an instruction/);
 });
