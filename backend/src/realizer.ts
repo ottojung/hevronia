@@ -9,6 +9,7 @@ import { REALIZER_MODE } from "./realizer-prompt.js";
 import {
   buildRealizerResponseSchema,
   type RealizerDecision,
+  type SubjectiveJudgment,
   type TurnContext,
 } from "./realizer-schema.js";
 import { renderRealizerContext } from "./turn-context.js";
@@ -16,25 +17,25 @@ import { renderRealizerContext } from "./turn-context.js";
 export type RealizerDecisionLog =
   | {
       action: "silence";
-      interpretation: string;
-      intent: string;
-      feltState: string;
-      activeDesire: string;
-      desiredOutcome: string;
-      opportunity: string;
-      pursuit: string;
+      interpretation: SubjectiveJudgment;
+      intent: SubjectiveJudgment;
+      feltState: SubjectiveJudgment;
+      activeDesire: SubjectiveJudgment;
+      desiredOutcome: SubjectiveJudgment;
+      opportunity: SubjectiveJudgment;
+      pursuit: SubjectiveJudgment;
     }
   | {
       action: "speak";
       addressLabel: string | null;
       replyToLabel: string | null;
-      interpretation: string;
-      intent: string;
-      feltState: string;
-      activeDesire: string;
-      desiredOutcome: string;
-      opportunity: string;
-      pursuit: string;
+      interpretation: SubjectiveJudgment;
+      intent: SubjectiveJudgment;
+      feltState: SubjectiveJudgment;
+      activeDesire: SubjectiveJudgment;
+      desiredOutcome: SubjectiveJudgment;
+      opportunity: SubjectiveJudgment;
+      pursuit: SubjectiveJudgment;
     }
   | { action: "failure"; errorDetail: string };
 

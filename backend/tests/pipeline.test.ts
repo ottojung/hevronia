@@ -282,22 +282,30 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   assert.ok(failure.includes("передано реалізатору"));
   assert.ok(failure.includes("boom"));
 
+  const judgment = (leading: string) => ({ leading, alternative: "alt", whyLeading: "why" });
   const silenceLog: RealizerDecisionLog = {
-    action: "silence", interpretation: "i", intent: "t", feltState: "f",
-    activeDesire: "a", desiredOutcome: "o", opportunity: "o", pursuit: "p",
+    action: "silence",
+    interpretation: judgment("i"), intent: judgment("t"), feltState: judgment("f"),
+    activeDesire: judgment("a"), desiredOutcome: judgment("o"), opportunity: judgment("o"),
+    pursuit: judgment("p"),
   };
   const silence = formatRealizerLog(silenceLog);
   assert.ok(silence.startsWith("Реалізатор: [silence]"));
-  assert.ok(silence.includes("  interpretation: i"));
-  assert.ok(silence.includes("  intent: t"));
+  assert.ok(silence.includes("  interpretation:"));
+  assert.ok(silence.includes("    leading: i"));
+  assert.ok(silence.includes("    alternative: alt"));
+  assert.ok(silence.includes("    whyLeading: why"));
 
   const speakLog: RealizerDecisionLog = {
     action: "speak", addressLabel: "character 42", replyToLabel: "M1 → Іра",
-    interpretation: "i", intent: "t", feltState: "f", activeDesire: "a",
-    desiredOutcome: "o", opportunity: "o", pursuit: "p",
+    interpretation: judgment("i"), intent: judgment("t"), feltState: judgment("f"),
+    activeDesire: judgment("a"), desiredOutcome: judgment("o"), opportunity: judgment("o"),
+    pursuit: judgment("p"),
   };
   const speak = formatRealizerLog(speakLog);
   assert.ok(speak.startsWith("Реалізатор: speak → character 42"));
   assert.ok(speak.includes("  replyTo: M1 → Іра"));
-  assert.ok(speak.includes("  interpretation: i"));
+  assert.ok(speak.includes("    leading: i"));
+  assert.ok(speak.includes("    alternative: alt"));
+  assert.ok(speak.includes("    whyLeading: why"));
 });

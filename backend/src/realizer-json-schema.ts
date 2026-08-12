@@ -1,15 +1,16 @@
 import { buildHandleChoices } from "./handles.js";
-import type { ConstFreeJsonSchema, VisibleMessage } from "./realizer-schema.js";
+import { subjectiveJudgmentKeys, type ConstFreeJsonSchema, type VisibleMessage } from "./realizer-schema.js";
 
-const jsonSubjectiveFields = {
-  interpretation: { type: "string", minLength: 1 },
-  intent: { type: "string", minLength: 1 },
-  feltState: { type: "string", minLength: 1 },
-  activeDesire: { type: "string", minLength: 1 },
-  desiredOutcome: { type: "string", minLength: 1 },
-  opportunity: { type: "string", minLength: 1 },
-  pursuit: { type: "string", minLength: 1 },
-};
+function subjectiveJudgmentJson(additionalProperties: boolean): Record<string, unknown> {
+  return {
+    type: "object",
+    ...(additionalProperties ? { additionalProperties: false } : {}),
+    properties: Object.fromEntries(
+      subjectiveJudgmentKeys.map((key) => [key, { type: "string", minLength: 1 }]),
+    ),
+    required: [...subjectiveJudgmentKeys],
+  };
+}
 
 /**
  * Builds the realizer's decision shape as a plain, fully inlined JSON Schema
@@ -27,10 +28,19 @@ export function buildRealizerJsonSchema(
 ): ConstFreeJsonSchema {
   const choices = buildHandleChoices(candidates);
   const objectKeywords = strict ? { additionalProperties: false } : {};
+  const subjectiveFields = {
+    interpretation: subjectiveJudgmentJson(strict),
+    intent: subjectiveJudgmentJson(strict),
+    feltState: subjectiveJudgmentJson(strict),
+    activeDesire: subjectiveJudgmentJson(strict),
+    desiredOutcome: subjectiveJudgmentJson(strict),
+    opportunity: subjectiveJudgmentJson(strict),
+    pursuit: subjectiveJudgmentJson(strict),
+  };
   const silenceVariant = {
     type: "object",
     ...objectKeywords,
-    properties: { action: { type: "string", enum: ["silence"] }, ...jsonSubjectiveFields },
+    properties: { action: { type: "string", enum: ["silence"] }, ...subjectiveFields },
     required: ["action", "interpretation", "intent", "feltState", "activeDesire",
       "desiredOutcome", "opportunity", "pursuit"],
   };
@@ -42,7 +52,7 @@ export function buildRealizerJsonSchema(
       addressCharacter: handleField(choices.characters.map(({ handle }) => handle)),
       replyToMessage: handleField(choices.messages.map(({ handle }) => handle)),
       message: { type: "string", minLength: 1 },
-      ...jsonSubjectiveFields,
+      ...subjectiveFields,
     },
     required: ["action", "addressCharacter", "replyToMessage", "message",
       "interpretation", "intent", "feltState", "activeDesire",

@@ -10,7 +10,11 @@ import type {
   Scheduler,
 } from "../src/long-term-memory/runtime.js";
 import type { Realizer } from "../src/realizer.js";
-import type { RealizerDecision, TurnContext } from "../src/realizer-schema.js";
+import type {
+  RealizerDecision,
+  SubjectiveJudgment,
+  TurnContext,
+} from "../src/realizer-schema.js";
 
 /** Builds a conversation layer with stub models so unit tests never need keys. */
 export function testLayer(
@@ -26,16 +30,48 @@ export function testLayer(
   });
 }
 
+function judgment(leading: string, alternative: string, whyLeading: string): SubjectiveJudgment {
+  return { leading, alternative, whyLeading };
+}
+
 export function realizerSilence(): RealizerDecision {
   return {
     action: "silence",
-    interpretation: "You read this as an ordinary moment with nothing at stake for you.",
-    intent: "They are just chatting idly, without any clear purpose toward you.",
-    feltState: "This leaves you quietly indifferent.",
-    activeDesire: "You want nothing from speaking right now.",
-    desiredOutcome: "You want the present calm to remain undisturbed.",
-    opportunity: "You notice no opportunity here that advances anything you want.",
-    pursuit: "You decide that staying silent serves you best.",
+    interpretation: judgment(
+      "You read this as an ordinary moment with nothing at stake for you.",
+      "They are making a small bid for your attention.",
+      "Nothing here engages you personally enough to matter.",
+    ),
+    intent: judgment(
+      "They are just chatting idly, without any clear purpose toward you.",
+      "They are quietly testing whether you are still listening.",
+      "Their message names no one and asks for no response.",
+    ),
+    feltState: judgment(
+      "This leaves you quietly indifferent.",
+      "This leaves you faintly curious.",
+      "There is nothing new enough here to spark real interest.",
+    ),
+    activeDesire: judgment(
+      "You want nothing from speaking right now.",
+      "You want to keep the peace of the moment unbroken.",
+      "No live urge supports spending attention on this.",
+    ),
+    desiredOutcome: judgment(
+      "You want the present calm to remain undisturbed.",
+      "You want to stay ready in case something more interesting appears.",
+      "Disturbing the calm would serve nothing you actually want.",
+    ),
+    opportunity: judgment(
+      "You notice no opportunity here that advances anything you want.",
+      "You could acknowledge them and test how they respond.",
+      "Without an active desire, that opportunity is not worth taking.",
+    ),
+    pursuit: judgment(
+      "You decide that staying silent serves you best.",
+      "You could offer a one-word acknowledgment.",
+      "Saying nothing costs nothing and keeps the calm you want.",
+    ),
   };
 }
 
@@ -46,13 +82,41 @@ export function realizerSpeak(
     action: "speak",
     addressCharacter: "P1",
     replyToMessage: null,
-    interpretation: "You understand this as an ordinary moment worth a short reply.",
-    intent: "They want a quick reaction from you.",
-    feltState: "This leaves you mildly interested.",
-    activeDesire: "You want to acknowledge them simply.",
-    desiredOutcome: "You want the moment to be acknowledged without fuss.",
-    opportunity: "You notice the present interaction gives you room to say a few words.",
-    pursuit: "You decide to say something short.",
+    interpretation: judgment(
+      "You understand this as an ordinary moment worth a short reply.",
+      "This is a small bid for your attention that deserves more.",
+      "Their light, casual phrasing matches a short reply.",
+    ),
+    intent: judgment(
+      "They want a quick reaction from you.",
+      "They are simply passing time in company.",
+      "The open phrasing invites a reply more than a report.",
+    ),
+    feltState: judgment(
+      "This leaves you mildly interested.",
+      "This leaves you neutral and unengaged.",
+      "The message has enough color to hold your attention briefly.",
+    ),
+    activeDesire: judgment(
+      "You want to acknowledge them simply.",
+      "You want to keep the exchange at a distance.",
+      "A small acknowledgment fits the light tone without investing much.",
+    ),
+    desiredOutcome: judgment(
+      "You want the moment to be acknowledged without fuss.",
+      "You want the conversation to deepen into something more personal.",
+      "There is no relationship weight here to justify more.",
+    ),
+    opportunity: judgment(
+      "You notice the present interaction gives you room to say a few words.",
+      "You could steer the topic toward something that interests you more.",
+      "A short reply serves your light aim without commandeering the chat.",
+    ),
+    pursuit: judgment(
+      "You decide to say something short.",
+      "You decide to stay silent and let the moment pass.",
+      "A short reply acknowledges them without overinvesting.",
+    ),
     message: "ага",
     ...overrides,
   };
