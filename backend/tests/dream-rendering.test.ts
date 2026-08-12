@@ -404,7 +404,7 @@ test("visible messages stay internal and keep their message ids for resolution",
 });
 
 test("natural names replace notebook labels in dream rendering", () => {
-  const names = new Map<number, string>([[52, "Боб"], [63, "Мес"]]);
+  const names = new Map<number, string>([[52, "Боб"], [63, "Аня"]]);
   assert.match(renderDreamEvent(participant(1, 52, "SuperBob3000", "привіт"), undefined, names),
     /Your sleeping mind made Боб say:\n\nпривіт/);
   const mesReply = participant(2, 63, "137^WT&^t1g3y", "привіт боб!", {
@@ -412,7 +412,7 @@ test("natural names replace notebook labels in dream rendering", () => {
       targetSenderDisplayName: "SuperBob3000", targetSenderUsername: null,
       targetText: "привіт", targetIsHevronia: false } });
   assert.match(renderDreamEvent(mesReply, undefined, names),
-    /Your sleeping mind made Мес reply to Боб with:/);
+    /Your sleeping mind made Аня reply to Боб with:/);
   const own = ownMessage(3, "і тобі привіт", { targetMessageId: 2,
     targetSender: { kind: "user", id: 52 }, targetSenderDisplayName: "SuperBob3000",
     targetSenderUsername: null, targetText: "привіт боб!", targetIsHevronia: false });

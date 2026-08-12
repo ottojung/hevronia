@@ -41,21 +41,29 @@ export function buildHandleChoices(
   candidates: readonly VisibleMessage[],
   naturalNames: NaturalNames = new Map(),
 ): RealizerChoices {
-  const seen = new Map<string, VisibleMessage>();
+  // Handle ordering follows first appearance, but the Telegram display name
+  // and username come from the latest visible message for each sender, so the
+  // planner and realizer never act on stale metadata.
+  const firstSeen = new Map<string, VisibleMessage>();
+  const latest = new Map<string, VisibleMessage>();
   for (const candidate of candidates) {
-    const key = `${candidate.sender.kind}:${candidate.sender.id}`;
-    if (!seen.has(key)) seen.set(key, candidate);
+    const key = senderKey(candidate.sender);
+    if (!firstSeen.has(key)) firstSeen.set(key, candidate);
+    latest.set(key, candidate);
   }
-  const characters: CharacterHandle[] = [...seen.values()].map((candidate, index) => ({
-    handle: handleFor("P", index),
-    character: {
-      sender: candidate.sender,
-      subject: dreamSubject(candidate.sender, naturalNames),
-      notebook: notebookSubject(candidate.sender),
-      displayName: candidate.senderDisplayName,
-      username: candidate.senderUsername ?? null,
-    },
-  }));
+  const characters: CharacterHandle[] = [...firstSeen.entries()].map(([key, candidate], index) => {
+    const meta = latest.get(key) ?? candidate;
+    return {
+      handle: handleFor("P", index),
+      character: {
+        sender: candidate.sender,
+        subject: dreamSubject(candidate.sender, naturalNames),
+        notebook: notebookSubject(candidate.sender),
+        displayName: meta.senderDisplayName,
+        username: meta.senderUsername ?? null,
+      },
+    };
+  });
   const messages: MessageHandle[] = candidates.map((message, index) => ({
     handle: handleFor("M", index),
     message,
@@ -64,6 +72,10 @@ export function buildHandleChoices(
     messages.map(({ handle, message }) => [message.messageId, handle]),
   );
   return { characters, messages, messageAnnotations };
+}
+
+function senderKey(sender: TelegramSenderIdentity): string {
+  return `${sender.kind}:${sender.id}`;
 }
 
 function handleFor(prefix: "P" | "M", index: number): string {

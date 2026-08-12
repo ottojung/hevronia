@@ -278,6 +278,13 @@ test("the realizer receives the full personality, history, and memories, not pla
 test("conversation diagnostics distinguish filtered, realizer-silence, and realizer-speak", () => {
   assert.ok(formatPlannerLog({ outcome: "pass", attention: true, naturalNames: {} }).includes("yes"));
   assert.ok(formatPlannerLog({ outcome: "filter", attention: false, naturalNames: {} }).includes("відфільтровано"));
+  const forced = formatPlannerLog({
+    outcome: "pass", attention: false, naturalNames: { P1: "@wt_t1g3y137" },
+  });
+  assert.ok(forced.includes("direct/private"));
+  assert.ok(forced.includes("передано реалізатору"));
+  assert.ok(forced.includes("@wt_t1g3y137"));
+  assert.ok(!forced.includes("yes"));
   const failure = formatPlannerLog({ outcome: "failure", errorDetail: "boom" });
   assert.ok(failure.includes("передано реалізатору"));
   assert.ok(failure.includes("boom"));

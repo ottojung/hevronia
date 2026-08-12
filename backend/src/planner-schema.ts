@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import type { CharacterHandle } from "./handles.js";
-import { MAX_NATURAL_NAME_LENGTH, naturalNameSchema } from "./natural-names/schema.js";
+import {
+  CYRILLIC_ALIAS_PATTERN,
+  MAX_NATURAL_NAME_LENGTH,
+  cyrillicAliasSchema,
+} from "./natural-names/schema.js";
 import type { ConstFreeJsonSchema } from "./realizer-schema.js";
 import type { NaturalNames } from "./telegram-event.js";
 
@@ -46,6 +50,17 @@ export function missingNaturalNameChoices(
 }
 
 /**
+ * The allowed value for one unnamed person: a short Cyrillic conversational
+ * alias, or — when a Telegram username exists — exactly that `@username`.
+ * Arbitrary Latin handles, modified usernames, and invented nicknames that do
+ * not read as Cyrillic names are impossible.
+ */
+export function namingValueSchema(choice: MissingNaturalNameChoice): z.ZodType<string> {
+  if (choice.username === null || choice.username === "") return cyrillicAliasSchema;
+  return cyrillicAliasSchema.or(z.literal(`@${choice.username}`));
+}
+
+/**
  * Builds the planner's expected response schema dynamically from the exact
  * per-turn naming choices: the unnamed visible user handles are the only
  * properties of `naturalNames`, every one is required, and nothing else is
@@ -55,7 +70,7 @@ export function buildPlannerResponseSchema(
   namingChoices: readonly MissingNaturalNameChoice[],
 ): z.ZodType<PlannerResponse> {
   const naturalNames = z.object(
-    Object.fromEntries(namingChoices.map(({ handle }) => [handle, naturalNameSchema])),
+    Object.fromEntries(namingChoices.map((choice) => [choice.handle, namingValueSchema(choice)])),
   ).strict();
   return z.object({
     attention: z.enum(["yes", "no"]),
@@ -81,10 +96,7 @@ export function buildPlannerJsonSchema(
         type: "object",
         additionalProperties: false,
         properties: Object.fromEntries(
-          namingChoices.map(({ handle }) => [
-            handle,
-            { type: "string", minLength: 1, maxLength: MAX_NATURAL_NAME_LENGTH },
-          ]),
+          namingChoices.map((choice) => [choice.handle, namingValueJsonSchema(choice)]),
         ),
         required: namingChoices.map(({ handle }) => handle),
       },
@@ -92,3 +104,15 @@ export function buildPlannerJsonSchema(
     required: ["attention", "naturalNames"],
   };
 }
+
+function namingValueJsonSchema(choice: MissingNaturalNameChoice): Record<string, unknown> {
+  const alias = {
+    type: "string",
+    pattern: CYRILLIC_ALIAS_PATTERN,
+    minLength: 1,
+    maxLength: MAX_NATURAL_NAME_LENGTH,
+  };
+  if (choice.username === null || choice.username === "") return alias;
+  return { anyOf: [alias, { type: "string", enum: [`@${choice.username}`] }] };
+}
+

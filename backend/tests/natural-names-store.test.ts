@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { MAX_NATURAL_NAME_LENGTH, naturalNameSchema } from "../src/natural-names/schema.js";
+import { MAX_NATURAL_NAME_LENGTH, cyrillicAliasSchema, naturalNameSchema } from "../src/natural-names/schema.js";
 import { createNaturalNameStore } from "../src/natural-names/store.js";
 
 function tempPath(label: string): string {
@@ -34,8 +34,8 @@ test("persistence survives closing and reopening the store", async () => {
   store = createNaturalNameStore(p);
   try {
     assert.equal(await store.get(52), "Боб");
-    assert.equal(await store.assignIfAbsent(63, "Мес"), "Мес");
-    assert.equal(await store.get(63), "Мес");
+    assert.equal(await store.assignIfAbsent(63, "Аня"), "Аня");
+    assert.equal(await store.get(63), "Аня");
   } finally {
     await store.close();
     rmSync(dir, { recursive: true, force: true });
@@ -112,4 +112,15 @@ test("the central natural-name schema rejects empty, whitespace-only, and overlo
   assert.equal(naturalNameSchema.safeParse("   ").success, false);
   assert.equal(naturalNameSchema.safeParse("x".repeat(MAX_NATURAL_NAME_LENGTH)).success, true);
   assert.equal(naturalNameSchema.safeParse("x".repeat(MAX_NATURAL_NAME_LENGTH + 1)).success, false);
+});
+
+test("cyrillicAliasSchema accepts name-like Cyrillic aliases and rejects handles and Latin", () => {
+  assert.equal(cyrillicAliasSchema.safeParse("Боб").success, true);
+  assert.equal(cyrillicAliasSchema.safeParse("Супербоб").success, true);
+  assert.equal(cyrillicAliasSchema.safeParse("Анна").success, true);
+  assert.equal(cyrillicAliasSchema.safeParse("Оля-Ірина").success, true);
+  assert.equal(cyrillicAliasSchema.safeParse("wt_t1g3y137").success, false);
+  assert.equal(cyrillicAliasSchema.safeParse("@wt_t1g3y137").success, false);
+  assert.equal(cyrillicAliasSchema.safeParse("CyberBob").success, false);
+  assert.equal(cyrillicAliasSchema.safeParse("Мес1").success, false);
 });

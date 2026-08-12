@@ -19,9 +19,14 @@ export function formatPlannerLog(log: PlannerDecisionLog): string {
   if (log.outcome === "failure") {
     return `Планер: [error → передано реалізатору] ${singleLine(log.errorDetail)}`;
   }
-  const head = log.outcome === "pass"
-    ? "Планер: yes → передано реалізатору"
-    : "Планер: no → повідомлення відфільтровано";
+  let head: string;
+  if (log.outcome === "filter") {
+    head = "Планер: no → повідомлення відфільтровано";
+  } else if (log.attention) {
+    head = "Планер: yes → передано реалізатору";
+  } else {
+    head = "Планер: no → direct/private, тому передано реалізатору";
+  }
   const names = Object.entries(log.naturalNames);
   if (names.length === 0) return head;
   return [

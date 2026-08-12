@@ -31,11 +31,11 @@ const context: TurnContext = {
   naturalNames: new Map(),
 };
 
-const choice = (handle: string, id: number): MissingNaturalNameChoice => ({
+const choice = (handle: string, id: number, username: string | null = null): MissingNaturalNameChoice => ({
   handle,
   sender: { kind: "user", id },
   displayName: "Display",
-  username: null,
+  username,
 });
 
 function plannerWithResponse(content: string) {
@@ -72,18 +72,18 @@ test("the dynamic planner schema exposes exactly the unnamed handles and nothing
   const schema = buildPlannerResponseSchema([choice("P2", 63), choice("P4", 94)]);
   const parse = (payload: unknown) => schema.safeParse(payload);
 
-  assert.equal(parse({ attention: "yes", naturalNames: { P2: "Мес", P4: "Боб" } }).success, true);
+  assert.equal(parse({ attention: "yes", naturalNames: { P2: "Аня", P4: "Боб" } }).success, true);
   // already-named, channel, stale, and arbitrary handles are impossible
-  assert.equal(parse({ attention: "yes", naturalNames: { P1: "Роб", P2: "Мес", P4: "Боб" } }).success, false);
-  assert.equal(parse({ attention: "yes", naturalNames: { P3: "Канал", P2: "Мес", P4: "Боб" } }).success, false);
-  assert.equal(parse({ attention: "yes", naturalNames: { P999: "Хто", P2: "Мес", P4: "Боб" } }).success, false);
+  assert.equal(parse({ attention: "yes", naturalNames: { P1: "Роб", P2: "Аня", P4: "Боб" } }).success, false);
+  assert.equal(parse({ attention: "yes", naturalNames: { P3: "Канал", P2: "Аня", P4: "Боб" } }).success, false);
+  assert.equal(parse({ attention: "yes", naturalNames: { P999: "Хто", P2: "Аня", P4: "Боб" } }).success, false);
   // both unnamed handles are required
-  assert.equal(parse({ attention: "yes", naturalNames: { P2: "Мес" } }).success, false);
+  assert.equal(parse({ attention: "yes", naturalNames: { P2: "Аня" } }).success, false);
   assert.equal(parse({ attention: "yes", naturalNames: { P4: "Боб" } }).success, false);
   assert.equal(parse({ attention: "yes", naturalNames: {} }).success, false);
   assert.equal(parse({ attention: "yes" }).success, false);
-  assert.equal(parse({ attention: "no", naturalNames: { P2: "Мес", P4: "Боб" } }).success, true);
-  assert.equal(parse({ attention: "maybe", naturalNames: { P2: "Мес", P4: "Боб" } }).success, false);
+  assert.equal(parse({ attention: "no", naturalNames: { P2: "Аня", P4: "Боб" } }).success, true);
+  assert.equal(parse({ attention: "maybe", naturalNames: { P2: "Аня", P4: "Боб" } }).success, false);
 });
 
 test("the dynamic planner schema is empty and strict when nobody needs a name", () => {
@@ -120,12 +120,68 @@ test("the OpenAI and Gemini provider schemas expose exactly the same naming choi
   assert.equal(openAi, gemini);
 });
 
+test("the naming value schema allows a Cyrillic alias or the exact @username", () => {
+  const schema = buildPlannerResponseSchema([choice("P2", 63, "wt_t1g3y137")]);
+  const parse = (name: unknown) => schema.safeParse({
+    attention: "yes", naturalNames: { P2: name },
+  }).success;
+  assert.equal(parse("Боб"), true);
+  assert.equal(parse("Супербоб"), true);
+  assert.equal(parse("Анна"), true);
+  assert.equal(parse("@wt_t1g3y137"), true);
+  assert.equal(parse("wt_t1g3y137"), false, "raw username without @ is rejected");
+  assert.equal(parse("@wt_t1g3y138"), false, "modified username is rejected");
+  assert.equal(parse("CyberBob"), false, "Latin invented nickname is rejected");
+  assert.equal(parse("Аня1"), false, "digit is not a name");
+});
+
+test("the naming value schema for a user without a username allows only a Cyrillic alias", () => {
+  const schema = buildPlannerResponseSchema([choice("P2", 63, null)]);
+  const parse = (name: unknown) => schema.safeParse({
+    attention: "yes", naturalNames: { P2: name },
+  }).success;
+  assert.equal(parse("Олена"), true);
+  assert.equal(parse("@wt_t1g3y137"), false, "an @username is not a display-name alias");
+  assert.equal(parse("Bob"), false);
+});
+
+test("the provider value schema encodes the Cyrillic alias and exact username restriction", () => {
+  const serialized = JSON.stringify(buildPlannerJsonSchema([choice("P2", 63, "wt_t1g3y137")]));
+  assert.ok(serialized.includes('"pattern":'));
+  assert.ok(serialized.includes('"enum":["@wt_t1g3y137"]'));
+  assert.ok(serialized.includes('"anyOf"'));
+  assert.ok(serialized.includes("А-Яа-я"));
+});
+
+test("the latest visible Telegram metadata wins for a recurring sender", () => {
+  const visible: import("../src/realizer-schema.js").VisibleMessage[] = [
+    { messageId: 1, sender: { kind: "user", id: 52 }, senderDisplayName: "Bob",
+      senderUsername: null, text: "old" },
+    { messageId: 2, sender: { kind: "user", id: 52 }, senderDisplayName: "SuperBob3000",
+      senderUsername: "super_bob3000", text: "new" },
+  ];
+  const characters = buildHandleChoices(visible).characters;
+  assert.equal(characters.length, 1);
+  assert.equal(characters[0]?.character.displayName, "SuperBob3000");
+  assert.equal(characters[0]?.character.username, "super_bob3000");
+  const choices = missingNaturalNameChoices(characters, new Map());
+  assert.equal(choices[0]?.username, "super_bob3000");
+  assert.equal(choices[0]?.displayName, "SuperBob3000");
+  const schema = buildPlannerResponseSchema(choices);
+  assert.equal(schema.safeParse({
+    attention: "yes", naturalNames: { P1: "@super_bob3000" },
+  }).success, true);
+  assert.equal(schema.safeParse({
+    attention: "yes", naturalNames: { P1: "@bob" },
+  }).success, false, "stale username must not be allowed");
+});
+
 test("an exact planner response returns attention and names", async () => {
   const planner = plannerWithResponse(JSON.stringify({
-    attention: "yes", naturalNames: { P2: "Мес" },
+    attention: "yes", naturalNames: { P2: "Аня" },
   }));
   const decision = await planner.consider(context, [choice("P2", 63)]);
-  assert.deepEqual(decision, { attention: true, naturalNames: { P2: "Мес" } });
+  assert.deepEqual(decision, { attention: true, naturalNames: { P2: "Аня" } });
 });
 
 test("a malformed planner response is a planner failure", async () => {
@@ -182,7 +238,7 @@ test("one source of truth: the same choices drive the prompt and the schema", ()
   assert.ok(rendered.includes("P2 = character 63"));
   assert.ok(rendered.includes("P4 = character 94"));
   assert.ok(rendered.includes("Names to assign:"));
-  const parsed = schema.safeParse({ attention: "yes", naturalNames: { P2: "Мес", P4: "Боб" } });
+  const parsed = schema.safeParse({ attention: "yes", naturalNames: { P2: "Аня", P4: "Боб" } });
   assert.equal(parsed.success, true);
   if (parsed.success) {
     assert.deepEqual(Object.keys(parsed.data.naturalNames), ["P2", "P4"]);
@@ -191,7 +247,7 @@ test("one source of truth: the same choices drive the prompt and the schema", ()
     assert.ok(!rendered.includes(`Names to assign:\n${handle}`));
     assert.equal(schema.safeParse({
       attention: "yes",
-      naturalNames: { P2: "Мес", P4: "Боб", [handle]: "Хто" },
+      naturalNames: { P2: "Аня", P4: "Боб", [handle]: "Хто" },
     }).success, false, `${handle} must not be an allowed naming property`);
   }
 });

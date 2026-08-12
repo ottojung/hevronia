@@ -406,12 +406,15 @@ test("a simulated Telegram identity is naturalized and not re-offered on later t
   }
 });
 
-test("an opaque identity exercises invented naming with a stubbed nickname", async () => {
+test("an opaque identity falls back to its exact @username, never an invented nickname", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-nickname-"));
-  const identity = participantIdentityFor("long-boring-conversation");
+  const identity = participantIdentityFor("recruit-insult");
+  assert.equal(identity.username, "wt_t1g3y137");
   const planner = stubPlannerDecision((_context, namingChoices) => ({
     attention: true,
-    naturalNames: Object.fromEntries(namingChoices.map(({ handle }) => [handle, "Вівця"])),
+    naturalNames: Object.fromEntries(
+      namingChoices.map(({ handle, username }) => [handle, `@${username ?? ""}`]),
+    ),
   }));
   const realizer: Realizer = { realize: async () => realizerSilence() };
   const threadId = conversationThreadIdFromTelegramPrivateChat(7_003);
@@ -430,9 +433,9 @@ test("an opaque identity exercises invented naming with a stubbed nickname", asy
       currentMessage: message,
       visibleMessages: visibleMessages(history),
       participantMemories: [],
-      naturalNames: new Map([[PARTICIPANT_ID, "Вівця"]]),
+      naturalNames: new Map([[PARTICIPANT_ID, "@wt_t1g3y137"]]),
     });
-    assert.match(rendered, /Your sleeping mind made Вівця say:/);
+    assert.match(rendered, /Your sleeping mind made @wt_t1g3y137 say:/);
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
