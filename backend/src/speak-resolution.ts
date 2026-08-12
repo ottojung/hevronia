@@ -3,6 +3,7 @@ import type { CharacterHandle, MessageHandle } from "./handles.js";
 import type { RealizerDecision, VisibleMessage } from "./realizer-schema.js";
 import type {
   DeliveredHevroniaMessage,
+  NaturalNames,
   ObservedTelegramMessage,
   ReplyRelationship,
   TelegramSenderIdentity,
@@ -26,8 +27,9 @@ export interface ResolvedRealizerDecision {
 export function resolveRealizerDecision(
   decision: Extract<RealizerDecision, { action: "speak" }>,
   candidates: readonly VisibleMessage[],
+  naturalNames: NaturalNames = new Map(),
 ): ResolvedRealizerDecision | undefined {
-  const choices = buildHandleChoices(candidates);
+  const choices = buildHandleChoices(candidates, naturalNames);
   let address: CharacterHandle | null = null;
   if (decision.addressCharacter !== null) {
     const found = choices.characters.find(({ handle }) => handle === decision.addressCharacter);

@@ -36,7 +36,9 @@ export async function finalizeTurn(
     return GeneratedTurn.fromSilence();
   }
 
-  const resolved = resolveRealizerDecision(decision, context.visibleMessages);
+  const resolved = resolveRealizerDecision(
+    decision, context.visibleMessages, context.naturalNames,
+  );
   if (resolved === undefined) {
     dependencies.onRealizerDecision?.({
       action: "failure",
