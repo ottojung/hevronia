@@ -8,6 +8,10 @@ import { conversationThreadIdFromTelegramPrivateChat } from "../src/identifiers.
 import { createLazyLongTermMemory } from "../src/long-term-memory/runtime.js";
 import { applyProposedNames } from "../src/natural-names/apply.js";
 import { createNaturalNameStore } from "../src/natural-names/store.js";
+import {
+  isConversationThreadPersistenceError,
+  PendingConversationWrites,
+} from "../src/pending-conversation-writes.js";
 import { isReactionCancelledError, ReactionCancelledError } from "../src/reaction-cancelled.js";
 import type { AttentionPlanner } from "../src/attention-planner.js";
 import type { Realizer } from "../src/realizer.js";
@@ -788,6 +792,54 @@ test("an explicit planner Cyrillic alias is stored", async () => {
     } finally {
       await names.close();
     }
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a structured-output failure produces zero Telegram sends", async () => {
+  const dir = tempDir("silent-structured");
+  const sent: string[] = [];
+  const realizer = {
+    realize: async (): Promise<never> => {
+      const error = new Error("model output did not satisfy the response schema");
+      error.name = "StructuredOutputParsingError";
+      throw error;
+    },
+  };
+  const layer = testLayer(path.join(dir, "db.sqlite"), { planner: passingPlanner(), realizer });
+  try {
+    await layer.observe(respondInput(1, "A"), {
+      showTyping: async () => undefined,
+      reply: async (text) => { sent.push(text); return 1; },
+    });
+    await layer.settle();
+    assert.deepEqual(sent, [], "a structured-output failure must never produce Telegram dialogue");
+  } finally {
+    await layer.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("a canonical persistence failure produces zero Telegram sends", async () => {
+  const dir = tempDir("silent-persistence");
+  const sent: string[] = [];
+  const layer = testLayer(path.join(dir, "db.sqlite"), {
+    planner: passingPlanner(),
+    realizer: { realize: async () => realizerSilence() },
+    pendingConversationWrites: new PendingConversationWrites(1, 0),
+    conversationStore: {
+      append: async () => { throw new Error("disk full"); },
+      getMessages: async () => [],
+    },
+  });
+  try {
+    await assert.rejects(() => layer.observe(respondInput(1, "A"), {
+      showTyping: async () => undefined,
+      reply: async (text) => { sent.push(text); return 1; },
+    }), isConversationThreadPersistenceError);
+    assert.deepEqual(sent, [], "a persistence failure produces no Telegram dialogue");
   } finally {
     await layer.close();
     rmSync(dir, { recursive: true, force: true });
