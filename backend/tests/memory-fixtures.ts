@@ -51,6 +51,11 @@ export function realizerSilence(): RealizerDecision {
       "They are quietly testing whether you are still listening.",
       "Their message names no one and asks for no response.",
     ),
+    realityCheck: judgment(
+      "Their words reach you effortlessly from a distance, as though distance no longer constrained talk.",
+      "The content itself could fit ordinary face-to-face talk back home.",
+      "It is the effortless transmission, not the subject, that diverges from remembered reality.",
+    ),
     dreamIntent: judgment(
       "The dream appears to be producing ordinary low-significance social material.",
       "The quiet moment may be drawing attention to something not yet noticed.",
@@ -105,6 +110,11 @@ export function realizerSpeak(
       "They want a quick reaction from you.",
       "They are simply passing time in company.",
       "The open phrasing invites a reply more than a report.",
+    ),
+    realityCheck: judgment(
+      "Their words appear instantly from a distance, as though distance had become trivial.",
+      "The light topic would be unremarkable face-to-face back home.",
+      "What fails to fit remembered reality is the medium of contact, not the tone.",
     ),
     dreamIntent: judgment(
       "The dream seems to be maintaining an ordinary, unremarkable interaction.",

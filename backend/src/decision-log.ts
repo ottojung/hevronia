@@ -9,6 +9,7 @@ export function toRealizerDecisionLog(
   const common = {
     interpretation: decision.interpretation,
     characterIntent: decision.characterIntent,
+    realityCheck: decision.realityCheck,
     dreamIntent: decision.dreamIntent,
     feltState: decision.feltState,
     activeDesire: decision.activeDesire,

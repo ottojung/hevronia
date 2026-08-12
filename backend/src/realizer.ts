@@ -20,6 +20,7 @@ export type RealizerDecisionLog =
       action: "silence";
       interpretation: SubjectiveJudgment;
       characterIntent: SubjectiveJudgment;
+      realityCheck: SubjectiveJudgment;
       dreamIntent: SubjectiveJudgment;
       feltState: SubjectiveJudgment;
       activeDesire: SubjectiveJudgment;
@@ -34,6 +35,7 @@ export type RealizerDecisionLog =
       replyToLabel: string | null;
       interpretation: SubjectiveJudgment;
       characterIntent: SubjectiveJudgment;
+      realityCheck: SubjectiveJudgment;
       dreamIntent: SubjectiveJudgment;
       feltState: SubjectiveJudgment;
       activeDesire: SubjectiveJudgment;

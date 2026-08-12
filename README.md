@@ -355,8 +355,8 @@ scenario by category with its behavior tags. Each turn shows the participant's
 message, a `Планер:` line for the cheap attention filter (`yes → передано
 реалізатору`, `no → повідомлення відфільтровано`, or `[error → передано
 реалізатору]`), a `Реалізатор:` block with Хевронія's individually labeled
-private fields (`interpretation`, `characterIntent`, `dreamIntent`, `feltState`,
-`activeDesire`, `desiredOutcome`, `opportunity`, `fiveTurnStrategy`,
+private fields (`interpretation`, `characterIntent`, `realityCheck`, `dreamIntent`,
+`feltState`, `activeDesire`, `desiredOutcome`, `opportunity`, `fiveTurnStrategy`,
 `fiftyTurnStrategy`) and her chosen addressee and reply
 attachment, and then her realized Telegram reply. The three outcomes are
 distinguishable in the transcript: filtered by the planner, passed but silenced

@@ -127,9 +127,9 @@ cheap attention planner
 The cheap planner is a high-recall attention filter: it only decides whether the
 situation is worth a smart-model invocation. It cannot force speech. The smart
 realizer is the authoritative mind of the turn: it owns interpretation,
-character-intent inference, dream-level interpretation, feelings, desires,
-outcome, opportunity, medium- and long-term strategies, addressee choice,
-reply attachment, the final speak/silence decision, and the wording.
+character-intent inference, reality-check, dream-level interpretation, feelings,
+desires, outcome, opportunity, medium- and long-term strategies, addressee
+choice, reply attachment, the final speak/silence decision, and the wording.
 
 ## Module layout
 
@@ -314,7 +314,7 @@ plausibility. `whyRejected` names what is actually wrong with the alternative �
 the evidence or consideration that tells against it — rather than merely
 restating that the leading view is good or fits.
 
-The nine contrastive fields:
+The ten contrastive fields:
 
 - `interpretation` — what Хевронія thinks is happening / what the event means
   in context, weighed against the strongest competing interpretation;
@@ -322,11 +322,15 @@ The nine contrastive fields:
   character wants from her specifically: the response, belief, feeling, role,
   or participation they are trying to produce in her, weighed against the
   strongest competing theory of their motive;
-- `dreamIntent` — her more distant interpretation of what the dream, as a
-  construction of her sleeping mind, may be doing by producing the event or the
-  wider visible pattern: what it appears to be showing, repeating, testing,
-  pressing, reminding, or drawing her attention toward. It is inferential, may
-  be mundane, and does not by itself create a desire or a discrepancy
+- `realityCheck` — the most revealing way in which the event, claim, object,
+  convention, or its ordinary dream-world implications fail to fit her
+  remembered real reality around Stormwind; it always finds a seam (never
+  "everything makes sense") by deriving consequences from grounded premises,
+  comparing against remembered reality rather than Warcraft as lore;
+- `dreamIntent` — her more distant, suspicious strategic hypothesis about what
+  the dream — the process that continues to keep her from waking — may gain by
+  producing the event or the wider visible pattern. It is inferential, may be
+  mundane, and does not by itself create a desire or a discrepancy
   investigation;
 - `feltState` — her immediate emotional/felt reaction, weighed against another
   plausible characterization of the same reaction;

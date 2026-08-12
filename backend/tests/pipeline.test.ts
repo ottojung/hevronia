@@ -292,8 +292,8 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   const judgment = (leading: string) => ({ leading, alternative: "alt", whyRejected: "why" });
   const silenceLog: RealizerDecisionLog = {
     action: "silence",
-    interpretation: judgment("i"), characterIntent: judgment("c"), dreamIntent: judgment("d"),
-    feltState: judgment("f"),
+    interpretation: judgment("i"), characterIntent: judgment("c"), realityCheck: judgment("r"),
+    dreamIntent: judgment("d"), feltState: judgment("f"),
     activeDesire: judgment("a"), desiredOutcome: judgment("o"), opportunity: judgment("o"),
     fiveTurnStrategy: judgment("s5"), fiftyTurnStrategy: judgment("s50"),
   };
@@ -306,8 +306,8 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
 
   const speakLog: RealizerDecisionLog = {
     action: "speak", addressLabel: "character 42", replyToLabel: "M1 → Іра",
-    interpretation: judgment("i"), characterIntent: judgment("c"), dreamIntent: judgment("d"),
-    feltState: judgment("f"),
+    interpretation: judgment("i"), characterIntent: judgment("c"), realityCheck: judgment("r"),
+    dreamIntent: judgment("d"), feltState: judgment("f"),
     activeDesire: judgment("a"), desiredOutcome: judgment("o"), opportunity: judgment("o"),
     fiveTurnStrategy: judgment("s5"), fiftyTurnStrategy: judgment("s50"),
   };
