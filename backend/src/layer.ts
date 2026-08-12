@@ -58,6 +58,7 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
       options.naturalNameDbPath ?? naturalNamesDbPathFor(dbPath),
     );
   const coordinator = new ReactionCoordinator();
+  let layerClosed = false;
   const dependencies: ReactTurnDependencies = { store, planner, realizer, naturalNameStore,
     personality, canonicalWrites, lazyMemory, onPlannerDecision: options.onPlannerDecision,
     onRealizerDecision: options.onRealizerDecision };
@@ -70,13 +71,13 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
       const result = await reactTurn(dependencies, input, undefined, undefined);
       return result.status === "speak" ? result.turn : GeneratedTurn.fromSilence();
     },
-    observe: async (input, delivery) => {
+    observe: async (input, delivery, onCurrentReactionFailure) => {
       const threadKey = input.threadId.toPersistenceKey();
       const revision = coordinator.invalidate(threadKey);
       await observeIncoming(store, canonicalWrites, lazyMemory, input);
       coordinator.start(threadKey, revision, async (ctx) => {
         await reactTurn(dependencies, input, ctx, delivery);
-      });
+      }, { onCurrentReactionFailure });
     },
     recordDeliveredMessage: (threadId, message) => {
       canonicalWrites.enqueue(threadId, () => store.append(threadId, message));
@@ -86,6 +87,8 @@ export function createConversationLayer(options: ConversationLayerOptions = {}):
     warmParticipant: (sender) => warmParticipant(lazyMemory, sender),
     settle: () => coordinator.settle(),
     async close(): Promise<void> {
+      if (layerClosed) return;
+      layerClosed = true;
       await coordinator.abortAllAndSettle();
       await canonicalWrites.drain();
       await lazyMemory?.close();

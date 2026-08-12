@@ -5,7 +5,11 @@ import { GeneratedTurn } from "./generated-turn.js";
 import type { ReactionContext } from "./reaction-context.js";
 import type { RealizerDecision, TurnContext } from "./realizer-schema.js";
 import type { ReactTurnDependencies, ReactTurnResult } from "./react-turn-types.js";
-import { deliverGeneratedTurn, type TelegramTurnDelivery } from "./telegram-delivery.js";
+import {
+  deliverGeneratedTurn,
+  type DeliveryCommit,
+  type TelegramTurnDelivery,
+} from "./telegram-delivery.js";
 import {
   UnresolvableRealizerDecisionError,
   deliveredEvent,
@@ -15,8 +19,10 @@ import {
 
 /**
  * Resolves a realizer speak decision into a turn and, when a delivery is
- * provided, sends it under the reaction's revision guards so a stale or
- * cancelled reaction can neither send nor persist an obsolete reply.
+ * provided, sends it under the reaction's revision guards. Delivery becomes
+ * committed at the moment the Telegram send begins: a confirmed send is always
+ * persisted even if a newer event arrived while the network request was in
+ * flight, and the replacement reaction waits for that reconciliation.
  */
 export async function finalizeSpeakOrDeliver(
   dependencies: ReactTurnDependencies,
@@ -54,7 +60,20 @@ export async function finalizeSpeakOrDeliver(
   if (delivery === undefined) {
     return { status: "speak", turn };
   }
-  await deliverGeneratedTurn(turn, delivery, () => ctx?.throwIfStale());
-  console.log(`Delivered reaction thread=${ctx?.threadKey ?? "-"} revision=${ctx?.revision ?? 0}`);
+  await deliverGeneratedTurn(
+    turn, delivery, () => ctx?.throwIfStale(), commitHook(ctx),
+  );
+  console.log(`Confirmed delivery thread=${ctx?.threadKey ?? "-"} revision=${ctx?.revision ?? 0}`);
   return { status: "delivered" };
+}
+
+function commitHook(ctx: ReactionContext | undefined): DeliveryCommit | undefined {
+  if (ctx === undefined) return undefined;
+  let complete: (() => void) | undefined;
+  return {
+    begin: () => {
+      complete = ctx.beginCommittedDelivery().complete;
+    },
+    complete: () => complete?.(),
+  };
 }

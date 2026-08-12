@@ -3,12 +3,12 @@ import { Bot } from "grammy";
 import { recordDeliveredMessage } from "./respond.js";
 import { conversationThreadIdFromTelegramChat } from "./identifiers.js";
 import { installMembershipWarmup } from "./telegram-membership.js";
-import { deliverFallbackMessage } from "./telegram-delivery.js";
 import { logBotIdentity, tokenFromEnv } from "./telegram-config.js";
 import { createObservedTelegramMessage, hasDirectMention, telegramDisplayName, telegramSenderIdentity } from "./telegram-observation.js";
 import { installTelegramRetry } from "./telegram-retry.js";
 import { isConversationThreadPersistenceError } from "./pending-conversation-writes.js";
 import { getConversationLayer } from "./memory.js";
+import { fallbackSourceFor, sendFallback, type TelegramMessageEnvelope } from "./telegram-fallback.js";
 
 export async function startBot(): Promise<void> {
   const bot = new Bot(tokenFromEnv());
@@ -29,6 +29,13 @@ export async function startBot(): Promise<void> {
     const messageId = ctx.message.message_id;
     const messageThreadId = ctx.message.message_thread_id;
     console.log(`Handling Telegram text message update=${updateId} message=${messageId}`);
+    const envelope: TelegramMessageEnvelope = {
+      botId: me.id, chatKind: ctx.chat.type, chatId: ctx.chat.id, messageId,
+      messageThreadId: messageThreadId ?? null, fromId: ctx.from.id,
+      fromFirstName: ctx.from.first_name, fromLastName: ctx.from.last_name,
+      fromUsername: ctx.message.from?.username ?? null,
+      senderChatId: ctx.message.sender_chat?.id, text: ctx.message.text,
+    };
     try {
       const threadId = conversationThreadIdFromTelegramChat(ctx.chat.type, ctx.chat.id, messageThreadId);
       const reply = ctx.message.reply_to_message;
@@ -54,31 +61,29 @@ export async function startBot(): Promise<void> {
       });
       // Observe and react asynchronously: the handler returns after canonical
       // persistence while the reaction continues detached under per-thread
-      // cancellation.
+      // cancellation. A genuine current-reaction failure may produce the
+      // normal fallback; cancellation, stale failures, and shutdown never do.
+      const fallbackSource = fallbackSourceFor(envelope);
       await getConversationLayer().observe({ threadId, message,
         hevroniaSender: { kind: "user", id: me.id },
         senderIsBot: ctx.from.is_bot }, {
         showTyping: async () => { await ctx.replyWithChatAction("typing"); },
         reply: sendReply,
+      }, async (error, reactionCtx) => {
+        if (isConversationThreadPersistenceError(error)) return;
+        try {
+          reactionCtx.throwIfStale();
+        } catch {
+          return;
+        }
+        await sendFallback(fallbackSource, sendReply, recordDeliveredMessage,
+          () => reactionCtx.throwIfStale());
       });
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       console.error(`Failed to handle message=${messageId}: ${detail}`);
       if (isConversationThreadPersistenceError(error)) return;
-      const fallbackText = "Щось я зараз зависла. Спробуй ще раз за хвилину.";
-      const fallbackThreadId = conversationThreadIdFromTelegramChat(ctx.chat.type, ctx.chat.id, messageThreadId);
-      await deliverFallbackMessage({ text: fallbackText, sender: { kind: "user", id: me.id },
-        chatKind: ctx.chat.type, messageThreadId: messageThreadId ?? null,
-        replyTo: { targetMessageId: messageId,
-          targetSender: telegramSenderIdentity(ctx.from.id, ctx.message.sender_chat?.id),
-          targetSenderDisplayName: telegramDisplayName(ctx.from.first_name, ctx.from.last_name),
-          targetSenderUsername: ctx.message.from?.username ?? null,
-          targetText: ctx.message.text, targetIsHevronia: false } }, {
-        showTyping: async () => undefined,
-        reply: sendReply,
-      }, (fallback) => recordDeliveredMessage(fallbackThreadId, fallback)).catch(
-        (fallbackError) => console.error(`Failed to deliver fallback: ${String(fallbackError)}`),
-      );
+      await sendFallback(fallbackSourceFor(envelope), sendReply, recordDeliveredMessage);
     }
   });
 

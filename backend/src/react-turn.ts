@@ -1,12 +1,11 @@
 import type { RespondInput } from "./conversation-types.js";
-import type { PlannerDecision } from "./attention-planner.js";
+import { toRealizerDecisionLog } from "./decision-log.js";
 import { errorDetail } from "./error-detail.js";
 import { isReactionCancelledError } from "./reaction-cancelled.js";
 import type { ReactionContext } from "./reaction-context.js";
 import type { RealizerDecision, TurnContext } from "./realizer-schema.js";
-import { toRealizerDecisionLog } from "./decision-log.js";
-import { applyProposedNames } from "./natural-names/apply.js";
 import { finalizeSpeakOrDeliver } from "./finalize-reaction.js";
+import { runPlannerGate } from "./planner-gate.js";
 import { acquireReactionContext } from "./turn-memory.js";
 import type { TelegramTurnDelivery } from "./telegram-delivery.js";
 import type { ReactTurnDependencies, ReactTurnResult } from "./react-turn-types.js";
@@ -42,52 +41,19 @@ export async function reactTurn(
     };
 
     ctx?.throwIfStale();
-    let plannerDecision: PlannerDecision = { attention: true, naturalNames: {} };
-    let plannerFailed = false;
-    try {
-      plannerDecision = await dependencies.planner.consider(
-        context, state.namingChoices, ctx?.signal,
-      );
-    } catch (error) {
-      if (isReactionCancelledError(error)) throw error;
-      plannerFailed = true;
-      dependencies.onPlannerDecision?.({ outcome: "failure", errorDetail: errorDetail(error) });
-      // Fail open: a genuine attention pre-filter failure must never create an
-      // irreversible false negative, so continue to the smart realizer. An
-      // abort above never fails open.
-    }
-
-    // A stale planner result must never mutate durable first-write-wins
-    // natural names, and the mutation step itself re-checks before every write.
-    ctx?.throwIfStale();
-    const applied = await applyProposedNames(
-      dependencies.naturalNameStore, state.namingChoices,
-      plannerDecision.naturalNames, state.naturalNames,
-      () => ctx?.throwIfStale(),
+    const gate = await runPlannerGate(
+      dependencies.planner, dependencies.naturalNameStore, context,
+      state.namingChoices, input.message.chatKind, input.message.directlyAddressed,
+      ctx?.signal, ctx, dependencies.onPlannerDecision,
     );
-    context.naturalNames = applied.merged;
-
-    ctx?.throwIfStale();
-    if (!plannerFailed) {
-      const canFilter = !(input.message.chatKind === "private"
-        || input.message.directlyAddressed);
-      if (!plannerDecision.attention && canFilter) {
-        dependencies.onPlannerDecision?.({
-          outcome: "filter", attention: false,
-          naturalNames: applied.newNames,
-        });
-        console.log(`Filtered reaction thread=${ctx?.threadKey ?? "-"} revision=${ctx?.revision ?? 0}`);
-        return { status: "filtered" };
-      }
-      dependencies.onPlannerDecision?.({
-        outcome: "pass", attention: plannerDecision.attention,
-        naturalNames: applied.newNames,
-      });
+    if (gate.outcome === "filtered") {
+      console.log(`Filtered reaction thread=${ctx?.threadKey ?? "-"} revision=${ctx?.revision ?? 0}`);
+      return { status: "filtered" };
     }
 
     let decision: RealizerDecision;
     try {
-      decision = await dependencies.realizer.realize(context, ctx?.signal);
+      decision = await dependencies.realizer.realize(gate.context, ctx?.signal);
     } catch (error) {
       if (isReactionCancelledError(error)) throw error;
       dependencies.onRealizerDecision?.({ action: "failure", errorDetail: errorDetail(error) });
@@ -97,10 +63,13 @@ export async function reactTurn(
     ctx?.throwIfStale();
     if (decision.action === "silence") {
       dependencies.onRealizerDecision?.(toRealizerDecisionLog(decision, undefined));
+      console.log(`Realizer chose silence thread=${ctx?.threadKey ?? "-"} revision=${ctx?.revision ?? 0}`);
       return { status: "silence" };
     }
 
-    return finalizeSpeakOrDeliver(dependencies, input, context, decision, ctx, delivery);
+    return finalizeSpeakOrDeliver(
+      dependencies, input, gate.context, decision, ctx, delivery,
+    );
   } finally {
     memoryTurn?.release();
   }
