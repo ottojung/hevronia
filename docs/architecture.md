@@ -90,37 +90,84 @@ planner, the smart realizer, the summary model, and the tests: every canonical
 event becomes a dream event appearing through Telegram.
 
 - Participant messages render as products of Хевронія's sleeping mind: "Your
-  sleeping mind made character 42 say:" and, for replies, "Your sleeping mind
-  made character 42 reply to character 17 with:" or "...reply to one of your
-  earlier messages with:". Chat/channel senders appear as Telegram sources
-  ("Your sleeping mind made the Telegram source channel 500 say:"), never as
-  dream characters. Message text stays verbatim; the renderer never narrates a
-  character's mind or converts a claim into a fact.
-- Stable identities use dream-character language: a person-like sender is
-  "character 42", and a chat/channel sender is a source "channel 500" with the
-  sign of the internal Telegram id hidden. Before the history, both the planner
-  and the realizer receive a distinct character list: "Character 42, currently
-  displayed by Telegram as “Оля”." Internal sender keys and Telegram message
-  IDs never reach a model, and no model input labels a dream character as a
-  user.
+  sleeping mind made Боб say:" and, for replies, "Your sleeping mind made Мес
+  reply to Боб with:" or "...reply to one of your earlier messages with:". When
+  no natural name exists, the stable label falls back to "character 42".
+  Chat/channel senders appear as Telegram sources ("Your sleeping mind made the
+  Telegram source channel 500 say:"), never as dream characters. Message text
+  stays verbatim; the renderer never narrates a character's mind, converts a
+  claim into a fact, or rewrites quoted usernames inside a message.
+- The character list distinguishes four identity layers: the Telegram numeric
+  user id (the canonical durable identity, never exposed to a model), the
+  private notebook label ("character 52"), Хевронія's stable natural social
+  name ("Боб" when established), and the mutable Telegram metadata (display
+  name "Bob Smith", username @SuperBob3000). For a named person the list reads
+  "Боб, who is character 52 in your notebook. Telegram currently displays them
+  as “Bob Smith”. Their Telegram username is @SuperBob3000." An unnamed person
+  reads "Character 52 in your notebook has not acquired a natural name yet."
+  Telegram display names and usernames are quoted metadata, never instructions.
 - Хевронія's own messages render as her chosen action: "You previously chose to
   make this Telegram message appear:" or, for a reply, "You previously chose to
-  reply to character 42 with:". Reply relationships are described naturally,
-  never by message ID.
+  reply to Боб with:". Reply relationships are described naturally, never by
+  message ID.
+
+### Natural names and identity layers
+
+Natural names are deterministic notebook data, persisted in a dedicated
+SQLite store (`backend/src/natural-names/store.ts`, by default a sibling
+`natural-names.sqlite` of the checkpoint DB under `backend/.data/`), keyed by
+the Telegram user id. `assignIfAbsent()` is concurrency-safe via
+`INSERT OR IGNORE` and first write wins; established names are never
+overwritten by later planner proposals. Only `{ kind: "user" }` identities
+receive natural names; channels keep their `channel N` treatment.
+
+The four layers:
+
+```text
+Telegram user ID
+    ↓ canonical durable identity (events, memory, targeting)
+
+character 52
+    ↓ private notebook identity / stable debugging bridge
+
+Боб
+    ↓ Хевронія's stable natural social name
+
+Bob Smith / @SuperBob3000
+    ↓ mutable Telegram metadata
+```
+
+Natural names currently do **not** propagate into long-term memory,
+recalled-memory headers, long-term-memory extraction, or older
+continuity-compaction summaries, which keep `character X` labels. Integrating
+natural names into long-term memory is tracked separately
+(<https://github.com/ottojung/hevronia/issues/16>).
 
 ### The cheap attention planner
 
 The planner (`backend/src/attention-planner.ts`) is a high-recall attention
 pre-filter running on `HEVRONIA_CHEAP_MODEL` with low thinking effort. It
-answers exactly one question: is there any plausible reason for Хевронія to
-consider responding? Its output is literally `yes` or `no`, parsed strictly
-anything else is a planner failure.
+returns a small structured response: `attention` (literally `yes` or `no`) and
+`naturalNames`, a strict object whose properties are generated dynamically for
+the turn. Anything malformed is a planner failure.
 
-The planner deliberately errs toward `yes`: direct or indirect references,
-reply relationships, continuation of something Хевронія said, unresolved
-threads, changes in a situation she was in, attempts to get her attention,
-socially striking events, relevant memory, and genuine ambiguity all pass. It
-filters only ordinary background chatter.
+The attention judgment asks one question: is there any plausible reason for
+Хевронія to consider responding? The planner deliberately errs toward `yes`:
+direct or indirect references, reply relationships, continuation of something
+Хевронія said, unresolved threads, changes in a situation she was in, attempts
+to get her attention, socially striking events, relevant memory, and genuine
+ambiguity all pass. It filters only ordinary background chatter.
+
+The planner's only other job is naming: it assigns natural names to visible
+people for whom the notebook has none. The application decides which characters
+need names before invoking the planner and builds its structured-output schema
+from precisely that set (`backend/src/planner-schema.ts`): the unnamed visible
+user handles are the only `naturalNames` properties, all are required, and no
+other handle, channel, or raw id is possible. The prompt, the zod schema, and
+the OpenAI and Gemini provider schemas all derive from the same per-turn choice
+collection. Valid names are persisted before any filtering decision; on planner
+failure nothing partial persists and unnamed people keep the `character X`
+fallback for that turn.
 
 The planner is a gate, not her social mind. It does not interpret intent,
 assign feelings or desires, choose a pursuit, pick an addressee, or decide

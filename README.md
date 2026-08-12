@@ -323,6 +323,14 @@ terminal also prints the full set of model selections — response, simulator,
 memory extraction, embedding, and the cheap/smart tiers — even when none of
 them were overridden, and the same lines are saved into every transcript and
 the run index.
+
+The harness simulates Telegram-looking participant identities (display names
+and usernames such as `SuperBob3000` / `@super_bob3000`), so the cheap planner
+visibly naturalizes each new person on first encounter: the planner diagnostic
+prints the new natural names, and later dream context reads "Your sleeping mind
+made Боб say:" instead of exposing the raw handle. Each scenario runs against
+its own temporary checkpoint and natural-name database, so scenarios never
+read or leak names into each other.
 Transcripts are saved under `backend/.data/conversation-runs/<run-id>/`.
 
 During a run the terminal only shows a short `[start]` line when a scenario
