@@ -6,6 +6,12 @@ import {
 } from "./telegram-event.js";
 
 const EMPTY_NAMES: NaturalNames = new Map();
+
+/** Replaces newlines and newline-like characters with a single space. */
+export function escapeMessageText(text: string): string {
+  return text.replace(/\r\n|\r|\n|\u2028|\u2029|\u0085/gu, " ");
+}
+
 export function renderOwnMessage(
   event: DeliveredHevroniaMessage,
   naturalNames: NaturalNames = EMPTY_NAMES,
@@ -46,5 +52,5 @@ export function renderParticipantMessage(
     : event.directlyAddressed
       ? "\n\nThis message was addressed to you directly."
       : "";
-  return `${head}\n\n${event.text}${directness}`;
+  return `${head}\n\n${escapeMessageText(event.text)}${directness}`;
 }

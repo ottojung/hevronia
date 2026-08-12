@@ -8,6 +8,7 @@ import {
   renderDreamEvent,
   renderDreamObservations,
 } from "../src/dream-render.js";
+import { escapeMessageText } from "../src/dream-render-replies.js";
 import { renderPlannerContext } from "../src/attention-planner.js";
 import { renderParticipantMemoryContexts } from "../src/long-term-memory/render-context.js";
 import { buildHandleChoices } from "../src/handles.js";
@@ -458,4 +459,22 @@ test("recalled memory keeps the character N label even when the person has a nat
   ]);
   assert.match(rendered, /“character 52”/);
   assert.doesNotMatch(rendered, /“Боб”/);
+});
+
+test("escapeMessageText replaces newline-like characters with a single space", () => {
+  assert.equal(escapeMessageText("a\nb"), "a b");
+  assert.equal(escapeMessageText("a\r\nb"), "a b");
+  assert.equal(escapeMessageText("a\rb"), "a b");
+  assert.equal(escapeMessageText("a\u2028b"), "a b");
+  assert.equal(escapeMessageText("a\u2029b"), "a b");
+  assert.equal(escapeMessageText("a\u0085b"), "a b");
+  assert.equal(escapeMessageText("no newlines here"), "no newlines here");
+});
+
+test("participant message newlines are escaped to spaces in dream rendering", () => {
+  const rendered = renderDreamEvent(participant(1, 42, "Іра", "перший рядок\nдругий рядок"));
+  assert.match(rendered, /^Your sleeping mind made character 42 say:\n\nперший рядок другий рядок$/);
+  const textPart = rendered.slice(rendered.indexOf("\n\n") + 2);
+  assert.ok(!textPart.includes("\n"));
+  assert.ok(!textPart.includes("\r"));
 });
