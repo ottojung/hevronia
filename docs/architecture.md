@@ -67,7 +67,16 @@ into the planner, the realizer, and the underlying LangChain model
 invocations, and the model-retry layer stops immediately on abort and never
 retries a cancelled request. A cancelled planner never fails open into the
 realizer, a cancelled realizer never delivers, and shutdown or a newer message
-never triggers fallback text.
+never produces any Telegram message.
+
+Errors never produce Telegram dialogue: planner/provider errors, realizer
+errors, structured-output failures, retry exhaustion, Telegram delivery
+failures, cancellation, shutdown, persistence failures, and unexpected internal
+exceptions all result in silence as the only Telegram-visible outcome. A
+genuine non-cancellation reaction error is logged internally with its thread
+and revision and terminates that reaction; expected cancellation and stale
+failures remain low-noise. Retries stay an internal mechanism and never become
+dialogue.
 
 Before Telegram delivery begins, a reaction may be superseded freely. Once a
 Telegram send has begun, its outcome must be reconciled with canonical history:
@@ -85,12 +94,10 @@ harness.
 Obsolete reactions remain lifecycle-tracked until their underlying tasks
 physically settle, even after they cease to be the current reaction. Shutdown
 aborts every in-flight attempt and does not close persistence resources until
-all of them have settled.
-
-Genuine current-reaction failures may produce the normal Telegram fallback;
-expected cancellation and stale failures do not. A fallback is itself
-revision-guarded before its send and, once Telegram confirms it, persisted
-canonically.
+all of them have settled. A replacement start that is waiting on a committed
+delivery is itself tracked, and `settle()` resolves only once all
+already-scheduled reaction work — including pending replacement starts — has
+reached quiescence.
 
 The turn is a two-stage pipeline:
 
