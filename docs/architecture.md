@@ -142,21 +142,50 @@ character list, all relevant cached participant memories, and the available
 character and reply-message handles.
 
 It returns a structured decision, either `silence` or `speak`. Its private
-fields are kept distinct:
+fields are kept distinct.
+
+Every subjective field is a **contrastive judgment** with a shared shape:
+
+```text
+leading        — the judgment Хевронія currently prefers
+alternative    — the strongest genuinely competing judgment she considered and
+                 did not choose (mandatory, never null or omitted)
+whyLeading     — why the leading judgment is currently better supported,
+                 more accurate, more important, or more appropriate from her
+                 subjective perspective
+```
+
+The alternative is not an arbitrary opposite or a strawman; it is the best
+remaining plausible competitor, the one that would meaningfully change her
+understanding or behavior if chosen instead, and it may retain some
+plausibility. `whyLeading` explains why the leading view currently wins, not
+why the alternative is logically disproven.
+
+The seven contrastive fields:
 
 - `interpretation` — what Хевронія thinks is happening / what the event means
-  in context;
+  in context, weighed against the strongest competing interpretation;
 - `intent` — her best inference about what the relevant others are trying to
-  do, want, signal, obtain, or cause (distinct from her own desire);
-- `feltState` — her immediate emotional/felt reaction;
+  do, want, signal, obtain, or cause (distinct from her own desire), weighed
+  against the strongest competing theory of their intent;
+- `feltState` — her immediate emotional/felt reaction, weighed against another
+  plausible characterization of the same reaction;
 - `activeDesire` — what she currently wants (her motive, not the others'
-  intent);
+  intent), weighed against the strongest competing account of what she wants
+  most;
 - `desiredOutcome` — the state she wants to bring about, distinct from the
-  action;
-- `opportunity` — what the situation makes possible;
+  action, weighed against the strongest competing outcome;
+- `opportunity` — what the situation makes possible in relation to her desire,
+  weighed against another plausible opportunity;
 - `pursuit` — the action/strategy she chooses (ask, answer, tease, object,
   challenge, redirect, acknowledge, refuse, or intentionally saying nothing),
-  separate from the final wording.
+  separate from the final wording, weighed against the strongest competing
+  action she seriously could have chosen instead.
+
+The contrastive shape forces the realizer to discriminate: for each judgment it
+must identify a live competitor and state why the selected version currently
+wins, instead of emitting the first plausible interpretation, motive, feeling,
+desire, outcome, opportunity, or action that occurs to it.
 
 For `speak`, the realizer additionally chooses an `addressCharacter` handle (if
 any), an independent `replyToMessage` handle (if any Telegram reply
