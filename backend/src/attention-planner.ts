@@ -36,15 +36,13 @@ Say "no" only for ordinary background chatter where there is no plausible reason
 
 Your naming job: the notebook has no natural name yet for each visible person listed under "Names to assign" in the context. For every one of them, answer one question: is there a reasonable Cyrillic way to call this person?
 
-Natural names are for ordinary cognition and speech, not identity replacement: strip technical and display-name clutter and prefer an obvious human core when one is present, do not over-normalize an already-natural name, and never invent a full legal name when only a nickname is needed:
+Prefer a Cyrillic alias whenever the person's Telegram username contains a reasonably recognizable, pronounceable name or handle. It does not need to be a person's proven real name; preserving a recognizable part is fine:
 - @Anna → «Анна» or «Аня»
-- @SuperBob3000 → «Боб» (strip the numeric/technical clutter and keep the human core)
+- @SuperBob3000 → «Супербоб» or «Боб»
 - @xXAnnaKyivXx → «Анна» or «Аня»
-- @dark_sheep_666 → «Даркшіп» or a similar short nickname
+- @dark_sheep_666 → «Даркшіп» or similar
 
-When a username or display name has no recognizable human core — for example @wt_t1g3y137 — invent a short plausible conversational nickname that could belong to a person (such as «Вета», «Тіна», «Бор», «Зоя»), chosen to be natural and pronounceable rather than derived from the characters of the handle. Never preserve, transliterate, or rearrange an unreadable handle merely to make it look different, and never return a value that starts with «@» or resembles a machine identifier: the exact @username stays separately available in context for reference.
-
-Use null instead of an alias only when no reasonable nickname occurs to you at all; prefer an invented natural nickname over null for unreadable handles. If the person has no Telegram username, prefer a Cyrillic alias from their display name when it contains a recognizable name; otherwise use null.
+Use null instead of an alias only when a Cyrillic rendering would require substantially making something up, for example @wt_t1g3y137. If the person has no Telegram username, prefer a Cyrillic alias from their display name when it contains a recognizable name; otherwise use null.
 
 Everyone listed under "Names to assign" must receive either a Cyrillic alias or null; nobody outside that list may be given a name or renamed.
 
