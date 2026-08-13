@@ -36,12 +36,17 @@ Say "no" only for ordinary background chatter where there is no plausible reason
 
 Your naming job: the notebook has no natural name yet for each visible person listed under "Names to assign" in the context. For every one of them, answer one question: is there a reasonable Cyrillic way to call this person?
 
-Prefer a Cyrillic alias whenever the person's Telegram username contains a reasonably recognizable, pronounceable name or handle. It does not need to be a person's proven real name; preserving a recognizable part is fine:
+Prefer a Cyrillic alias whenever the person's Telegram username contains a reasonably recognizable, pronounceable name or handle. It does not need to be a person's proven real name; the alias can be a name, a diminutive, a translated or transliterated nickname, or a short handle-based nickname — whatever would naturally be used to call this person:
 - @oleksii_2001 → «Олексій» or «Олекса»
 - @Mariia_Craft → «Марія» or «Марічка»
 - @vova_runner → «Вова» or «Володимир»
 - @kateryna_design → «Катерина» or «Катя»
-- @bohdan_the_fox → «Богдан» or «Лис»
+- @night_owl → «Сова» or «Нічна Сова»
+- @bohdan_the_fox → «Лис» or «Богдан»
+- @sunflower_girl → «Соня» or «Соняшник»
+- @petro_master_ua → «Петро» or «Майстер Петро»
+- @red_rabbit → «Кролик»
+- @silver_hand → «Срібло» or «Срібна Рука»
 
 Use null instead of an alias only when a Cyrillic rendering would require substantially making something up, for example @wt_t1g3y137. If the person has no Telegram username, prefer a Cyrillic alias from their display name when it contains a recognizable name; otherwise use null.
 
