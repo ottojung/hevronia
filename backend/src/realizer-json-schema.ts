@@ -1,7 +1,6 @@
 import { buildHandleChoices } from "./handles.js";
 import {
   presentMindKeys,
-  realityCheckKeys,
   subjectiveJudgmentKeys,
   type ConstFreeJsonSchema,
   type VisibleMessage,
@@ -15,17 +14,6 @@ function subjectiveJudgmentJson(additionalProperties: boolean): Record<string, u
       subjectiveJudgmentKeys.map((key) => [key, { type: "string", minLength: 1 }]),
     ),
     required: [...subjectiveJudgmentKeys],
-  };
-}
-
-function realityCheckJson(additionalProperties: boolean): Record<string, unknown> {
-  return {
-    type: "object",
-    ...(additionalProperties ? { additionalProperties: false } : {}),
-    properties: Object.fromEntries(
-      realityCheckKeys.map((key) => [key, { type: "string", minLength: 1 }]),
-    ),
-    required: ["leading"],
   };
 }
 
@@ -67,7 +55,7 @@ export function buildRealizerJsonSchema(
     interpretation: subjectiveJudgmentJson(strict),
     presentMind: presentMindJson(strict),
     characterIntent: subjectiveJudgmentJson(strict),
-    realityCheck: realityCheckJson(strict),
+    realityCheck: subjectiveJudgmentJson(strict),
     dreamIntent: subjectiveJudgmentJson(strict),
     feltState: subjectiveJudgmentJson(strict),
     activeDesire: subjectiveJudgmentJson(strict),

@@ -30,22 +30,6 @@ export type SubjectiveJudgment = z.infer<typeof subjectiveJudgmentSchema>;
 export const subjectiveJudgmentKeys: readonly string[] = ["leading", "alternative", "whyRejected"];
 
 /**
- * `realityCheck` keeps one required leading seam, but the alternative and
- * whyRejected are optional: the model may legitimately find a single strong
- * seam and no second equally strong competitor instead of inventing a strained
- * mismatch merely to satisfy a mandatory contrastive pair.
- */
-export const realityCheckSchema = z.object({
-  leading: z.string().trim().min(1),
-  alternative: z.string().trim().min(1).optional(),
-  whyRejected: z.string().trim().min(1).optional(),
-}).strict();
-
-export type RealityCheckJudgment = z.infer<typeof realityCheckSchema>;
-
-export const realityCheckKeys: readonly string[] = ["leading", "alternative", "whyRejected"];
-
-/**
  * `presentMind` is the durable first-order cognition state, not an analytical
  * judgment. It records the most salient mental event that arose plus a small
  * number of additional first-order events. There is deliberately no
@@ -65,7 +49,7 @@ const decisionFields = {
   interpretation: subjectiveJudgmentSchema,
   presentMind: presentMindSchema,
   characterIntent: subjectiveJudgmentSchema,
-  realityCheck: realityCheckSchema,
+  realityCheck: subjectiveJudgmentSchema,
   dreamIntent: subjectiveJudgmentSchema,
   feltState: subjectiveJudgmentSchema,
   activeDesire: subjectiveJudgmentSchema,
@@ -202,7 +186,7 @@ export interface RealizerDecision {
   interpretation: SubjectiveJudgment;
   presentMind: PresentMind;
   characterIntent: SubjectiveJudgment;
-  realityCheck: RealityCheckJudgment;
+  realityCheck: SubjectiveJudgment;
   dreamIntent: SubjectiveJudgment;
   feltState: SubjectiveJudgment;
   activeDesire: SubjectiveJudgment;
