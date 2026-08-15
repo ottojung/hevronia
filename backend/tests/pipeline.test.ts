@@ -18,7 +18,7 @@ import {
 import { SYSTEM_PROMPT } from "../src/personality.js";
 import { createRealizer } from "../src/realizer.js";
 import type { RealizerDecisionLog } from "../src/realizer.js";
-import type { ActiveDesire, RealityCheck } from "../src/realizer-schema.js";
+import type { ActiveDesire } from "../src/realizer-schema.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 import { formatPlannerLog, formatRealizerLog } from "../scripts/conversations/diagnostics.js";
 import {
@@ -289,9 +289,11 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   assert.ok(failure.includes("boom"));
 
   const text = (v: string) => v;
-  const presentMind = (primary: string) => ({ primary, secondary: [] });
-  const realityCheck = (content: string): RealityCheck => ({ status: "none", content });
-  const activeDesire = (content: string): ActiveDesire => ({ strength: "none", content });
+  const presentMind = (immediate: string) =>
+    ({ immediate, stormwindAssociation: "sw", integration: "int" });
+  const realityCheck = (v: string) => v;
+  const activeDesire = (content: string): ActiveDesire =>
+    ({ motive: "softPower", strength: "weak", content });
   const silenceLog: RealizerDecisionLog = {
     action: "silence",
     interpretation: text("i"), presentMind: presentMind("pm"), characterIntent: text("c"),
@@ -303,9 +305,9 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   assert.ok(silence.startsWith("Реалізатор: [silence]"));
   assert.ok(silence.includes("  interpretation: i"));
   assert.ok(silence.includes("  presentMind:"));
-  assert.ok(silence.includes("    primary: pm"));
-  assert.ok(silence.includes("  realityCheck:"));
-  assert.ok(silence.includes("    status: none"));
+  assert.ok(silence.includes("    immediate: pm"));
+  assert.ok(silence.includes("    stormwindAssociation: sw"));
+  assert.ok(silence.includes("  realityCheck: r"));
 
   const speakLog: RealizerDecisionLog = {
     action: "speak", addressLabel: "character 42", replyToLabel: "M1 → Іра",
@@ -319,5 +321,6 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   assert.ok(speak.includes("  replyTo: M1 → Іра"));
   assert.ok(speak.includes("  interpretation: i"));
   assert.ok(speak.includes("  activeDesire:"));
-  assert.ok(speak.includes("    strength: none"));
+  assert.ok(speak.includes("    motive: softPower"));
+  assert.ok(speak.includes("    strength: weak"));
 });

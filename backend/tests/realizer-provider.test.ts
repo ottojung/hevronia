@@ -12,8 +12,8 @@ import {
 import type { TurnContext } from "../src/realizer-response-schema.js";
 import {
   activeDesireSchema,
+  motiveSchema,
   presentMindSchema,
-  realityCheckSchema,
   realizerDecisionObjectSchema,
   realizerDecisionSchema,
 } from "../src/realizer-schema.js";
@@ -92,52 +92,84 @@ test("every decision field is required; there are no optional fields", () => {
   }
 
   // Nested object fields are also fully required.
-  assert.deepEqual(Object.keys(presentMindSchema.shape).sort(), ["primary", "secondary"]);
+  assert.deepEqual(Object.keys(presentMindSchema.shape).sort(),
+    ["immediate", "integration", "stormwindAssociation"]);
   assert.equal(realizerDecisionSchema.safeParse({
-    ...base, presentMind: { primary: "p" },
-  }).success, false, "presentMind missing secondary");
-  assert.deepEqual(Object.keys(realityCheckSchema.shape).sort(), ["content", "status"]);
-  assert.deepEqual(Object.keys(activeDesireSchema.shape).sort(), ["content", "strength"]);
+    ...base, presentMind: { immediate: "i" },
+  }).success, false, "presentMind missing stormwindAssociation and integration");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, presentMind: { immediate: "i", stormwindAssociation: "s" },
+  }).success, false, "presentMind missing integration");
+  assert.deepEqual(Object.keys(activeDesireSchema.shape).sort(),
+    ["content", "motive", "strength"]);
 });
 
-test("presentMind secondary is required and bounded", () => {
+test("activeDesire requires a closed motive; there is no none motive or none strength", () => {
+  const base = realizerSilence();
   assert.equal(realizerDecisionSchema.safeParse({
-    ...realizerSilence(), presentMind: { primary: "p" },
-  }).success, false, "missing secondary");
+    ...base, activeDesire: { strength: "weak", content: "x" },
+  }).success, false, "missing motive");
   assert.equal(realizerDecisionSchema.safeParse({
-    ...realizerSilence(), presentMind: { primary: "p", secondary: ["a", "b", "c", "d", "e"] },
-  }).success, false, "too many secondary entries");
+    ...base, activeDesire: { motive: "none", strength: "weak", content: "x" },
+  }).success, false, "none motive is invalid");
   assert.equal(realizerDecisionSchema.safeParse({
-    ...realizerSilence(), presentMind: { primary: "p", secondary: [] },
-  }).success, true, "empty secondary is valid");
-});
-
-test("realityCheck status none is valid without inventing a second seam", () => {
-  const decision = realizerSilence();
+    ...base, activeDesire: { motive: "other", strength: "weak", content: "x" },
+  }).success, false, "catch-all other is invalid");
   assert.equal(realizerDecisionSchema.safeParse({
-    ...decision, realityCheck: { status: "none", content: "No grounded seam here." },
+    ...base, activeDesire: { motive: "softPower", strength: "none", content: "x" },
+  }).success, false, "none strength is invalid");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, activeDesire: { motive: "gossip", strength: "moderate", content: "x" },
   }).success, true);
 });
 
-test("weak activeDesire plus silence is valid and stays a desire", () => {
-  const decision: ReturnType<typeof realizerSilence> = {
+test("the motive enum is exactly the approved closed set", () => {
+  assert.deepEqual(motiveSchema.options,
+    ["wakeHomeDream", "gossip", "softPower", "selfProtection", "attachment", "amusement"]);
+});
+
+test("presentMind fields are all required and non-empty", () => {
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...realizerSilence(), presentMind: { immediate: "i", stormwindAssociation: "s" },
+  }).success, false, "missing integration");
+  assert.equal(realizerDecisionSchema.safeParse({
     ...realizerSilence(),
-    activeDesire: { strength: "weak", content: "I want Bob to know his name sounds ridiculous." },
-  };
-  assert.equal(realizerDecisionSchema.safeParse(decision).success, true);
+    presentMind: { immediate: "i", stormwindAssociation: "s", integration: "   " },
+  }).success, false, "blank integration");
+  assert.equal(realizerDecisionSchema.safeParse(realizerSilence()).success, true);
+});
+
+test("realityCheck is a required positive string; there is no none status", () => {
+  const base = realizerSilence();
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, realityCheck: "   ",
+  }).success, false, "blank realityCheck");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, realityCheck: { status: "none", content: "x" },
+  }).success, false, "object-shaped realityCheck is invalid");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, realityCheck: "Anonymous chatter is weightless beside known faces and reputations.",
+  }).success, true);
+});
+
+test("silence is strategic under an active motive, never motivational emptiness", () => {
+  const decision = realizerSilence();
   assert.equal(decision.activeDesire.strength, "weak");
+  assert.equal(["wakeHomeDream", "gossip", "softPower", "selfProtection", "attachment", "amusement"]
+    .includes(decision.activeDesire.motive), true);
+  assert.ok(decision.activeDesire.content.length > 0);
+  assert.ok(decision.desiredOutcome.length > 0);
+  assert.ok(decision.opportunity.length > 0);
+  assert.ok(decision.fiveTurnStrategy.length > 0);
+  assert.ok(decision.fiftyTurnStrategy.length > 0);
+  assert.equal(realizerDecisionSchema.safeParse(decision).success, true);
 });
 
 test("weak activeDesire plus speak is valid", () => {
   const decision = realizerSpeak({
-    activeDesire: { strength: "weak", content: "I want Bob to know his name sounds ridiculous." },
+    activeDesire: { motive: "softPower", strength: "weak",
+      content: "You want Bob to understand this way of seeing the situation." },
   });
-  assert.equal(realizerDecisionSchema.safeParse(decision).success, true);
-});
-
-test("activeDesire none remains valid", () => {
-  const decision = realizerSilence();
-  assert.equal(decision.activeDesire.strength, "none");
   assert.equal(realizerDecisionSchema.safeParse(decision).success, true);
 });
 
