@@ -9,6 +9,7 @@ import {
 import { buildRealizerResponseSchema, type TurnContext } from "./realizer-response-schema.js";
 import {
   type ActiveDesire,
+  type InteractionFrame,
   type PresentMind,
   type RealizerDecision,
   type RealityRelation,
@@ -21,6 +22,7 @@ export type RealizerDecisionLog =
       interpretation: string;
       presentMind: PresentMind;
       characterIntent: string;
+      interactionFrame: InteractionFrame;
       realityRelation: RealityRelation;
       dreamIntent: string;
       feltState: string;
@@ -37,6 +39,7 @@ export type RealizerDecisionLog =
       interpretation: string;
       presentMind: PresentMind;
       characterIntent: string;
+      interactionFrame: InteractionFrame;
       realityRelation: RealityRelation;
       dreamIntent: string;
       feltState: string;

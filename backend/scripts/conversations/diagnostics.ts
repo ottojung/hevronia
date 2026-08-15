@@ -1,6 +1,11 @@
 import type { PlannerDecisionLog } from "../../src/attention-planner.js";
 import type { RealizerDecisionLog } from "../../src/realizer.js";
-import type { ActiveDesire, PresentMind, RealityRelation } from "../../src/realizer-schema.js";
+import type {
+  ActiveDesire,
+  InteractionFrame,
+  PresentMind,
+  RealityRelation,
+} from "../../src/realizer-schema.js";
 
 function singleLine(text: string): string {
   return text.replaceAll(/\s+/gu, " ").trim();
@@ -14,8 +19,18 @@ function formatPresentMind(presentMind: PresentMind): string {
   return [
     "  presentMind:",
     `    immediate: ${singleLine(presentMind.immediate)}`,
-    `    culturalThought: ${singleLine(presentMind.culturalThought)}`,
+    `    culturalThought: ${singleLine(presentMind.culturalThought.content)}`,
+    `      whyNow: ${singleLine(presentMind.culturalThought.whyNow)}`,
     `    foreground: ${singleLine(presentMind.foreground)}`,
+  ].join("\n");
+}
+
+function formatInteractionFrame(interactionFrame: InteractionFrame): string {
+  return [
+    "  interactionFrame:",
+    `    kind: ${interactionFrame.kind}`,
+    `    stance: ${interactionFrame.stance}`,
+    `    reason: ${singleLine(interactionFrame.reason)}`,
   ].join("\n");
 }
 
@@ -34,6 +49,7 @@ function formatActiveDesire(activeDesire: ActiveDesire): string {
     `    strength: ${activeDesire.strength}`,
     `    content: ${singleLine(activeDesire.content)}`,
     `    basis: ${singleLine(activeDesire.basis)}`,
+    `    whyNow: ${singleLine(activeDesire.whyNow)}`,
   ].join("\n");
 }
 
@@ -63,6 +79,7 @@ function formatJudgments(log: Extract<RealizerDecisionLog, { action: "silence" |
     formatText("interpretation", log.interpretation),
     formatPresentMind(log.presentMind),
     formatText("characterIntent", log.characterIntent),
+    formatInteractionFrame(log.interactionFrame),
     formatRealityRelation(log.realityRelation),
     formatText("dreamIntent", log.dreamIntent),
     formatText("feltState", log.feltState),

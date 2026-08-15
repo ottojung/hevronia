@@ -10,6 +10,7 @@ export function toRealizerDecisionLog(
     interpretation: decision.interpretation,
     presentMind: decision.presentMind,
     characterIntent: decision.characterIntent,
+    interactionFrame: decision.interactionFrame,
     realityRelation: decision.realityRelation,
     dreamIntent: decision.dreamIntent,
     feltState: decision.feltState,
