@@ -7,7 +7,6 @@ import {
   motiveSchema,
   realizerDecisionSchema,
   type ActiveDesire,
-  type PresentMind,
   type RealizerDecision,
 } from "../src/realizer-schema.js";
 
@@ -82,12 +81,13 @@ test("every psychological field is required and never empty", () => {
     assert.equal(realizerDecisionSchema.safeParse(partial).success, false, `missing ${key}`);
   }
   // presentMind sub-fields are all required and non-empty.
-  for (const missing of [
+  const incompletePresentMinds: Array<{ immediate: string; stormwindAssociation?: string; integration?: string }> = [
     { immediate: "im" },
     { immediate: "im", stormwindAssociation: "sw" },
-  ]) {
+  ];
+  for (const missing of incompletePresentMinds) {
     assert.equal(realizerDecisionSchema.safeParse({
-      ...full, presentMind: missing as PresentMind,
+      ...full, presentMind: missing,
     }).success, false);
   }
 });
@@ -113,7 +113,7 @@ test("execution fields remain required-nullable and speak requires a message", (
   assert.equal(realizerDecisionSchema.safeParse(base).success, true);
   assert.equal(realizerDecisionSchema.safeParse({ ...base, message: null }).success, false);
   assert.equal(realizerDecisionSchema.safeParse({ ...base, message: "   " }).success, false);
-  const silent = { ...base, action: "silence" as const, message: null, addressCharacter: null, replyToMessage: null };
+  const silent: RealizerDecision = { ...base, action: "silence", message: null, addressCharacter: null, replyToMessage: null };
   assert.equal(realizerDecisionSchema.safeParse(silent).success, true);
   assert.equal(realizerDecisionSchema.safeParse({ ...silent, message: "ага" }).success, false);
   assert.equal(realizerDecisionSchema.safeParse({ ...silent, addressCharacter: "P1" }).success, false);
