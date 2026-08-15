@@ -314,19 +314,34 @@ plausibility. `whyRejected` names what is actually wrong with the alternative �
 the evidence or consideration that tells against it — rather than merely
 restating that the leading view is good or fits.
 
-The eleven contrastive fields:
+The decision is generated in a fixed causal order: the internal state that
+determines the choice comes before the choice itself, and `action` is the last
+decision made. Most fields are contrastive (leading / alternative / whyRejected);
+`presentMind` is a compact first-order cognition state instead.
+
+Fields, in generation order:
 
 - `interpretation` — what Хевронія thinks is happening / what the event means
   in context, weighed against the strongest competing interpretation;
+- `presentMind` — the most salient first-order thing that actually arose in her
+  mind when the event arrived: a judgment, association, memory, reaction,
+  image, or impulse. It is not a goal, plan, strategy, reason for action,
+  summary of the other character's message, or a chain-of-thought dump, and it
+  is not an evidence contest. Shape: `primary` = the one most salient mental
+  event; `secondary` = a small list of other first-order events that also arose
+  (may be empty). There is deliberately no `whyRejected`: later analytical
+  fields do not retroactively redefine what first arose;
 - `characterIntent` — her best supported guess about what the relevant other
   character wants from her specifically: the response, belief, feeling, role,
   or participation they are trying to produce in her, weighed against the
   strongest competing theory of their motive;
 - `realityCheck` — the most revealing way in which the event, claim, object,
   convention, or its ordinary dream-world implications fail to fit her
-  remembered real reality around Stormwind; it always finds a seam (never
-  "everything makes sense") by deriving consequences from grounded premises,
-  comparing against remembered reality rather than Warcraft as lore;
+  remembered real reality around Stormwind; it always finds at least one seam
+  (never "everything makes sense") by deriving consequences from grounded
+  premises, comparing against remembered reality rather than Warcraft as lore.
+  `leading` is required; a second distinct candidate seam is optional, so the
+  model does not invent a strained mismatch to satisfy a contrastive pair;
 - `dreamIntent` — her more distant, suspicious strategic hypothesis about what
   the dream — the process that continues to keep her from waking — may gain by
   producing the event or the wider visible pattern. It is inferential, may be
@@ -334,16 +349,10 @@ The eleven contrastive fields:
   investigation;
 - `feltState` — her immediate emotional/felt reaction, weighed against another
   plausible characterization of the same reaction;
-- `presentMind` — the most salient first-order thing that actually arose in her
-  mind before motive selection: a judgment, association, memory, reaction,
-  image, or impulse. It is not a goal, plan, strategy, or reason for action; it
-  is compact durable cognition that feeds desire selection. The alternative is
-  another plausible first-order mental event that also arose or nearly arose,
-  and `whyRejected` explains why the leading event is more salient or central —
-  not whether either is action-worthy;
-- `activeDesire` — what she currently wants (her motive, not the others'
-  character intent), weighed against the strongest competing account of what
-  she wants most;
+- `activeDesire` — what she actually wants right now (her motive, not the
+  others' character intent): the strongest real unsatisfied desire, strong or
+  weak, weighed against the strongest competing account of what she wants most.
+  A weak-but-real desire remains a desire; action-worth is not decided here;
 - `desiredOutcome` — the state, result, or experience she wants, distinct from
   what she will do, weighed against the strongest competing outcome;
 - `opportunity` — a concrete affordance the present situation itself gives her
@@ -357,18 +366,28 @@ The eleven contrastive fields:
   relationship, interaction pattern, investigation, or situation persisted over
   a much longer span; scoped to that situation, possibly mundane, and only
   connected to enduring aims such as waking or home when they are genuinely
-  relevant to it.
+  relevant to it;
+- `action` — the last field: "speak" or "silence", the only place where
+  action-worth is decided. A real desire may exist in `activeDesire` without
+  this field committing to act on it;
+- for `speak`: `addressCharacter`, `replyToMessage`, and `message` (the actual
+  Telegram text). For `silence`: these are null.
 
-The contrastive shape forces the realizer to discriminate: for each judgment it
-must identify a live competitor and state why the selected version currently
-wins, instead of emitting the first plausible interpretation, motive, feeling,
-desire, outcome, opportunity, or strategy that occurs to it.
+The contrastive shape forces the realizer to discriminate: for each analytical
+field it must identify a live competitor and state why the selected version
+currently wins, instead of emitting the first plausible interpretation, motive,
+feeling, desire, outcome, opportunity, or strategy that occurs to it.
+`presentMind` is the deliberate exception: first-order cognition records what
+arose rather than which thought wins an argument, so it carries no
+`whyRejected`. `realityCheck` requires a leading seam but treats a second
+candidate seam as optional, so the model does not invent a strained mismatch
+merely to fill a contrastive pair.
 
 For `speak`, the realizer additionally chooses an `addressCharacter` handle (if
 any), an independent `replyToMessage` handle (if any Telegram reply
 attachment is wanted), and the `message` — the actual Telegram text. The realizer
-owns the final speak/silence decision; a planner `yes` does not obligate it to
-speak.
+owns the final speak/silence decision, made last, after the internal fields; a
+planner `yes` does not obligate it to speak.
 
 Character and reply-message handles are ephemeral per-turn labels (P1, M1, ...)
 that are annotated in place on matching dream observations. The realizer sees
