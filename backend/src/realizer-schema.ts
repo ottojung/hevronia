@@ -28,32 +28,60 @@ export type Motive = z.infer<typeof motiveSchema>;
 
 /**
  * `presentMind` is the durable first-order cognition state of the turn. It is
- * always full: `immediate` names the strongest immediate reaction, `stormwindAssociation`
- * names the cultural/story association generated from the established substrate,
- * and `integration` names what becomes most salient when both coexist. All fields
- * are required; there is no empty or "nothing arose" state.
+ * always full: `immediate` names the direct first-order reaction to the current
+ * event, `culturalThought` names a concrete thought arising from the remembered
+ * Warcraft-world substrate (which need not relate to the current event at all),
+ * and `foreground` names which thought is actually in the foreground now. All
+ * fields are required; there is no empty or "nothing arose" state.
  */
 export const presentMindSchema = z.object({
   immediate: z.string().trim().min(1),
-  stormwindAssociation: z.string().trim().min(1),
-  integration: z.string().trim().min(1),
+  culturalThought: z.string().trim().min(1),
+  foreground: z.string().trim().min(1),
 }).strict();
 
 export type PresentMind = z.infer<typeof presentMindSchema>;
 
 /**
  * `activeDesire` is always positive and concrete. `motive` selects exactly one
- * closed motive family, `strength` is "weak"/"moderate"/"strong", and `content`
- * names the concrete object. There is no "none" motive, no "none" strength, and
- * no empty state: Хевронія is never modeled as motivationally empty.
+ * closed motive family, `strength` is "weak"/"moderate"/"strong", `content`
+ * names the concrete object, and `basis` names the concrete admission fact that
+ * shows why this desire genuinely belongs to its motive family. There is no
+ * "none" motive, no "none" strength, and no empty state: Хевронія is never
+ * modeled as motivationally empty. When the motive is amusement, strength must
+ * be moderate or strong: the amusement threshold is high, and a weak amusement
+ * does not admit the motive.
  */
 export const activeDesireSchema = z.object({
   motive: motiveSchema,
   strength: z.enum(["weak", "moderate", "strong"]),
   content: z.string().trim().min(1),
-}).strict();
+  basis: z.string().trim().min(1),
+}).strict().superRefine((value, ctx) => {
+  if (value.motive === "amusement" && value.strength === "weak") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["strength"],
+      message: "amusement requires strength moderate or strong",
+    });
+  }
+});
 
 export type ActiveDesire = z.infer<typeof activeDesireSchema>;
+
+/**
+ * `realityRelation` names how the dream-world event relates to remembered
+ * reality: a grounded world-to-world difference, a close correspondence, or a
+ * distortion where something recognizable from reality appears flattened,
+ * gamified, displaced, or simplified. It is always positive — there is no
+ * "none" value and the model is never required to manufacture a mismatch.
+ */
+export const realityRelationSchema = z.object({
+  kind: z.enum(["difference", "correspondence", "distortion"]),
+  content: z.string().trim().min(1),
+}).strict();
+
+export type RealityRelation = z.infer<typeof realityRelationSchema>;
 
 /**
  * Every field is required. Nullable execution fields are always present; `null`
@@ -64,7 +92,7 @@ export const realizerDecisionObjectSchema = z.object({
   interpretation: z.string().trim().min(1),
   presentMind: presentMindSchema,
   characterIntent: z.string().trim().min(1),
-  realityCheck: z.string().trim().min(1),
+  realityRelation: realityRelationSchema,
   dreamIntent: z.string().trim().min(1),
   feltState: z.string().trim().min(1),
   activeDesire: activeDesireSchema,

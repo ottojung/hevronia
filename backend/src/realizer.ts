@@ -11,6 +11,7 @@ import {
   type ActiveDesire,
   type PresentMind,
   type RealizerDecision,
+  type RealityRelation,
 } from "./realizer-schema.js";
 import { renderRealizerContext } from "./turn-context.js";
 
@@ -20,7 +21,7 @@ export type RealizerDecisionLog =
       interpretation: string;
       presentMind: PresentMind;
       characterIntent: string;
-      realityCheck: string;
+      realityRelation: RealityRelation;
       dreamIntent: string;
       feltState: string;
       activeDesire: ActiveDesire;
@@ -36,7 +37,7 @@ export type RealizerDecisionLog =
       interpretation: string;
       presentMind: PresentMind;
       characterIntent: string;
-      realityCheck: string;
+      realityRelation: RealityRelation;
       dreamIntent: string;
       feltState: string;
       activeDesire: ActiveDesire;
