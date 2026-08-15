@@ -1,9 +1,6 @@
-import type { BaseMessage } from "@langchain/core/messages";
 import { z } from "zod";
 
-import { buildHandleChoices } from "./handles.js";
-import type { ParticipantMemoryContext } from "./participant-memory.js";
-
+/** Shared plain JSON-Schema shape used by the planner's hand-built schema. */
 export interface ConstFreeJsonSchema {
   type: "null" | "boolean" | "object" | "array" | "number" | "string" | "integer";
   properties?: Record<string, unknown>;
@@ -13,28 +10,11 @@ export interface ConstFreeJsonSchema {
 }
 
 /**
- * A contrastive subjective judgment: the leading view, the strongest genuinely
- * competing view, and why that alternative loses. Used for analytical fields
- * where the model must discriminate between live alternatives rather than emit
- * the first plausible interpretation, motive, feeling, desire, outcome,
- * opportunity, or strategy that occurs to it.
- */
-export const subjectiveJudgmentSchema = z.object({
-  leading: z.string().trim().min(1),
-  alternative: z.string().trim().min(1),
-  whyRejected: z.string().trim().min(1),
-}).strict();
-
-export type SubjectiveJudgment = z.infer<typeof subjectiveJudgmentSchema>;
-
-export const subjectiveJudgmentKeys: readonly string[] = ["leading", "alternative", "whyRejected"];
-
-/**
- * `presentMind` is the durable first-order cognition state, not an analytical
- * judgment. It records the most salient mental event that arose plus a small
- * number of additional first-order events. There is deliberately no
- * `whyRejected`: spontaneous cognition is not selected by an evidence contest,
- * and it is not action-worth. It is a compact phenomenological state.
+ * `presentMind` is the durable first-order cognition state: the most salient
+ * mental event that arose plus a bounded list of additional first-order events.
+ * Every field is required; `secondary` may be an empty array. There is
+ * deliberately no contrastive `whyRejected` machinery: spontaneous cognition is
+ * not selected by an evidence contest.
  */
 export const presentMindSchema = z.object({
   primary: z.string().trim().min(1),
@@ -43,40 +23,57 @@ export const presentMindSchema = z.object({
 
 export type PresentMind = z.infer<typeof presentMindSchema>;
 
-export const presentMindKeys: readonly string[] = ["primary", "secondary"];
+/**
+ * `realityCheck` explicitly distinguishes a real world-to-world mismatch from
+ * no meaningful mismatch. Both fields are always required: when no grounded
+ * seam exists, `status` is "none" and `content` states that plainly. The model
+ * is never required to invent a seam to satisfy the schema.
+ */
+export const realityCheckSchema = z.object({
+  status: z.enum(["seam", "none"]),
+  content: z.string().trim().min(1),
+}).strict();
 
-const decisionFields = {
-  interpretation: subjectiveJudgmentSchema,
+export type RealityCheck = z.infer<typeof realityCheckSchema>;
+
+/**
+ * `activeDesire` distinguishes a real weak desire from the absence of a want.
+ * `strength` is always present: "none" means genuinely no unsatisfied want
+ * exists, while "weak"/"moderate"/"strong" mean a real desire exists. A weak
+ * desire is still a desire; enactment-worth is decided by `action`, never by
+ * rewriting the desire into "none".
+ */
+export const activeDesireSchema = z.object({
+  strength: z.enum(["none", "weak", "moderate", "strong"]),
+  content: z.string().trim().min(1),
+}).strict();
+
+export type ActiveDesire = z.infer<typeof activeDesireSchema>;
+
+/**
+ * Every field is required. Nullable execution fields are always present; `null`
+ * is the required value meaning "no address / no reply / no message". There
+ * are no optional or omitted properties anywhere in the decision.
+ */
+export const realizerDecisionObjectSchema = z.object({
+  interpretation: z.string().trim().min(1),
   presentMind: presentMindSchema,
-  characterIntent: subjectiveJudgmentSchema,
-  realityCheck: subjectiveJudgmentSchema,
-  dreamIntent: subjectiveJudgmentSchema,
-  feltState: subjectiveJudgmentSchema,
-  activeDesire: subjectiveJudgmentSchema,
-  desiredOutcome: subjectiveJudgmentSchema,
-  opportunity: subjectiveJudgmentSchema,
-  fiveTurnStrategy: subjectiveJudgmentSchema,
-  fiftyTurnStrategy: subjectiveJudgmentSchema,
-};
-
-const actionFields = {
+  characterIntent: z.string().trim().min(1),
+  realityCheck: realityCheckSchema,
+  dreamIntent: z.string().trim().min(1),
+  feltState: z.string().trim().min(1),
+  activeDesire: activeDesireSchema,
+  desiredOutcome: z.string().trim().min(1),
+  opportunity: z.string().trim().min(1),
+  fiveTurnStrategy: z.string().trim().min(1),
+  fiftyTurnStrategy: z.string().trim().min(1),
   action: z.enum(["speak", "silence"]),
   message: z.string().trim().nullable(),
   addressCharacter: z.string().nullable(),
   replyToMessage: z.string().nullable(),
-};
+}).strict();
 
-/**
- * The decision is one flat object whose property order follows the causal
- * order: the internal fields that determine the choice are generated before
- * `action`, and `action` is generated before the speak-only addressing and
- * message fields. The model must not choose `action` before generating the
- * internal state that is supposed to cause it.
- */
-const flatDecisionSchema = z.object({
-  ...decisionFields,
-  ...actionFields,
-}).strict().superRefine((value, ctx) => {
+export const realizerDecisionSchema = realizerDecisionObjectSchema.superRefine((value, ctx) => {
   if (value.action === "speak") {
     if (value.message === null || value.message.length === 0) {
       ctx.addIssue({
@@ -90,7 +87,7 @@ const flatDecisionSchema = z.object({
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["message"],
-        message: "silence requires message to be null or empty",
+        message: "silence requires message to be null",
       });
     }
     if (value.addressCharacter !== null) {
@@ -110,109 +107,5 @@ const flatDecisionSchema = z.object({
   }
 });
 
-export const realizerDecisionSchema: z.ZodType<RealizerDecision> = flatDecisionSchema;
+export type RealizerDecision = z.infer<typeof realizerDecisionSchema>;
 
-// Provider structured outputs require the root JSON Schema to be an object.
-// The wrapper keeps the domain decision intact while giving the provider an
-// object root; callers stay on `RealizerDecision` via the unwrapped schema.
-export const realizerResponseSchema = z.object({
-  decision: realizerDecisionSchema,
-}).strict();
-
-/**
- * Builds the response schema for a specific turn so that `addressCharacter`
- * and `replyToMessage` can only take the handles of the characters and
- * messages actually visible in the context. The provider enforces the enum in
- * strict mode; the client-side parse enforces it even when the provider does
- * not, so the model cannot emit a raw id, a display name, or free text.
- */
-export function buildRealizerResponseSchema(
-  candidates: readonly VisibleMessage[],
-): z.ZodType<{ decision: RealizerDecision }> {
-  const choices = buildHandleChoices(candidates);
-  const decision = z.object({
-    ...decisionFields,
-    action: z.enum(["speak", "silence"]),
-    message: z.string().trim().nullable(),
-    addressCharacter: handleChoice(choices.characters.map(({ handle }) => handle)),
-    replyToMessage: handleChoice(choices.messages.map(({ handle }) => handle)),
-  }).strict().superRefine((value, ctx) => {
-    if (value.action === "speak") {
-      if (value.message === null || value.message.length === 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["message"],
-          message: "speak requires a non-empty message",
-        });
-      }
-    } else {
-      if (value.message !== null && value.message.length > 0) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["message"],
-          message: "silence requires message to be null or empty",
-        });
-      }
-      if (value.addressCharacter !== null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["addressCharacter"],
-          message: "silence requires addressCharacter to be null",
-        });
-      }
-      if (value.replyToMessage !== null) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["replyToMessage"],
-          message: "silence requires replyToMessage to be null",
-        });
-      }
-    }
-  });
-  return z.object({ decision }).strict();
-}
-
-function handleChoice(handles: readonly string[]): z.ZodType<string | null> {
-  const head = handles[0];
-  if (head === undefined) return z.null();
-  let schema: z.ZodType<string> = z.literal(head);
-  for (const handle of handles.slice(1)) {
-    schema = schema.or(z.literal(handle));
-  }
-  return schema.nullable();
-}
-
-export interface RealizerDecision {
-  interpretation: SubjectiveJudgment;
-  presentMind: PresentMind;
-  characterIntent: SubjectiveJudgment;
-  realityCheck: SubjectiveJudgment;
-  dreamIntent: SubjectiveJudgment;
-  feltState: SubjectiveJudgment;
-  activeDesire: SubjectiveJudgment;
-  desiredOutcome: SubjectiveJudgment;
-  opportunity: SubjectiveJudgment;
-  fiveTurnStrategy: SubjectiveJudgment;
-  fiftyTurnStrategy: SubjectiveJudgment;
-  action: "speak" | "silence";
-  message: string | null;
-  addressCharacter: string | null;
-  replyToMessage: string | null;
-}
-
-export interface VisibleMessage {
-  messageId: number;
-  sender: import("./telegram-event.js").TelegramSenderIdentity;
-  senderDisplayName: string;
-  senderUsername: string | null;
-  text: string;
-}
-
-export interface TurnContext {
-  boundedHistory: BaseMessage[];
-  currentMessage: import("./telegram-event.js").ObservedTelegramMessage;
-  visibleMessages: VisibleMessage[];
-  participantMemories: ParticipantMemoryContext[];
-  /** Persisted natural names keyed by Telegram user id. */
-  naturalNames: import("./telegram-event.js").NaturalNames;
-}

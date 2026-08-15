@@ -12,7 +12,7 @@ import { missingNaturalNameChoices } from "./planner-schema.js";
 import type { PendingConversationWrites } from "./pending-conversation-writes.js";
 import { memoriesForCandidates, selectedParticipantIds } from "./participant-memory.js";
 import type { ParticipantMemoryContext } from "./participant-memory.js";
-import type { VisibleMessage } from "./realizer-schema.js";
+import type { VisibleMessage } from "./realizer-response-schema.js";
 import type { NaturalNames } from "./telegram-event.js";
 import { visibleMessages } from "./turn-context.js";
 

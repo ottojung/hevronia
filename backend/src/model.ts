@@ -1,4 +1,5 @@
 import type { BaseLanguageModel } from "@langchain/core/language_models/base";
+import type { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import { ChatOpenAI } from "@langchain/openai";
 
@@ -56,7 +57,7 @@ export interface ChatModelOptions {
 export function createChatModel(
   modelName: string,
   options: ChatModelOptions = {},
-): BaseLanguageModel {
+): BaseChatModel {
   // LangChain's own retry is disabled (maxRetries: 0): rate-limit and
   // transient failures are retried once, with a bounded fixed delay, by the
   // shared model-retry wrapper instead of by exponential backoff.

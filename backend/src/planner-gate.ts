@@ -5,7 +5,7 @@ import type { NaturalNameStore } from "./natural-names/store.js";
 import type { MissingNaturalNameChoice } from "./planner-schema.js";
 import { isReactionCancelledError } from "./reaction-cancelled.js";
 import type { ReactionContext } from "./reaction-context.js";
-import type { TurnContext } from "./realizer-schema.js";
+import type { TurnContext } from "./realizer-response-schema.js";
 
 export interface PlannerGateOutcome {
   context: TurnContext;

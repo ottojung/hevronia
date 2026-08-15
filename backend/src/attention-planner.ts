@@ -11,7 +11,7 @@ import {
   type MissingNaturalNameChoice,
 } from "./planner-schema.js";
 import { throwIfAborted } from "./reaction-cancelled.js";
-import type { TurnContext } from "./realizer-schema.js";
+import type { TurnContext } from "./realizer-response-schema.js";
 
 export { missingNaturalNameChoices, buildPlannerResponseSchema, buildPlannerJsonSchema } from "./planner-schema.js";
 export type { MissingNaturalNameChoice } from "./planner-schema.js";

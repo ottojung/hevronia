@@ -3,7 +3,7 @@ import { type BaseMessage } from "@langchain/core/messages";
 import { renderConversationFraming, renderDreamCharacterList, renderDreamObservations } from "./dream-render.js";
 import { buildHandleChoices } from "./handles.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
-import type { TurnContext, VisibleMessage } from "./realizer-schema.js";
+import type { TurnContext, VisibleMessage } from "./realizer-response-schema.js";
 import { deserializeTelegramEvent } from "./telegram-event.js";
 import { extractText } from "./text.js";
 

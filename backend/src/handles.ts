@@ -4,7 +4,7 @@ import {
   type NaturalNames,
   type TelegramSenderIdentity,
 } from "./telegram-event.js";
-import type { VisibleMessage } from "./realizer-schema.js";
+import type { VisibleMessage } from "./realizer-response-schema.js";
 
 export interface DreamCharacter {
   sender: TelegramSenderIdentity;

@@ -1,6 +1,7 @@
 import { buildHandleChoices } from "./handles.js";
 import type { CharacterHandle, MessageHandle } from "./handles.js";
-import type { RealizerDecision, VisibleMessage } from "./realizer-schema.js";
+import type { RealizerDecision } from "./realizer-schema.js";
+import type { VisibleMessage } from "./realizer-response-schema.js";
 import type {
   DeliveredHevroniaMessage,
   NaturalNames,

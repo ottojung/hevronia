@@ -3,7 +3,8 @@ import { toRealizerDecisionLog } from "./decision-log.js";
 import { errorDetail } from "./error-detail.js";
 import { GeneratedTurn } from "./generated-turn.js";
 import type { ReactionContext } from "./reaction-context.js";
-import type { RealizerDecision, TurnContext } from "./realizer-schema.js";
+import type { RealizerDecision } from "./realizer-schema.js";
+import type { TurnContext } from "./realizer-response-schema.js";
 import type { ReactTurnDependencies, ReactTurnResult } from "./react-turn-types.js";
 import {
   deliverGeneratedTurn,
@@ -33,8 +34,12 @@ export async function finalizeSpeakOrDeliver(
   delivery: TelegramTurnDelivery | undefined,
 ): Promise<ReactTurnResult> {
   if (decision.action !== "speak" || decision.message === null) {
-    return { status: "silence" };
+    // A validated speak decision always carries a message; reaching this state
+    // means an internal invariant was broken, not that the character chose
+    // silence. Surface it instead of silently reinterpreting it as silence.
+    throw new Error("Realizer speak decision is missing a message");
   }
+  const message = decision.message;
   const resolved = resolveRealizerDecision(
     decision, context.visibleMessages, context.naturalNames,
   );
@@ -50,9 +55,9 @@ export async function finalizeSpeakOrDeliver(
 
   dependencies.onRealizerDecision?.(toRealizerDecisionLog(decision, resolved));
   const replyTo = replyRelationshipFor(resolved.replyTo);
-  const turn = GeneratedTurn.fromSpeak(decision.message, replyTo, (messageId) => {
+  const turn = GeneratedTurn.fromSpeak(message, replyTo, (messageId) => {
     const delivered = deliveredEvent(
-      messageId, input.hevroniaSender, decision.message, input.message, replyTo,
+      messageId, input.hevroniaSender, message, input.message, replyTo,
     );
     dependencies.canonicalWrites.enqueue(
       input.threadId, () => dependencies.store.append(input.threadId, delivered),

@@ -2,7 +2,7 @@ import { renderConversationFraming, renderDreamCharacterList, renderDreamObserva
 import { buildHandleChoices } from "./handles.js";
 import { renderParticipantMemoryContexts } from "./long-term-memory/render-context.js";
 import type { MissingNaturalNameChoice } from "./planner-schema.js";
-import type { TurnContext } from "./realizer-schema.js";
+import type { TurnContext } from "./realizer-response-schema.js";
 import { notebookSubject } from "./telegram-event.js";
 
 export function renderPlannerContext(
