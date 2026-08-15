@@ -1,18 +1,13 @@
 import type { PlannerDecisionLog } from "../../src/attention-planner.js";
 import type { RealizerDecisionLog } from "../../src/realizer.js";
-import type { PresentMind, SubjectiveJudgment } from "../../src/realizer-schema.js";
+import type { ActiveDesire, PresentMind, RealityCheck } from "../../src/realizer-schema.js";
 
 function singleLine(text: string): string {
   return text.replaceAll(/\s+/gu, " ").trim();
 }
 
-function formatJudgment(label: string, judgment: SubjectiveJudgment): string {
-  return [
-    `  ${label}:`,
-    `    leading: ${singleLine(judgment.leading)}`,
-    `    alternative: ${singleLine(judgment.alternative)}`,
-    `    whyRejected: ${singleLine(judgment.whyRejected)}`,
-  ].join("\n");
+function formatText(label: string, text: string): string {
+  return `  ${label}: ${singleLine(text)}`;
 }
 
 function formatPresentMind(presentMind: PresentMind): string {
@@ -23,6 +18,22 @@ function formatPresentMind(presentMind: PresentMind): string {
     "  presentMind:",
     `    primary: ${singleLine(presentMind.primary)}`,
     `    secondary: ${secondary}`,
+  ].join("\n");
+}
+
+function formatRealityCheck(realityCheck: RealityCheck): string {
+  return [
+    "  realityCheck:",
+    `    status: ${realityCheck.status}`,
+    `    content: ${singleLine(realityCheck.content)}`,
+  ].join("\n");
+}
+
+function formatActiveDesire(activeDesire: ActiveDesire): string {
+  return [
+    "  activeDesire:",
+    `    strength: ${activeDesire.strength}`,
+    `    content: ${singleLine(activeDesire.content)}`,
   ].join("\n");
 }
 
@@ -49,17 +60,17 @@ export function formatPlannerLog(log: PlannerDecisionLog): string {
 
 function formatJudgments(log: Extract<RealizerDecisionLog, { action: "silence" | "speak" }>): string {
   return [
-    formatJudgment("interpretation", log.interpretation),
+    formatText("interpretation", log.interpretation),
     formatPresentMind(log.presentMind),
-    formatJudgment("characterIntent", log.characterIntent),
-    formatJudgment("realityCheck", log.realityCheck),
-    formatJudgment("dreamIntent", log.dreamIntent),
-    formatJudgment("feltState", log.feltState),
-    formatJudgment("activeDesire", log.activeDesire),
-    formatJudgment("desiredOutcome", log.desiredOutcome),
-    formatJudgment("opportunity", log.opportunity),
-    formatJudgment("fiveTurnStrategy", log.fiveTurnStrategy),
-    formatJudgment("fiftyTurnStrategy", log.fiftyTurnStrategy),
+    formatText("characterIntent", log.characterIntent),
+    formatRealityCheck(log.realityCheck),
+    formatText("dreamIntent", log.dreamIntent),
+    formatText("feltState", log.feltState),
+    formatActiveDesire(log.activeDesire),
+    formatText("desiredOutcome", log.desiredOutcome),
+    formatText("opportunity", log.opportunity),
+    formatText("fiveTurnStrategy", log.fiveTurnStrategy),
+    formatText("fiftyTurnStrategy", log.fiftyTurnStrategy),
   ].join("\n");
 }
 

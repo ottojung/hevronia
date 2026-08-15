@@ -145,8 +145,9 @@ choice, reply attachment, the final speak/silence decision, and the wording.
   / `reaction-cancelled.ts` — per-thread revision/abort coordination, the
   observation/reaction split, and cancellation semantics.
 - `backend/src/attention-planner.ts` — the cheap high-recall attention filter.
-- `backend/src/realizer.ts` / `backend/src/realizer-schema.ts` — the smart
-  realizer that owns social cognition and final wording.
+- `backend/src/realizer.ts` / `backend/src/realizer-call.ts` /
+  `backend/src/realizer-response-schema.ts` / `backend/src/realizer-schema.ts` —
+  the smart realizer that owns social cognition and final wording.
 - `backend/src/long-term-memory/` — the persistent Mem0 store, the lazy
   in-process runtime, the background queue, and the conservative extraction
   policy.
@@ -295,91 +296,71 @@ character and reply-message handles.
 It returns a structured decision, either `silence` or `speak`. Its private
 fields are kept distinct.
 
-Every subjective field is a **contrastive judgment** with a shared shape:
+The realizer is one direct structured-output chat-model call: bind the per-turn
+Zod schema to the chat model, invoke it with the personality system prompt and
+the rendered context, and validate the returned decision with the same schema.
+No agent, no tools, no provider response-strategy dispatch, and no reliance on
+JSON property order as a causal mechanism — the prompt states the semantic
+dependencies (presentMind is what arose, activeDesire is what she wants, action
+is whether she enacts it), and the structured output merely records them.
 
-```text
-leading        — the judgment Хевронія currently prefers
-alternative    — the strongest genuinely competing judgment she considered and
-                 did not choose (mandatory, never null or omitted)
-whyRejected    — the specific reason the alternative loses: the concrete way it
-                 is worse, less supported, less accurate, less important, or
-                 less appropriate, or what following it would fail to account
-                 for
-```
+Every decision field is required; absence uses explicit `null` values, never
+omitted properties.
 
-The alternative is not an arbitrary opposite or a strawman; it is the best
-remaining plausible competitor, the one that would meaningfully change her
-understanding or behavior if chosen instead, and it may retain some
-plausibility. `whyRejected` names what is actually wrong with the alternative —
-the evidence or consideration that tells against it — rather than merely
-restating that the leading view is good or fits.
+Fields:
 
-The decision is generated in a fixed causal order: the internal state that
-determines the choice comes before the choice itself, and `action` is the last
-decision made. Most fields are contrastive (leading / alternative / whyRejected);
-`presentMind` is a compact first-order cognition state instead.
-
-Fields, in generation order:
-
-- `interpretation` — what Хевронія thinks is happening / what the event means
-  in context, weighed against the strongest competing interpretation;
+- `interpretation` — what Хевронія thinks is happening / what the event means in
+  context: a concise declarative sentence;
 - `presentMind` — the most salient first-order thing that actually arose in her
-  mind when the event arrived: a judgment, association, memory, reaction,
-  image, or impulse. It is not a goal, plan, strategy, reason for action,
-  summary of the other character's message, or a chain-of-thought dump, and it
-  is not an evidence contest. Shape: `primary` = the one most salient mental
-  event; `secondary` = a small list of other first-order events that also arose
-  (may be empty). There is deliberately no `whyRejected`: later analytical
-  fields do not retroactively redefine what first arose;
+  ongoing mind. She already has an ongoing mind; the current event enters it
+  along with unresolved context, present emotion, remembered home, and Stormwind
+  formation. Shape: `primary` = the one most salient mental event; `secondary` =
+  a bounded list (at most four) of other first-order events that also arose (may
+  be empty). Not a goal, plan, strategy, reason for action, summary of the
+  message, or a chain-of-thought dump, and not an evidence contest;
 - `characterIntent` — her best supported guess about what the relevant other
-  character wants from her specifically: the response, belief, feeling, role,
-  or participation they are trying to produce in her, weighed against the
-  strongest competing theory of their motive;
-- `realityCheck` — the most revealing way in which the event, claim, object,
-  convention, or its ordinary dream-world implications fail to fit her
-  remembered real reality around Stormwind; it always finds seams (never
-  "everything makes sense") by deriving consequences from grounded premises,
-  comparing against remembered reality rather than Warcraft as lore. Both
-  leading and alternative are distinct valid seams, and whyRejected compares
-  them;
+  character wants from her specifically: the response, belief, feeling, role, or
+  participation they are trying to produce in her;
+- `realityCheck` — a world-to-world comparison against remembered reality.
+  Shape: `status` is "seam" when a genuine grounded mismatch exists and "none"
+  when this event exposes no meaningful mismatch; `content` names the strongest
+  seam or states plainly that none exists. Both fields are always required; the
+  absence of a seam is a valid result and the model is not required to invent
+  one;
 - `dreamIntent` — her more distant, suspicious strategic hypothesis about what
   the dream — the process that continues to keep her from waking — may gain by
   producing the event or the wider visible pattern. It is inferential, may be
-  mundane, and does not by itself create a desire or a discrepancy
-  investigation;
-- `feltState` — her immediate emotional/felt reaction, weighed against another
-  plausible characterization of the same reaction;
-- `activeDesire` — what she actually wants right now (her motive, not the
-  others' character intent): the strongest real unsatisfied desire, strong or
-  weak, weighed against the strongest competing account of what she wants most.
-  A weak-but-real desire remains a desire; action-worth is not decided here;
-- `desiredOutcome` — the state, result, or experience she wants, distinct from
-  what she will do, weighed against the strongest competing outcome;
+  mundane, is a hypothesis about the dream (not a motive or a command), and does
+  not by itself create a desire or a discrepancy investigation;
+- `feltState` — her immediate emotional/felt reaction, part of the immediate
+  subjective state alongside `presentMind`;
+- `activeDesire` — what she actually wants right now. Shape: `strength` is
+  "none" (genuinely no unsatisfied want) or "weak"/"moderate"/"strong" (a real
+  desire exists); `content` names the concrete want or, when strength is "none",
+  states that no actual want arose. A weak desire is still a desire; action-worth
+  is not decided here;
+- `desiredOutcome` — the state, result, or experience that would satisfy the
+  active desire, distinct from what she will do;
 - `opportunity` — a concrete affordance the present situation itself gives her
   toward the desired outcome (evidence, material, timing, leverage, or room),
-  not her own next action, weighed against another plausible opportunity;
+  not her own next action;
 - `fiveTurnStrategy` — the best current short-horizon approach over roughly the
-  next several exchanges if the situation continues: the direction, what kind
-  of result matters, and how near-term outcomes would change the approach;
-  adaptive rather than a scheduled script;
+  next several exchanges if the situation continues;
 - `fiftyTurnStrategy` — the stance that would organize her behavior if the same
   relationship, interaction pattern, investigation, or situation persisted over
-  a much longer span; scoped to that situation, possibly mundane, and only
-  connected to enduring aims such as waking or home when they are genuinely
-  relevant to it;
-- `action` — the last field: "speak" or "silence", the only place where
-  action-worth is decided. A real desire may exist in `activeDesire` without
-  this field committing to act on it;
-- for `speak`: `addressCharacter`, `replyToMessage`, and `message` (the actual
-  Telegram text). For `silence`: these are null.
+  a much longer span; scoped to that situation, possibly mundane;
+- `action` — "speak" or "silence", the only place where action-worth is decided.
+  A real desire may exist in `activeDesire` without this field committing to act
+  on it;
+- `addressCharacter`, `replyToMessage`, `message` — always present. For `speak`,
+  `message` is non-empty and the handles are valid visible P/M handles or `null`;
+  for `silence`, all three are `null`.
 
-The contrastive shape forces the realizer to discriminate: for each analytical
-field it must identify a live competitor and state why the selected version
-currently wins, instead of emitting the first plausible interpretation, motive,
-feeling, desire, outcome, opportunity, or strategy that occurs to it.
-`presentMind` is the deliberate exception: first-order cognition records what
-arose rather than which thought wins an argument, so it carries no
-`whyRejected`.
+A real desire may coexist with `action = silence`: desiredOutcome, opportunity,
+and the strategies remain populated for the real desire even when it is not
+enacted. Malformed structured output is regenerated a bounded number of times
+inside the realizer; after exhaustion the error propagates and no message is
+sent — a malformed `speak` is never silently reinterpreted as valid silence.
 
 For `speak`, the realizer additionally chooses an `addressCharacter` handle (if
 any), an independent `replyToMessage` handle (if any Telegram reply

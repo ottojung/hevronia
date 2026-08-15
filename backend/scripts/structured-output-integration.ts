@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 
-import { AIMessage } from "@langchain/core/messages";
-import { createAgent } from "langchain";
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 
 import {
   createChatModel,
@@ -10,8 +9,9 @@ import {
 } from "../src/model.js";
 import { invokeWithRateLimitRetry } from "../src/model-retry.js";
 import {
-  realizerResponseSchema,
-} from "../src/realizer-schema.js";
+  buildRealizerResponseSchema,
+} from "../src/realizer-response-schema.js";
+import type { VisibleMessage } from "../src/realizer-response-schema.js";
 
 const modelName = smartModelFromEnv();
 const provider = providerForModelName(modelName);
@@ -24,18 +24,22 @@ if (key === undefined || key === "") {
 }
 
 const model = createChatModel(modelName);
-const agent = createAgent({
-  model,
-  tools: [],
-  systemPrompt: "Return only the requested structured data.",
-  responseFormat: realizerResponseSchema,
-});
 
-const result = await invokeWithRateLimitRetry(() => agent.invoke({
-  messages: [new AIMessage("test")],
-}));
-const parsed = realizerResponseSchema.parse(result.structuredResponse);
-assert.ok(parsed.decision.action === "silence" || parsed.decision.action === "speak");
+// No visible handles in this standalone check, so the schema only permits null
+// addressing. This exercises the exact direct structured-output path used in
+// production: bind the Zod schema to the chat model and invoke it directly.
+const visibleMessages: VisibleMessage[] = [];
+const schema = buildRealizerResponseSchema(visibleMessages);
+const structuredModel = model.withStructuredOutput(schema);
+
+const decision = await invokeWithRateLimitRetry(() => structuredModel.invoke([
+  new SystemMessage("Return only the requested structured data."),
+  new HumanMessage("test"),
+]));
+
+// The schema that defined the structured output also validates the result.
+const parsed = schema.parse(decision);
+assert.ok(parsed.action === "silence" || parsed.action === "speak");
 console.log(
-  `${provider} accepted the provider schema and returned decision ${JSON.stringify(parsed.decision)}`,
+  `${provider} accepted the direct structured-output schema and returned decision ${JSON.stringify(parsed)}`,
 );
