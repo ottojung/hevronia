@@ -8,7 +8,7 @@ import { AIMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
 
 
-import type { TurnContext } from "../src/realizer-schema.js";
+import type { TurnContext } from "../src/realizer-response-schema.js";
 import { SUMMARY_PREFIX } from "../src/summary.js";
 import { extractText } from "../src/text.js";
 import { filteringPlanner, stubPlanner, testLayer } from "./memory-fixtures.js";

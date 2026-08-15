@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { AIMessage, type BaseMessage } from "@langchain/core/messages";
-import { fakeModel } from "@langchain/core/testing";
+import { BaseMessage } from "@langchain/core/messages";
 
 import { SYSTEM_PROMPT } from "../src/personality.js";
 import { createRealizer } from "../src/realizer.js";
@@ -13,10 +12,16 @@ import {
   longTermMemoryUserIdFromTelegramSender,
   conversationThreadIdFromTelegramPrivateChat,
 } from "../src/identifiers.js";
-import type { VisibleMessage } from "../src/realizer-schema.js";
+import type { VisibleMessage } from "../src/realizer-response-schema.js";
 import type { ObservedTelegramMessage, TelegramSenderIdentity } from "../src/telegram-event.js";
 import { memoriesForCandidates, selectedParticipantIds } from "../src/participant-memory.js";
-import { realizerSpeak, staticMemory, stubPlanner, testLayer } from "./memory-fixtures.js";
+import {
+  CapturingStructuredChatModel,
+  realizerSpeak,
+  staticMemory,
+  stubPlanner,
+  testLayer,
+} from "./memory-fixtures.js";
 
 function message(id: number, sender: TelegramSenderIdentity, name: string, text: string): ObservedTelegramMessage {
   return { kind: "participant", messageId: id, sender, senderDisplayName: name, senderUsername: null,
@@ -81,16 +86,9 @@ test("planner and realizer both receive all relevant participant memories", asyn
     assert.ok(!context.participantMemories.some(({ participant }) => participant.id === -500));
     return true;
   });
-  const model = fakeModel();
-  const captured: string[] = [];
-  const replyHandler = (messages: BaseMessage[]) => {
-    captured.push(messages.map((item) => typeof item.content === "string"
-      ? item.content : JSON.stringify(item.content)).join("\n"));
-    return new AIMessage(JSON.stringify({ decision: realizerSpeak({ message: "я знала шо ти це зробиш" }) }));
-  };
-  model.respond(replyHandler);
-  model.respond(replyHandler);
-  model.respond(replyHandler);
+  const model = new CapturingStructuredChatModel(
+    realizerSpeak({ message: "я знала шо ти це зробиш" }),
+  );
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-participant-memory-"));
   const layer = testLayer(path.join(dir, "db.sqlite"),
     { planner, realizer: createRealizer(model, SYSTEM_PROMPT), lazyMemory: memory });
@@ -107,6 +105,10 @@ test("planner and realizer both receive all relevant participant memories", asyn
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(turn.outcome.action, "speak");
     assert.equal(plannerCall, 3);
+    const captured = model.calls.map((messages) => messages.map((item) =>
+      BaseMessage.isInstance(item)
+        ? (typeof item.content === "string" ? item.content : JSON.stringify(item.content))
+        : String(item)).join("\n"));
     assert.equal(captured.length, 3);
     const last = captured[2] ?? "";
     assert.match(last, /Іра працювала над цим тижнями/);

@@ -4,15 +4,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { AIMessage, type BaseMessage } from "@langchain/core/messages";
-import { fakeModel } from "@langchain/core/testing";
+import { BaseMessage } from "@langchain/core/messages";
 
 import { SYSTEM_PROMPT } from "../src/personality.js";
 import { createRealizer } from "../src/realizer.js";
 import { renderDreamEvent } from "../src/dream-render.js";
 import type { DeliveredHevroniaMessage, ObservedTelegramMessage } from "../src/telegram-event.js";
 import { conversationThreadIdFromTelegramPrivateChat } from "../src/identifiers.js";
-import { passingPlanner, realizerSpeak, testLayer } from "./memory-fixtures.js";
+import { CapturingStructuredChatModel, passingPlanner, realizerSpeak, testLayer } from "./memory-fixtures.js";
 
 const threadId = conversationThreadIdFromTelegramPrivateChat(71);
 
@@ -23,15 +22,9 @@ function participant(messageId: number, senderId: number, name: string, text: st
 }
 test("the realizer receives the dream framing, memories, and the character handles it needs", async () => {
   const dir = mkdtempSync(path.join(tmpdir(), "hevronia-target-context-"));
-  const model = fakeModel();
-  const captured: string[] = [];
-  const replyHandler = (messages: BaseMessage[]) => {
-    captured.push(messages.map((item) => typeof item.content === "string"
-      ? item.content : JSON.stringify(item.content)).join("\n"));
-    return new AIMessage(JSON.stringify({ decision: realizerSpeak({ message: "стій. а шо сталося?" }) }));
-  };
-  model.respond(replyHandler);
-  model.respond(replyHandler);
+  const model = new CapturingStructuredChatModel(
+    realizerSpeak({ message: "стій. а шо сталося?" }),
+  );
   const layer = testLayer(path.join(dir, "db.sqlite"), {
     planner: passingPlanner(),
     realizer: createRealizer(model, SYSTEM_PROMPT),
@@ -43,6 +36,10 @@ test("the realizer receives the dream framing, memories, and the character handl
       message: participant(11, 202, "Макс", "хто буде каву"), hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
     assert.equal(turn.outcome.action, "speak");
     if (turn.outcome.action === "speak") assert.equal(turn.outcome.replyTo, null);
+    const captured = model.calls.map((messages) => messages.map((item) =>
+      BaseMessage.isInstance(item)
+        ? (typeof item.content === "string" ? item.content : JSON.stringify(item.content))
+        : String(item)).join("\n"));
     assert.equal(captured.length, 2);
     const input = captured[1] ?? "";
     assert.match(input, /Character 101 in your notebook has not acquired a natural name yet\.\nTelegram currently displays them as “Іра”\./);

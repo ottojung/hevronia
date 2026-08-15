@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { AIMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
 
 import { createConversationLayer } from "../src/layer.js";
@@ -33,8 +32,8 @@ import {
   longTermMemoryUserIdFromTelegramSender,
 } from "../src/identifiers.js";
 import {
-  FakeScheduler, FakeStore, deferred, fact, filteringPlanner, passingPlanner,
-  realizerSpeak, stubPlanner,
+  FakeScheduler, FakeStore, ThrowingStructuredChatModel, deferred, fact,
+  filteringPlanner, passingPlanner, realizerSpeak, stubPlanner,
 } from "./memory-fixtures.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 
@@ -50,7 +49,7 @@ function observedMessage(text: string, messageId: number, senderId = 1,
 }
 
 function speakReply(model: ReturnType<typeof fakeModel>, text: string): void {
-  model.respond(new AIMessage(JSON.stringify({ decision: realizerSpeak({ message: text }) })));
+  model.structuredResponse(realizerSpeak({ message: text }));
 }
 
 function fixture(overrides: {
@@ -331,15 +330,25 @@ test("a generation failure still observes the user's message", async () => {
   const scheduler = new FakeScheduler();
   store.searchImpl = () => [];
   const memory = createLazyLongTermMemory({ store, scheduler, idleDelayMs: 10 });
-  const { dir, model, layer } = fixture({ lazyMemory: memory });
+  const dir = mkdtempSync(path.join(tmpdir(), "hevronia-ltm-"));
   try {
-    model.respond(new Error("generation failed"));
+    const layer = createConversationLayer({
+      dbPath: path.join(dir, "checkpoints.sqlite"),
+      planner: passingPlanner(),
+      realizer: createRealizer(
+        new ThrowingStructuredChatModel(new Error("generation failed")),
+        SYSTEM_PROMPT,
+      ),
+      summaryModel: fakeModel(),
+      naturalNameDbPath: path.join(dir, "natural-names.sqlite"),
+      lazyMemory: memory,
+    });
     await assert.rejects(() => layer.respond({ threadId, message: observedMessage("hello", 1),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false }));
     await scheduler.fireAll();
     assert.deepEqual(store.rememberCalls.flatMap(({ texts }) => texts), ["hello"]);
-  } finally {
     await layer.close();
+  } finally {
     rmSync(dir, { recursive: true, force: true });
   }
 });

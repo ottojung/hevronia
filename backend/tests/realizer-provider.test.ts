@@ -1,21 +1,28 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { AIMessage } from "@langchain/core/messages";
 import { fakeModel } from "@langchain/core/testing";
-import { providerStrategy } from "langchain";
 
-import { buildGeminiRealizerJsonSchema, buildOpenAiRealizerJsonSchema } from "../src/realizer-json-schema.js";
 import { SYSTEM_PROMPT } from "../src/personality.js";
 import { createRealizer } from "../src/realizer.js";
+import { RealizerStructuredOutputError } from "../src/realizer-call.js";
 import {
   buildRealizerResponseSchema,
+} from "../src/realizer-response-schema.js";
+import type { TurnContext } from "../src/realizer-response-schema.js";
+import {
+  activeDesireSchema,
+  presentMindSchema,
+  realityCheckSchema,
+  realizerDecisionObjectSchema,
   realizerDecisionSchema,
-  realizerResponseSchema,
-  type TurnContext,
 } from "../src/realizer-schema.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
-import { realizerSilence, realizerSpeak } from "./memory-fixtures.js";
+import {
+  SequencedStructuredChatModel,
+  realizerSilence,
+  realizerSpeak,
+} from "./memory-fixtures.js";
 
 function message(overrides: Partial<ObservedTelegramMessage> = {}): ObservedTelegramMessage {
   return { kind: "participant", messageId: 10, sender: { kind: "user", id: 88 },
@@ -32,235 +39,154 @@ const context: TurnContext = {
   naturalNames: new Map(),
 };
 
-function realizerWithResponse(content: string) {
+function realizerWithStructuredResponse(value: Record<string, unknown>) {
   const model = fakeModel();
-  model.respond(new AIMessage(content));
+  model.structuredResponse(value);
   return createRealizer(model, SYSTEM_PROMPT);
 }
 
-function judgment(overrides: { leading?: unknown; alternative?: unknown; whyRejected?: unknown } = {}) {
-  return { leading: "l", alternative: "a", whyRejected: "w", ...overrides };
+function realizerWithSequencedResponses(values: unknown[]) {
+  return createRealizer(new SequencedStructuredChatModel(values), SYSTEM_PROMPT);
 }
 
-function presentMind(overrides: { primary?: unknown; secondary?: unknown } = {}) {
-  return { primary: "p", secondary: ["s"], ...overrides };
-}
-
-test("provider schema root is an object with the flat decision beneath it", () => {
-  const providerSchema = providerStrategy(realizerResponseSchema).schema;
-  assert.equal(providerSchema["type"], "object");
-  assert.ok(providerSchema["properties"]);
-  assert.deepEqual(providerSchema["required"], ["decision"]);
-  assert.equal(providerSchema["additionalProperties"], false);
-
-  const domainStrategy = providerStrategy(realizerDecisionSchema);
-  const domainSchema = domainStrategy.schema;
-  assert.equal(domainSchema["type"], "object");
-  assert.ok(domainSchema["properties"]);
-  assert.equal(domainSchema["additionalProperties"], false);
-});
-
-test("realize returns an unwrapped silence decision with the full private state", async () => {
+test("realizer uses the direct structured-output path and never an agent", async () => {
   const silence = realizerSilence();
-  const realizer = realizerWithResponse(JSON.stringify({ decision: silence }));
+  const realizer = realizerWithStructuredResponse(silence);
   assert.deepEqual(await realizer.realize(context), silence);
 });
 
-test("realize returns an unwrapped speak decision with message and handles", async () => {
+test("realizer returns a valid speak decision with message and handles", async () => {
   const decision = realizerSpeak({ message: "стій, я зараз" });
-  const realizer = realizerWithResponse(JSON.stringify({ decision }));
+  const realizer = realizerWithStructuredResponse(decision);
   assert.deepEqual(await realizer.realize(context), decision);
 });
 
 test("the dynamic schema restricts addressCharacter and replyToMessage to visible handles", () => {
   const schema = buildRealizerResponseSchema(context.visibleMessages);
   const speak = realizerSpeak({ addressCharacter: "P1", replyToMessage: "M1" });
-  assert.equal(schema.safeParse({ decision: speak }).success, true);
+  assert.equal(schema.safeParse(speak).success, true);
   for (const bad of ["7001", "Юхим", "character 7001", "P9", "M9", "я не братимусь розбирати це"]) {
-    assert.equal(schema.safeParse({ decision: { ...speak, addressCharacter: bad } }).success,
+    assert.equal(schema.safeParse({ ...speak, addressCharacter: bad }).success,
       false, `addressCharacter=${bad}`);
-    assert.equal(schema.safeParse({ decision: { ...speak, replyToMessage: bad } }).success,
+    assert.equal(schema.safeParse({ ...speak, replyToMessage: bad }).success,
       false, `replyToMessage=${bad}`);
   }
 });
 
-type SubjectiveFieldName = "interpretation" | "characterIntent" | "realityCheck" | "dreamIntent"
-  | "feltState" | "activeDesire" | "desiredOutcome" | "opportunity"
-  | "fiveTurnStrategy" | "fiftyTurnStrategy";
-const subjectiveFieldNames: readonly SubjectiveFieldName[] = ["interpretation", "characterIntent",
-  "realityCheck", "dreamIntent", "feltState", "activeDesire", "desiredOutcome",
-  "opportunity", "fiveTurnStrategy", "fiftyTurnStrategy"];
-
-test("presentMind carries primary/secondary cognition, not a contrastive judgment", () => {
-  for (const decision of [realizerSpeak(), realizerSilence()]) {
-    assert.equal(typeof decision.presentMind.primary, "string");
-    assert.ok(decision.presentMind.primary.length >= 1, "presentMind.primary");
-    assert.ok(Array.isArray(decision.presentMind.secondary), "presentMind.secondary");
-  }
-});
-
-test("all ten contrastive fields carry leading/alternative/whyRejected in both speak and silence", () => {
-  for (const decision of [realizerSpeak(), realizerSilence()]) {
-    for (const field of subjectiveFieldNames) {
-      const value = decision[field];
-      assert.equal(typeof value.leading, "string");
-      assert.ok(value.leading.length >= 1, `leading of ${field}`);
-      assert.equal(typeof value.alternative, "string");
-      assert.ok(value.alternative.length >= 1, `alternative of ${field}`);
-      assert.equal(typeof value.whyRejected, "string");
-      assert.ok(value.whyRejected.length >= 1, `whyRejected of ${field}`);
-    }
-  }
-});
-
-test("a speak decision carries a message and silence carries no message or handles", () => {
-  const speak = realizerSpeak();
-  assert.equal(speak.action, "speak");
-  assert.ok(speak.message !== null && speak.message.length >= 1);
-  const silence = realizerSilence();
-  assert.equal(silence.action, "silence");
-  assert.equal(silence.message, null);
-  assert.equal(silence.addressCharacter, null);
-  assert.equal(silence.replyToMessage, null);
-});
-
-function parseDecision(decision: unknown) {
-  return realizerResponseSchema.safeParse({ decision });
-}
-
-test("the schema rejects a judgment without an alternative", () => {
-  const speak = realizerSpeak();
-  const result = parseDecision({ ...speak, characterIntent: judgment({ alternative: undefined }) });
-  assert.equal(result.success, false);
-});
-
-test("the schema rejects a null alternative", () => {
-  const speak = realizerSpeak();
-  const result = parseDecision({ ...speak, characterIntent: judgment({ alternative: null }) });
-  assert.equal(result.success, false);
-});
-
-test("the schema rejects a judgment without whyRejected", () => {
-  const speak = realizerSpeak();
-  const result = parseDecision({ ...speak, characterIntent: judgment({ whyRejected: undefined }) });
-  assert.equal(result.success, false);
-});
-
-test("the schema rejects empty judgment strings", () => {
-  const speak = realizerSpeak();
-  const judgmentParts: readonly ("leading" | "alternative" | "whyRejected")[] =
-    ["leading", "alternative", "whyRejected"];
-  for (const key of judgmentParts) {
-    const result = parseDecision({ ...speak, characterIntent: judgment({ [key]: "   " }) });
-    assert.equal(result.success, false, key);
-  }
-});
-
-test("the schema rejects unexpected keys inside a judgment", () => {
-  const speak = realizerSpeak();
-  const result = parseDecision({
-    ...speak,
-    characterIntent: { ...speak.characterIntent, extra: "x" },
-  });
-  assert.equal(result.success, false);
-});
-
-test("a plain string is rejected in place of a judgment", () => {
-  const speak = realizerSpeak();
-  const result = parseDecision({ ...speak, interpretation: "i" });
-  assert.equal(result.success, false);
-});
-
-test("the Gemini schema uses enums instead of const and lists the visible handles", () => {
-  const schema = buildGeminiRealizerJsonSchema(context.visibleMessages);
-  const serialized = JSON.stringify(schema);
-  assert.ok(!serialized.includes('"const"'));
-  assert.ok(!serialized.includes("additionalProperties"));
-  assert.ok(serialized.includes('"enum"'));
-  assert.ok(serialized.includes("P1"));
-  assert.ok(serialized.includes("M1"));
-});
-
-test("the OpenAI schema is fully inlined and strict-compatible", () => {
-  const schema = buildOpenAiRealizerJsonSchema(context.visibleMessages);
-  const serialized = JSON.stringify(schema);
-  assert.ok(!serialized.includes('"$ref"'));
-  assert.ok(!serialized.includes('"$defs"'));
-  assert.ok(!serialized.includes('"const"'));
-  assert.ok(!serialized.includes('"minLength":0'));
-  assert.ok(serialized.includes('"additionalProperties":false'));
-  assert.ok(serialized.includes('"enum":["speak","silence"]'));
-  assert.ok(serialized.includes("P1"));
-  assert.ok(serialized.includes("M1"));
-});
-
-test("the OpenAI schema keeps additionalProperties off for Gemini but on for OpenAI", () => {
-  const geminiSchema = JSON.stringify(buildGeminiRealizerJsonSchema(context.visibleMessages));
-  const openAiSchema = JSON.stringify(buildOpenAiRealizerJsonSchema(context.visibleMessages));
-  assert.ok(!geminiSchema.includes("additionalProperties"));
-  assert.ok(openAiSchema.includes('"additionalProperties":false'));
-});
-
-test("the OpenAI provider schema nests the required judgment fields", () => {
-  const serialized = JSON.stringify(buildOpenAiRealizerJsonSchema(context.visibleMessages));
-  assert.ok(serialized.includes('"leading"'));
-  assert.ok(serialized.includes('"alternative"'));
-  assert.ok(serialized.includes('"whyRejected"'));
-  assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
-  const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
-  assert.equal(judgments.length, 10);
-});
-
-test("the Gemini provider schema nests the required judgment fields", () => {
-  const serialized = JSON.stringify(buildGeminiRealizerJsonSchema(context.visibleMessages));
-  assert.ok(serialized.includes('"leading"'));
-  assert.ok(serialized.includes('"alternative"'));
-  assert.ok(serialized.includes('"whyRejected"'));
-  assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
-  const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
-  assert.equal(judgments.length, 10);
-});
-
-test("malformed provider responses are rejected", async () => {
-  const speak = () => realizerSpeak();
-  const cases: string[] = [
-    JSON.stringify({}),
-    JSON.stringify({ decision: { action: "jump" } }),
-    JSON.stringify({ decision: { action: "silence" } }),
-    JSON.stringify({ decision: { action: "speak" } }),
-    JSON.stringify({ decision: { action: "silence", extra: true } }),
-    JSON.stringify({ decision: { action: "speak", addressCharacter: "P1" } }),
-    // a subjective field must be an object, not a plain string
-    JSON.stringify({ decision: { ...speak(), interpretation: "i" } }),
-    // speak without a message
-    JSON.stringify({ decision: { ...speak(), message: null } }),
-    // speak with an empty message
-    JSON.stringify({ decision: { ...speak(), message: "   " } }),
-    // silence with a message
-    JSON.stringify({ decision: { ...realizerSilence(), message: "ага" } }),
-    // silence with an address handle
-    JSON.stringify({ decision: { ...realizerSilence(), addressCharacter: "P1" } }),
-    // silence with a reply handle
-    JSON.stringify({ decision: { ...realizerSilence(), replyToMessage: "M1" } }),
-    // unexpected key at the decision level
-    JSON.stringify({ decision: { ...speak(), targetChoice: "A" } }),
-    // unexpected key inside a judgment
-    JSON.stringify({ decision: { ...speak(), characterIntent: { ...judgment(), extra: true } } }),
-    // presentMind uses primary/secondary, not a contrastive judgment
-    JSON.stringify({ decision: { ...speak(), presentMind: judgment() } }),
-    // presentMind without a primary
-    JSON.stringify({ decision: { ...speak(), presentMind: presentMind({ primary: undefined }) } }),
-    // missing alternative inside a judgment
-    JSON.stringify({ decision: { ...speak(), characterIntent: judgment({ alternative: undefined }) } }),
-    // null alternative inside a judgment
-    JSON.stringify({ decision: { ...speak(), characterIntent: judgment({ alternative: null }) } }),
-    // empty strings inside a judgment
-    JSON.stringify({ decision: { ...speak(), characterIntent: judgment({ leading: "" }) } }),
-    // invalid handle
-    JSON.stringify({ decision: { ...speak(), addressCharacter: "P9" } }),
+test("every decision field is required; there are no optional fields", () => {
+  const shape = realizerDecisionObjectSchema.shape;
+  const topLevelKeys = [
+    "interpretation", "presentMind", "characterIntent", "realityCheck", "dreamIntent",
+    "feltState", "activeDesire", "desiredOutcome", "opportunity", "fiveTurnStrategy",
+    "fiftyTurnStrategy", "action", "message", "addressCharacter", "replyToMessage",
   ];
-  for (const content of cases) {
-    const realizer = realizerWithResponse(content);
-    await assert.rejects(() => realizer.realize(context));
+  assert.deepEqual(Object.keys(shape).sort(), [...topLevelKeys].sort());
+
+  // A decision missing any single top-level field must fail, proving every
+  // field is required and none is optional.
+  const base = realizerSilence();
+  for (const key of topLevelKeys) {
+    const partial: Record<string, unknown> = { ...base };
+    delete partial[key];
+    assert.equal(realizerDecisionSchema.safeParse(partial).success, false, `missing ${key}`);
   }
+
+  // Nested object fields are also fully required.
+  assert.deepEqual(Object.keys(presentMindSchema.shape).sort(), ["primary", "secondary"]);
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, presentMind: { primary: "p" },
+  }).success, false, "presentMind missing secondary");
+  assert.deepEqual(Object.keys(realityCheckSchema.shape).sort(), ["content", "status"]);
+  assert.deepEqual(Object.keys(activeDesireSchema.shape).sort(), ["content", "strength"]);
+});
+
+test("presentMind secondary is required and bounded", () => {
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...realizerSilence(), presentMind: { primary: "p" },
+  }).success, false, "missing secondary");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...realizerSilence(), presentMind: { primary: "p", secondary: ["a", "b", "c", "d", "e"] },
+  }).success, false, "too many secondary entries");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...realizerSilence(), presentMind: { primary: "p", secondary: [] },
+  }).success, true, "empty secondary is valid");
+});
+
+test("realityCheck status none is valid without inventing a second seam", () => {
+  const decision = realizerSilence();
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...decision, realityCheck: { status: "none", content: "No grounded seam here." },
+  }).success, true);
+});
+
+test("weak activeDesire plus silence is valid and stays a desire", () => {
+  const decision: ReturnType<typeof realizerSilence> = {
+    ...realizerSilence(),
+    activeDesire: { strength: "weak", content: "I want Bob to know his name sounds ridiculous." },
+  };
+  assert.equal(realizerDecisionSchema.safeParse(decision).success, true);
+  assert.equal(decision.activeDesire.strength, "weak");
+});
+
+test("weak activeDesire plus speak is valid", () => {
+  const decision = realizerSpeak({
+    activeDesire: { strength: "weak", content: "I want Bob to know his name sounds ridiculous." },
+  });
+  assert.equal(realizerDecisionSchema.safeParse(decision).success, true);
+});
+
+test("activeDesire none remains valid", () => {
+  const decision = realizerSilence();
+  assert.equal(decision.activeDesire.strength, "none");
+  assert.equal(realizerDecisionSchema.safeParse(decision).success, true);
+});
+
+test("speak with null or blank message is invalid", () => {
+  const base = realizerSpeak();
+  assert.equal(realizerDecisionSchema.safeParse({ ...base, message: null }).success, false);
+  assert.equal(realizerDecisionSchema.safeParse({ ...base, message: "   " }).success, false);
+});
+
+test("silence with non-null message, address, or reply is invalid", () => {
+  const base = realizerSilence();
+  assert.equal(realizerDecisionSchema.safeParse({ ...base, message: "ага" }).success, false);
+  assert.equal(realizerDecisionSchema.safeParse({ ...base, addressCharacter: "P1" }).success, false);
+  assert.equal(realizerDecisionSchema.safeParse({ ...base, replyToMessage: "M1" }).success, false);
+});
+
+test("invalid P/M handles are invalid in the dynamic schema", () => {
+  const schema = buildRealizerResponseSchema(context.visibleMessages);
+  const speak = realizerSpeak();
+  assert.equal(schema.safeParse({ ...speak, addressCharacter: "P9" }).success, false);
+  assert.equal(schema.safeParse({ ...speak, replyToMessage: "M9" }).success, false);
+});
+
+test("malformed structured output is regenerated boundedly, then succeeds", async () => {
+  const realizer = realizerWithSequencedResponses([
+    { action: "silence" }, // malformed: missing all fields
+    realizerSilence(),
+  ]);
+  const decision = await realizer.realize(context);
+  assert.deepEqual(decision, realizerSilence());
+});
+
+test("persistent malformed structured output exhausts attempts and rejects", async () => {
+  const realizer = realizerWithSequencedResponses([
+    { action: "silence" },
+    { action: "silence" },
+    { action: "silence" },
+    { action: "silence" },
+  ]);
+  await assert.rejects(() => realizer.realize(context), RealizerStructuredOutputError);
+});
+
+test("an invalid speak decision is never reinterpreted as valid silence", async () => {
+  // A speak decision without a message must fail validation, not become silence.
+  const realizer = realizerWithSequencedResponses([
+    { ...realizerSpeak(), message: null },
+    { ...realizerSpeak(), message: null },
+    { ...realizerSpeak(), message: null },
+    { ...realizerSpeak(), message: null },
+  ]);
+  await assert.rejects(() => realizer.realize(context), RealizerStructuredOutputError);
 });

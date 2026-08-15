@@ -14,10 +14,10 @@ import { renderParticipantMemoryContexts } from "../src/long-term-memory/render-
 import { buildHandleChoices } from "../src/handles.js";
 import {
   buildRealizerResponseSchema,
-  realizerDecisionSchema,
   type TurnContext,
   type VisibleMessage,
-} from "../src/realizer-schema.js";
+} from "../src/realizer-response-schema.js";
+import { realizerDecisionSchema } from "../src/realizer-schema.js";
 import {
   SUMMARY_PREFIX,
   SUMMARY_PROMPT,
@@ -241,11 +241,11 @@ test("the dynamic realizer schema restricts handles to visible candidates", () =
   ];
   const schema = buildRealizerResponseSchema(candidates);
   const speak = realizerSpeak({ addressCharacter: "P1", replyToMessage: "M1" });
-  assert.equal(schema.safeParse({ decision: speak }).success, true);
+  assert.equal(schema.safeParse(speak).success, true);
   for (const bad of ["7001", "Юхим", "character 42", "P9", "M9"]) {
-    assert.equal(schema.safeParse({ decision: { ...speak, addressCharacter: bad } }).success,
+    assert.equal(schema.safeParse({ ...speak, addressCharacter: bad }).success,
       false, `addressCharacter=${bad}`);
-    assert.equal(schema.safeParse({ decision: { ...speak, replyToMessage: bad } }).success,
+    assert.equal(schema.safeParse({ ...speak, replyToMessage: bad }).success,
       false, `replyToMessage=${bad}`);
   }
 });

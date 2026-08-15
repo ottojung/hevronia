@@ -1,4 +1,7 @@
 import { fakeModel } from "@langchain/core/testing";
+import type { BaseMessageLike } from "@langchain/core/messages";
+import type { BaseLanguageModelInput } from "@langchain/core/language_models/base";
+import { RunnableLambda } from "@langchain/core/runnables";
 
 import type {
   AttentionPlanner,
@@ -14,11 +17,9 @@ import type {
   Scheduler,
 } from "../src/long-term-memory/runtime.js";
 import type { Realizer } from "../src/realizer.js";
-import type {
-  RealizerDecision,
-  SubjectiveJudgment,
-  TurnContext,
-} from "../src/realizer-schema.js";
+import type { StructuredOutputChatModel } from "../src/realizer-call.js";
+import type { RealizerDecision } from "../src/realizer-schema.js";
+import type { TurnContext } from "../src/realizer-response-schema.js";
 
 /** Builds a conversation layer with stub models so unit tests never need keys. */
 export function testLayer(
@@ -34,70 +35,32 @@ export function testLayer(
   });
 }
 
-function judgment(leading: string, alternative: string, whyRejected: string): SubjectiveJudgment {
-  return { leading, alternative, whyRejected };
-}
-
 export function realizerSilence(): RealizerDecision {
   return {
     action: "silence",
     addressCharacter: null,
     replyToMessage: null,
     message: null,
-    interpretation: judgment(
-      "You read this as an ordinary moment with nothing at stake for you.",
-      "They are making a small bid for your attention.",
-      "Nothing here engages you personally enough to matter.",
-    ),
+    interpretation: "You read this as an ordinary moment with nothing at stake for you.",
     presentMind: {
       primary: "A light ordinary message arrives and nothing in particular grabs you in it.",
       secondary: ["The mention of a shared ordinary moment faintly tugs at the memory of evenings at home."],
     },
-    characterIntent: judgment(
-      "They are just chatting idly, without any clear purpose toward you.",
-      "They are quietly testing whether you are still listening.",
-      "Their message names no one and asks for no response.",
-    ),
-    realityCheck: judgment(
-      "Their words reach you effortlessly from a distance, as though distance no longer constrained talk.",
-      "The content itself could fit ordinary face-to-face talk back home.",
-      "It is the effortless transmission, not the subject, that diverges from remembered reality.",
-    ),
-    dreamIntent: judgment(
-      "The dream appears to be producing ordinary low-significance social material.",
-      "The quiet moment may be drawing attention to something not yet noticed.",
-      "Nothing here has changed or become strange enough to support a stronger reading.",
-    ),
-    feltState: judgment(
-      "This leaves you quietly indifferent.",
-      "This leaves you faintly curious.",
-      "There is nothing new enough here to spark real interest.",
-    ),
-    activeDesire: judgment(
-      "You want nothing from speaking right now.",
-      "You want to keep the peace of the moment unbroken.",
-      "No live urge supports spending attention on this.",
-    ),
-    desiredOutcome: judgment(
-      "You want the present calm to remain undisturbed.",
-      "You want to stay ready in case something more interesting appears.",
-      "Disturbing the calm would serve nothing you actually want.",
-    ),
-    opportunity: judgment(
-      "You notice no opportunity here that advances anything you want.",
-      "You could acknowledge them and test how they respond.",
-      "Without an active desire, that opportunity is not worth taking.",
-    ),
-    fiveTurnStrategy: judgment(
-      "You decide that staying silent serves you best for the next several turns.",
-      "You could offer a one-word acknowledgment and see what follows.",
-      "Saying nothing costs nothing and keeps the calm you want.",
-    ),
-    fiftyTurnStrategy: judgment(
-      "You want to remain a quiet presence who engages when something genuinely matters.",
-      "You could keep the contact going regardless of its value.",
-      "Sustained contact with no personal value serves none of your enduring aims.",
-    ),
+    characterIntent: "They are just chatting idly, without any clear purpose toward you.",
+    realityCheck: {
+      status: "none",
+      content: "Nothing in this ordinary moment exposes a grounded difference in how remembered reality works.",
+    },
+    dreamIntent: "The dream appears to be producing ordinary low-significance social material.",
+    feltState: "This leaves you quietly indifferent.",
+    activeDesire: {
+      strength: "none",
+      content: "No actual unsatisfied want arose from this moment.",
+    },
+    desiredOutcome: "You want the present calm to remain undisturbed.",
+    opportunity: "You notice no opportunity here that advances anything you want.",
+    fiveTurnStrategy: "Staying silent serves you best for the next several turns.",
+    fiftyTurnStrategy: "You want to remain a quiet presence who engages when something genuinely matters.",
   };
 }
 
@@ -109,60 +72,26 @@ export function realizerSpeak(
     addressCharacter: "P1",
     replyToMessage: null,
     message: "ага",
-    interpretation: judgment(
-      "You understand this as an ordinary moment worth a short reply.",
-      "This is a small bid for your attention that deserves more.",
-      "Their light, casual phrasing matches a short reply.",
-    ),
+    interpretation: "You understand this as an ordinary moment worth a short reply.",
     presentMind: {
       primary: "You notice the light casual tone and feel a small impulse to answer in kind.",
       secondary: ["You register that they are still a stranger and hold yourself back."],
     },
-    characterIntent: judgment(
-      "They want a quick reaction from you.",
-      "They are simply passing time in company.",
-      "The open phrasing invites a reply more than a report.",
-    ),
-    realityCheck: judgment(
-      "Their words appear instantly from a distance, as though distance had become trivial.",
-      "The light topic would be unremarkable face-to-face back home.",
-      "What fails to fit remembered reality is the medium of contact, not the tone.",
-    ),
-    dreamIntent: judgment(
-      "The dream seems to be maintaining an ordinary, unremarkable interaction.",
-      "The dream may be presenting a light exchange to see how you handle it.",
-      "There is no larger pattern yet to support a stronger interpretation.",
-    ),
-    feltState: judgment(
-      "This leaves you mildly interested.",
-      "This leaves you neutral and unengaged.",
-      "The message has enough color to hold your attention briefly.",
-    ),
-    activeDesire: judgment(
-      "You want to acknowledge them simply.",
-      "You want to keep the exchange at a distance.",
-      "A small acknowledgment fits the light tone without investing much.",
-    ),
-    desiredOutcome: judgment(
-      "You want the moment to be acknowledged without fuss.",
-      "You want the conversation to deepen into something more personal.",
-      "There is no relationship weight here to justify more.",
-    ),
-    opportunity: judgment(
-      "You notice the present interaction gives you room to say a few words.",
-      "You could steer the topic toward something that interests you more.",
-      "A short reply serves your light aim without commandeering the chat.",
-    ),
-    fiveTurnStrategy: judgment(
-      "You decide to say something short now and see how it lands.",
-      "You decide to stay silent and let the moment pass.",
-      "A short reply acknowledges them without overinvesting.",
-    ),
-    fiftyTurnStrategy: judgment(
-      "You are not building anything long-term with this person yet.",
-      "You could invest in a deeper long-term connection with them.",
-      "There is no established relationship weight to justify a long-term investment.",
-    ),
+    characterIntent: "They want a quick reaction from you.",
+    realityCheck: {
+      status: "none",
+      content: "Nothing in this light exchange exposes a grounded difference in how remembered reality works.",
+    },
+    dreamIntent: "The dream seems to be maintaining an ordinary, unremarkable interaction.",
+    feltState: "This leaves you mildly interested.",
+    activeDesire: {
+      strength: "weak",
+      content: "You want to acknowledge them simply.",
+    },
+    desiredOutcome: "You want the moment to be acknowledged without fuss.",
+    opportunity: "You notice the present interaction gives you room to say a few words.",
+    fiveTurnStrategy: "Say something short now and see how it lands.",
+    fiftyTurnStrategy: "You are not building anything long-term with this person yet.",
     ...overrides,
   };
 }
@@ -333,4 +262,57 @@ export function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => voi
   let resolve: (value: T) => void = () => undefined;
   const promise = new Promise<T>((res) => { resolve = res; });
   return { promise, resolve };
+}
+
+/**
+ * A minimal chat model whose structured-output path returns a fixed decision
+ * while recording every message array it was invoked with. Used in tests that
+ * need to inspect the exact prompt sent to the realizer, where the stock fake's
+ * structured-output path (which returns a fixed value and ignores messages)
+ * cannot capture input.
+ */
+export class CapturingStructuredChatModel implements StructuredOutputChatModel {
+  readonly calls: BaseMessageLike[][] = [];
+
+  constructor(private readonly response: unknown) {}
+
+  withStructuredOutput(): RunnableLambda<BaseLanguageModelInput, unknown> {
+    return RunnableLambda.from(async (input: BaseLanguageModelInput) => {
+      this.calls.push(Array.isArray(input) ? input : []);
+      return this.response;
+    });
+  }
+}
+
+/**
+ * A minimal chat model whose structured-output path returns a fixed sequence
+ * of values, one per invocation. Used to verify bounded regeneration: a
+ * malformed first decision is retried and a later valid one is returned.
+ */
+export class SequencedStructuredChatModel implements StructuredOutputChatModel {
+  private index = 0;
+  constructor(private readonly responses: unknown[]) {}
+
+  withStructuredOutput(): RunnableLambda<BaseLanguageModelInput, unknown> {
+    return RunnableLambda.from(async () => {
+      const value = this.responses[this.index];
+      this.index += 1;
+      return value;
+    });
+  }
+}
+
+/**
+ * A minimal chat model whose structured-output path throws the given error on
+ * every invocation, so a realizer generation failure can be exercised end to
+ * end without relying on the stock fake's raw-message queue.
+ */
+export class ThrowingStructuredChatModel implements StructuredOutputChatModel {
+  constructor(private readonly error: Error) {}
+
+  withStructuredOutput(): RunnableLambda<BaseLanguageModelInput, unknown> {
+    return RunnableLambda.from(async () => {
+      throw this.error;
+    });
+  }
 }

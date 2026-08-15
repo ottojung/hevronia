@@ -18,7 +18,7 @@ import {
 import { buildHandleChoices } from "../src/handles.js";
 import { applyProposedNames } from "../src/natural-names/apply.js";
 import { createNaturalNameStore } from "../src/natural-names/store.js";
-import type { TurnContext } from "../src/realizer-schema.js";
+import type { TurnContext } from "../src/realizer-response-schema.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 
 function message(overrides: Partial<ObservedTelegramMessage> = {}): ObservedTelegramMessage {
@@ -50,7 +50,7 @@ function plannerWithResponse(content: string) {
 }
 
 test("missingNaturalNameChoices derives only unnamed visible users with aligned handles", () => {
-  const visible: import("../src/realizer-schema.js").VisibleMessage[] = [
+  const visible: import("../src/realizer-response-schema.js").VisibleMessage[] = [
     { messageId: 1, sender: { kind: "user", id: 52 }, senderDisplayName: "SuperBob3000",
       senderUsername: "super_bob3000", text: "a" },
     { messageId: 2, sender: { kind: "user", id: 63 }, senderDisplayName: "137^WT&^t1g3y",
@@ -162,7 +162,7 @@ test("the provider value schema encodes the Cyrillic alias or null restriction",
 });
 
 test("the latest visible Telegram metadata wins for a recurring sender", async () => {
-  const visible: import("../src/realizer-schema.js").VisibleMessage[] = [
+  const visible: import("../src/realizer-response-schema.js").VisibleMessage[] = [
     { messageId: 1, sender: { kind: "user", id: 52 }, senderDisplayName: "Bob",
       senderUsername: null, text: "old" },
     { messageId: 2, sender: { kind: "user", id: 52 }, senderDisplayName: "SuperBob3000",

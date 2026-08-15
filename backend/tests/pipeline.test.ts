@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { AIMessage } from "@langchain/core/messages";
-import { fakeModel } from "@langchain/core/testing";
+import { BaseMessage } from "@langchain/core/messages";
 import { ChatOpenAI } from "@langchain/openai";
 
 import type { PlannerDecisionLog } from "../src/attention-planner.js";
@@ -19,9 +18,11 @@ import {
 import { SYSTEM_PROMPT } from "../src/personality.js";
 import { createRealizer } from "../src/realizer.js";
 import type { RealizerDecisionLog } from "../src/realizer.js";
+import type { ActiveDesire, RealityCheck } from "../src/realizer-schema.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 import { formatPlannerLog, formatRealizerLog } from "../scripts/conversations/diagnostics.js";
 import {
+  CapturingStructuredChatModel,
   filteringPlanner,
   passingPlanner,
   realizerSilence,
@@ -247,12 +248,7 @@ test("the planner model is cheap with low thinking; the realizer is smart withou
 
 test("the realizer receives the full personality, history, and memories, not planner psychology", async () => {
   const dir = tempDir();
-  const captured: string[] = [];
-  const model = fakeModel();
-  model.respond((messages) => {
-    captured.push(messages.map((item) => typeof item.content === "string" ? item.content : JSON.stringify(item.content)).join("\n"));
-    return new AIMessage(JSON.stringify({ decision: realizerSpeak({ message: "ага" }) }));
-  });
+  const model = new CapturingStructuredChatModel(realizerSpeak({ message: "ага" }));
   const planner = stubPlanner((context) => context.participantMemories.length === 0);
   const layer = testLayer(path.join(dir, "db.sqlite"), {
     planner,
@@ -261,7 +257,10 @@ test("the realizer receives the full personality, history, and memories, not pla
   try {
     await layer.respond({ threadId, message: message(),
       hevroniaSender: { kind: "user", id: 999 }, senderIsBot: false });
-    const input = captured.join("\n");
+    const input = model.calls.map((messages) => messages.map((item) =>
+      BaseMessage.isInstance(item)
+        ? (typeof item.content === "string" ? item.content : JSON.stringify(item.content))
+        : String(item)).join("\n")).join("\n");
     assert.match(input, /You are Хевронія/);
     assert.match(input, /Character 88 in your notebook has not acquired a natural name yet\.\nTelegram currently displays them as “Іра”\./);
     assert.match(input, /Your sleeping mind made character 88 say:/);
@@ -289,34 +288,36 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   assert.ok(failure.includes("передано реалізатору"));
   assert.ok(failure.includes("boom"));
 
-  const judgment = (leading: string) => ({ leading, alternative: "alt", whyRejected: "why" });
+  const text = (v: string) => v;
   const presentMind = (primary: string) => ({ primary, secondary: [] });
-  const realityCheck = (leading: string) => ({ leading, alternative: "alt", whyRejected: "why" });
+  const realityCheck = (content: string): RealityCheck => ({ status: "none", content });
+  const activeDesire = (content: string): ActiveDesire => ({ strength: "none", content });
   const silenceLog: RealizerDecisionLog = {
     action: "silence",
-    interpretation: judgment("i"), presentMind: presentMind("pm"), characterIntent: judgment("c"),
-    realityCheck: realityCheck("r"), dreamIntent: judgment("d"), feltState: judgment("f"),
-    activeDesire: judgment("a"), desiredOutcome: judgment("o"), opportunity: judgment("o"),
-    fiveTurnStrategy: judgment("s5"), fiftyTurnStrategy: judgment("s50"),
+    interpretation: text("i"), presentMind: presentMind("pm"), characterIntent: text("c"),
+    realityCheck: realityCheck("r"), dreamIntent: text("d"), feltState: text("f"),
+    activeDesire: activeDesire("a"), desiredOutcome: text("o"), opportunity: text("o"),
+    fiveTurnStrategy: text("s5"), fiftyTurnStrategy: text("s50"),
   };
   const silence = formatRealizerLog(silenceLog);
   assert.ok(silence.startsWith("Реалізатор: [silence]"));
-  assert.ok(silence.includes("  interpretation:"));
-  assert.ok(silence.includes("    leading: i"));
-  assert.ok(silence.includes("    alternative: alt"));
-  assert.ok(silence.includes("    whyRejected: why"));
+  assert.ok(silence.includes("  interpretation: i"));
+  assert.ok(silence.includes("  presentMind:"));
+  assert.ok(silence.includes("    primary: pm"));
+  assert.ok(silence.includes("  realityCheck:"));
+  assert.ok(silence.includes("    status: none"));
 
   const speakLog: RealizerDecisionLog = {
     action: "speak", addressLabel: "character 42", replyToLabel: "M1 → Іра",
-    interpretation: judgment("i"), presentMind: presentMind("pm"), characterIntent: judgment("c"),
-    realityCheck: realityCheck("r"), dreamIntent: judgment("d"), feltState: judgment("f"),
-    activeDesire: judgment("a"), desiredOutcome: judgment("o"), opportunity: judgment("o"),
-    fiveTurnStrategy: judgment("s5"), fiftyTurnStrategy: judgment("s50"),
+    interpretation: text("i"), presentMind: presentMind("pm"), characterIntent: text("c"),
+    realityCheck: realityCheck("r"), dreamIntent: text("d"), feltState: text("f"),
+    activeDesire: activeDesire("a"), desiredOutcome: text("o"), opportunity: text("o"),
+    fiveTurnStrategy: text("s5"), fiftyTurnStrategy: text("s50"),
   };
   const speak = formatRealizerLog(speakLog);
   assert.ok(speak.startsWith("Реалізатор: speak → character 42"));
   assert.ok(speak.includes("  replyTo: M1 → Іра"));
-  assert.ok(speak.includes("    leading: i"));
-  assert.ok(speak.includes("    alternative: alt"));
-  assert.ok(speak.includes("    whyRejected: why"));
+  assert.ok(speak.includes("  interpretation: i"));
+  assert.ok(speak.includes("  activeDesire:"));
+  assert.ok(speak.includes("    strength: none"));
 });

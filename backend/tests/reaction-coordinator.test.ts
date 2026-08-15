@@ -15,7 +15,7 @@ import {
 import { isReactionCancelledError, ReactionCancelledError } from "../src/reaction-cancelled.js";
 import type { AttentionPlanner } from "../src/attention-planner.js";
 import type { Realizer } from "../src/realizer.js";
-import type { TurnContext } from "../src/realizer-schema.js";
+import type { TurnContext } from "../src/realizer-response-schema.js";
 import type { TelegramTurnDelivery } from "../src/telegram-delivery.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 import {
