@@ -77,9 +77,10 @@ test("the dynamic schema restricts addressCharacter and replyToMessage to visibl
 test("every decision field is required; there are no optional fields", () => {
   const shape = realizerDecisionObjectSchema.shape;
   const topLevelKeys = [
-    "interpretation", "presentMind", "characterIntent", "realityRelation", "dreamIntent",
-    "feltState", "activeDesire", "desiredOutcome", "opportunity", "fiveTurnStrategy",
-    "fiftyTurnStrategy", "action", "message", "addressCharacter", "replyToMessage",
+    "interpretation", "presentMind", "characterIntent", "interactionFrame", "realityRelation",
+    "dreamIntent", "feltState", "activeDesire", "desiredOutcome", "opportunity",
+    "fiveTurnStrategy", "fiftyTurnStrategy", "action", "message", "addressCharacter",
+    "replyToMessage",
   ];
   assert.deepEqual(Object.keys(shape).sort(), [...topLevelKeys].sort());
 
@@ -99,34 +100,40 @@ test("every decision field is required; there are no optional fields", () => {
     ...base, presentMind: { immediate: "i" },
   }).success, false, "presentMind missing culturalThought and foreground");
   assert.equal(realizerDecisionSchema.safeParse({
-    ...base, presentMind: { immediate: "i", culturalThought: "c" },
+    ...base, presentMind: { immediate: "i", culturalThought: { content: "c", whyNow: "w" } },
   }).success, false, "presentMind missing foreground");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, presentMind: { immediate: "i", culturalThought: { content: "c" }, foreground: "f" },
+  }).success, false, "culturalThought missing whyNow");
   assert.deepEqual(Object.keys(realityRelationSchema.shape).sort(),
     ["content", "kind"]);
   const activeDesireShape = activeDesireSchema._def.schema.shape;
   assert.deepEqual(Object.keys(activeDesireShape).sort(),
-    ["basis", "content", "motive", "strength"]);
+    ["basis", "content", "motive", "strength", "whyNow"]);
 });
 
-test("activeDesire requires a closed motive, a basis, and no none values", () => {
+test("activeDesire requires a closed motive, a basis, whyNow, and no none values", () => {
   const base = realizerSilence();
   assert.equal(realizerDecisionSchema.safeParse({
-    ...base, activeDesire: { strength: "weak", content: "x", basis: "b" },
+    ...base, activeDesire: { strength: "weak", content: "x", basis: "b", whyNow: "w" },
   }).success, false, "missing motive");
   assert.equal(realizerDecisionSchema.safeParse({
-    ...base, activeDesire: { motive: "none", strength: "weak", content: "x", basis: "b" },
+    ...base, activeDesire: { motive: "none", strength: "weak", content: "x", basis: "b", whyNow: "w" },
   }).success, false, "none motive is invalid");
   assert.equal(realizerDecisionSchema.safeParse({
-    ...base, activeDesire: { motive: "other", strength: "weak", content: "x", basis: "b" },
+    ...base, activeDesire: { motive: "other", strength: "weak", content: "x", basis: "b", whyNow: "w" },
   }).success, false, "catch-all other is invalid");
   assert.equal(realizerDecisionSchema.safeParse({
-    ...base, activeDesire: { motive: "softPower", strength: "none", content: "x", basis: "b" },
+    ...base, activeDesire: { motive: "softPower", strength: "none", content: "x", basis: "b", whyNow: "w" },
   }).success, false, "none strength is invalid");
   assert.equal(realizerDecisionSchema.safeParse({
-    ...base, activeDesire: { motive: "gossip", strength: "moderate", content: "x" },
+    ...base, activeDesire: { motive: "gossip", strength: "moderate", content: "x", whyNow: "w" },
   }).success, false, "missing basis");
   assert.equal(realizerDecisionSchema.safeParse({
     ...base, activeDesire: { motive: "gossip", strength: "moderate", content: "x", basis: "b" },
+  }).success, false, "missing whyNow");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, activeDesire: { motive: "gossip", strength: "moderate", content: "x", basis: "b", whyNow: "w" },
   }).success, true);
 });
 
@@ -137,13 +144,33 @@ test("the motive enum is exactly the approved closed set", () => {
 
 test("presentMind fields are all required and non-empty", () => {
   assert.equal(realizerDecisionSchema.safeParse({
-    ...realizerSilence(), presentMind: { immediate: "i", culturalThought: "c" },
+    ...realizerSilence(), presentMind: { immediate: "i", culturalThought: { content: "c", whyNow: "w" } },
   }).success, false, "missing foreground");
   assert.equal(realizerDecisionSchema.safeParse({
     ...realizerSilence(),
-    presentMind: { immediate: "i", culturalThought: "   ", foreground: "f" },
-  }).success, false, "blank culturalThought");
+    presentMind: { immediate: "i", culturalThought: { content: "   ", whyNow: "w" }, foreground: "f" },
+  }).success, false, "blank culturalThought content");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...realizerSilence(),
+    presentMind: { immediate: "i", culturalThought: { content: "c", whyNow: "   " }, foreground: "f" },
+  }).success, false, "blank culturalThought whyNow");
   assert.equal(realizerDecisionSchema.safeParse(realizerSilence()).success, true);
+});
+
+test("interactionFrame requires a valid kind, stance, and reason; there is no none", () => {
+  const base = realizerSilence();
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, interactionFrame: { kind: "none", stance: "accept", reason: "r" },
+  }).success, false, "none kind invalid");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, interactionFrame: { kind: "imposed", stance: "reject" },
+  }).success, false, "missing reason");
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, interactionFrame: { kind: "open", stance: "accept", reason: "r" },
+  }).success, true);
+  assert.equal(realizerDecisionSchema.safeParse({
+    ...base, interactionFrame: { kind: "imposed", stance: "reject", reason: "Technical-support role imposed on my attention." },
+  }).success, true);
 });
 
 test("realityRelation requires a valid kind and content; there is no none", () => {
@@ -172,6 +199,7 @@ test("silence is strategic under an active motive, never motivational emptiness"
     .includes(decision.activeDesire.motive), true);
   assert.ok(decision.activeDesire.content.length > 0);
   assert.ok(decision.activeDesire.basis.length > 0);
+  assert.ok(decision.activeDesire.whyNow.length > 0);
   assert.ok(decision.desiredOutcome.length > 0);
   assert.ok(decision.opportunity.length > 0);
   assert.ok(decision.fiveTurnStrategy.length > 0);
@@ -183,7 +211,8 @@ test("weak activeDesire plus speak is valid", () => {
   const decision = realizerSpeak({
     activeDesire: { motive: "softPower", strength: "weak",
       content: "You want Bob to understand this way of seeing the situation.",
-      basis: "It is a real valued distinction, Bob does not yet carry it, and you want it in his mind." },
+      basis: "It is a real valued distinction, Bob does not yet carry it, and you want it in his mind.",
+      whyNow: "His account of rebuilding makes the distinction actively want to be shared now." },
   });
   assert.equal(realizerDecisionSchema.safeParse(decision).success, true);
 });

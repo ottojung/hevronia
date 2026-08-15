@@ -18,7 +18,7 @@ import {
 import { SYSTEM_PROMPT } from "../src/personality.js";
 import { createRealizer } from "../src/realizer.js";
 import type { RealizerDecisionLog } from "../src/realizer.js";
-import type { ActiveDesire, RealityRelation } from "../src/realizer-schema.js";
+import type { ActiveDesire, InteractionFrame, RealityRelation } from "../src/realizer-schema.js";
 import type { ObservedTelegramMessage } from "../src/telegram-event.js";
 import { formatPlannerLog, formatRealizerLog } from "../scripts/conversations/diagnostics.js";
 import {
@@ -290,15 +290,18 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
 
   const text = (v: string) => v;
   const presentMind = (immediate: string) =>
-    ({ immediate, culturalThought: "ct", foreground: "fg" });
+    ({ immediate, culturalThought: { content: "ct", whyNow: "w" }, foreground: "fg" });
+  const interactionFrame = (): InteractionFrame =>
+    ({ kind: "open", stance: "accept", reason: "r" });
   const realityRelation = (content: string): RealityRelation =>
     ({ kind: "difference", content });
   const activeDesire = (content: string): ActiveDesire =>
-    ({ motive: "softPower", strength: "weak", content, basis: "b" });
+    ({ motive: "softPower", strength: "weak", content, basis: "b", whyNow: "w" });
   const silenceLog: RealizerDecisionLog = {
     action: "silence",
     interpretation: text("i"), presentMind: presentMind("pm"), characterIntent: text("c"),
-    realityRelation: realityRelation("r"), dreamIntent: text("d"), feltState: text("f"),
+    interactionFrame: interactionFrame(), realityRelation: realityRelation("r"),
+    dreamIntent: text("d"), feltState: text("f"),
     activeDesire: activeDesire("a"), desiredOutcome: text("o"), opportunity: text("o"),
     fiveTurnStrategy: text("s5"), fiftyTurnStrategy: text("s50"),
   };
@@ -308,13 +311,16 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   assert.ok(silence.includes("  presentMind:"));
   assert.ok(silence.includes("    immediate: pm"));
   assert.ok(silence.includes("    culturalThought: ct"));
+  assert.ok(silence.includes("  interactionFrame:"));
+  assert.ok(silence.includes("    kind: open"));
   assert.ok(silence.includes("  realityRelation:"));
   assert.ok(silence.includes("    kind: difference"));
 
   const speakLog: RealizerDecisionLog = {
     action: "speak", addressLabel: "character 42", replyToLabel: "M1 → Іра",
     interpretation: text("i"), presentMind: presentMind("pm"), characterIntent: text("c"),
-    realityRelation: realityRelation("r"), dreamIntent: text("d"), feltState: text("f"),
+    interactionFrame: interactionFrame(), realityRelation: realityRelation("r"),
+    dreamIntent: text("d"), feltState: text("f"),
     activeDesire: activeDesire("a"), desiredOutcome: text("o"), opportunity: text("o"),
     fiveTurnStrategy: text("s5"), fiftyTurnStrategy: text("s50"),
   };

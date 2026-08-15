@@ -44,10 +44,18 @@ export function realizerSilence(): RealizerDecision {
     interpretation: "You read this as an ordinary moment with a story you could place, but nothing needs saying now.",
     presentMind: {
       immediate: "A light ordinary message arrives and you notice its casual, unguarded tone.",
-      culturalThought: "You are thinking about the part of Lothar's story where people fled Stormwind and had to decide what possessions to carry.",
+      culturalThought: {
+        content: "The image of people fleeing Stormwind with Lothar and deciding what possessions to carry.",
+        whyNow: "Homesickness from earlier turns has kept the image of people carrying pieces of home active.",
+      },
       foreground: "The casual message stays light, while the image of the refugees deciding what to carry quietly holds your attention.",
     },
     characterIntent: "They are just chatting idly, without any clear purpose toward you.",
+    interactionFrame: {
+      kind: "open",
+      stance: "accept",
+      reason: "A harmless social opening that leaves me free and infringes nothing.",
+    },
     realityRelation: {
       kind: "difference",
       content: "Here a person chats freely with a total stranger, where back home most talk ran through people who knew each other, or quickly became known.",
@@ -59,6 +67,7 @@ export function realizerSilence(): RealizerDecision {
       strength: "weak",
       content: "You want this stranger to carry the image of refugees choosing which pieces of home to take after Stormwind fell.",
       basis: "It is a real valued inherited story, they do not yet have this image, and putting it into their mind serves your standing soft-power desire.",
+      whyNow: "The image has stayed emotionally foregrounded through recent turns, and you now genuinely want another mind to carry it.",
     },
     desiredOutcome: "The stranger now holds that image of the refugees deciding what to carry.",
     opportunity: "Their easy, unguarded presence gives the story somewhere to land whenever you choose to share it.",
@@ -78,10 +87,18 @@ export function realizerSpeak(
     interpretation: "You understand this as an ordinary moment worth a short reply.",
     presentMind: {
       immediate: "You notice the light casual tone and feel a small impulse to answer in kind.",
-      culturalThought: "You are thinking of the Uther stories from childhood — that a person could be so strong and still believe strength must answer to something.",
+      culturalThought: {
+        content: "The Uther stories from childhood — a person so strong who still believed strength must answer to something.",
+        whyNow: "The current discussion of power and responsibility directly evokes that inherited image.",
+      },
       foreground: "The casual tone feels familiar and warm, and the Uther image sits beside it, unforced.",
     },
     characterIntent: "They want a quick reaction from you.",
+    interactionFrame: {
+      kind: "offered",
+      stance: "accept",
+      reason: "A friendly topic is proposed without assigning me any function.",
+    },
     realityRelation: {
       kind: "correspondence",
       content: "The brisk exchange of pleasantries closely resembles the easy patter of people trading news in a market square at home.",
@@ -93,6 +110,7 @@ export function realizerSpeak(
       strength: "weak",
       content: "You want them to have the Uther image: strength that believes it must answer to something.",
       basis: "It is a real valued story from home, they do not yet carry this image, and you want it to exist in their mind.",
+      whyNow: "Their talk of power and responsibility makes the image actively want to be shared now.",
     },
     desiredOutcome: "They now hold that image of strength answerable to conscience.",
     opportunity: "Their light tone gives the image a natural opening if you let it surface.",
