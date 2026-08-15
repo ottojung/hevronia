@@ -105,7 +105,6 @@ test("all ten contrastive fields carry leading/alternative/whyRejected in both s
       const value = decision[field];
       assert.equal(typeof value.leading, "string");
       assert.ok(value.leading.length >= 1, `leading of ${field}`);
-      if (field === "realityCheck") continue;
       assert.equal(typeof value.alternative, "string");
       assert.ok(value.alternative.length >= 1, `alternative of ${field}`);
       assert.equal(typeof value.whyRejected, "string");
@@ -209,7 +208,7 @@ test("the OpenAI provider schema nests the required judgment fields", () => {
   assert.ok(serialized.includes('"whyRejected"'));
   assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
   const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
-  assert.equal(judgments.length, 9);
+  assert.equal(judgments.length, 10);
 });
 
 test("the Gemini provider schema nests the required judgment fields", () => {
@@ -219,7 +218,7 @@ test("the Gemini provider schema nests the required judgment fields", () => {
   assert.ok(serialized.includes('"whyRejected"'));
   assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
   const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
-  assert.equal(judgments.length, 9);
+  assert.equal(judgments.length, 10);
 });
 
 test("malformed provider responses are rejected", async () => {
