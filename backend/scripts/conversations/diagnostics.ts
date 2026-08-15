@@ -1,6 +1,6 @@
 import type { PlannerDecisionLog } from "../../src/attention-planner.js";
 import type { RealizerDecisionLog } from "../../src/realizer.js";
-import type { SubjectiveJudgment } from "../../src/realizer-schema.js";
+import type { PresentMind, RealityCheckJudgment, SubjectiveJudgment } from "../../src/realizer-schema.js";
 
 function singleLine(text: string): string {
   return text.replaceAll(/\s+/gu, " ").trim();
@@ -12,6 +12,28 @@ function formatJudgment(label: string, judgment: SubjectiveJudgment): string {
     `    leading: ${singleLine(judgment.leading)}`,
     `    alternative: ${singleLine(judgment.alternative)}`,
     `    whyRejected: ${singleLine(judgment.whyRejected)}`,
+  ].join("\n");
+}
+
+function formatRealityCheck(judgment: RealityCheckJudgment): string {
+  const parts = [`  realityCheck:`, `    leading: ${singleLine(judgment.leading)}`];
+  if (judgment.alternative !== undefined) {
+    parts.push(`    alternative: ${singleLine(judgment.alternative)}`);
+  }
+  if (judgment.whyRejected !== undefined) {
+    parts.push(`    whyRejected: ${singleLine(judgment.whyRejected)}`);
+  }
+  return parts.join("\n");
+}
+
+function formatPresentMind(presentMind: PresentMind): string {
+  const secondary = presentMind.secondary.length === 0
+    ? "—"
+    : presentMind.secondary.map(singleLine).join(" | ");
+  return [
+    "  presentMind:",
+    `    primary: ${singleLine(presentMind.primary)}`,
+    `    secondary: ${secondary}`,
   ].join("\n");
 }
 
@@ -39,11 +61,11 @@ export function formatPlannerLog(log: PlannerDecisionLog): string {
 function formatJudgments(log: Extract<RealizerDecisionLog, { action: "silence" | "speak" }>): string {
   return [
     formatJudgment("interpretation", log.interpretation),
+    formatPresentMind(log.presentMind),
     formatJudgment("characterIntent", log.characterIntent),
-    formatJudgment("realityCheck", log.realityCheck),
+    formatRealityCheck(log.realityCheck),
     formatJudgment("dreamIntent", log.dreamIntent),
     formatJudgment("feltState", log.feltState),
-    formatJudgment("presentMind", log.presentMind),
     formatJudgment("activeDesire", log.activeDesire),
     formatJudgment("desiredOutcome", log.desiredOutcome),
     formatJudgment("opportunity", log.opportunity),
