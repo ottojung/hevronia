@@ -1,5 +1,11 @@
 import { buildHandleChoices } from "./handles.js";
-import { subjectiveJudgmentKeys, type ConstFreeJsonSchema, type VisibleMessage } from "./realizer-schema.js";
+import {
+  presentMindKeys,
+  realityCheckKeys,
+  subjectiveJudgmentKeys,
+  type ConstFreeJsonSchema,
+  type VisibleMessage,
+} from "./realizer-schema.js";
 
 function subjectiveJudgmentJson(additionalProperties: boolean): Record<string, unknown> {
   return {
@@ -12,15 +18,44 @@ function subjectiveJudgmentJson(additionalProperties: boolean): Record<string, u
   };
 }
 
+function realityCheckJson(additionalProperties: boolean): Record<string, unknown> {
+  return {
+    type: "object",
+    ...(additionalProperties ? { additionalProperties: false } : {}),
+    properties: Object.fromEntries(
+      realityCheckKeys.map((key) => [key, { type: "string", minLength: 1 }]),
+    ),
+    required: ["leading"],
+  };
+}
+
+function presentMindJson(additionalProperties: boolean): Record<string, unknown> {
+  return {
+    type: "object",
+    ...(additionalProperties ? { additionalProperties: false } : {}),
+    properties: {
+      primary: { type: "string", minLength: 1 },
+      secondary: { type: "array", items: { type: "string", minLength: 1 } },
+    },
+    required: [...presentMindKeys],
+  };
+}
+
 /**
  * Builds the realizer's decision shape as a plain, fully inlined JSON Schema
- * with no `$ref` or `$defs`: every field is repeated literally in both
- * variants. OpenAI's structured-output validation rejects references that do
- * not point to top-level definitions, so inlining keeps one schema usable by
- * every provider. The zod schema (`buildRealizerResponseSchema`) remains the
- * source of truth for the typed client-side parse; these schemas only
- * constrain the generated output, so `const` is replaced with single-element
- * `enum` values.
+ * with no `$ref` or `$defs`: every field is repeated literally. OpenAI's
+ * structured-output validation rejects references that do not point to
+ * top-level definitions, so inlining keeps one schema usable by every provider.
+ * The zod schema (`buildRealizerResponseSchema`) remains the source of truth
+ * for the typed client-side parse; these schemas only constrain the generated
+ * output, so `const` is replaced with single-element `enum` values.
+ *
+ * The property order follows the causal order of generation: the internal
+ * fields (interpretation, presentMind, characterIntent, realityCheck,
+ * dreamIntent, feltState, activeDesire, desiredOutcome, opportunity,
+ * fiveTurnStrategy, fiftyTurnStrategy) come before `action`, and `action`
+ * comes before the speak-only addressing and message fields. The model must
+ * generate the state that determines the choice before it chooses the action.
  */
 export function buildRealizerJsonSchema(
   candidates: readonly VisibleMessage[],
@@ -28,46 +63,39 @@ export function buildRealizerJsonSchema(
 ): ConstFreeJsonSchema {
   const choices = buildHandleChoices(candidates);
   const objectKeywords = strict ? { additionalProperties: false } : {};
-  const subjectiveFields = {
+  const decisionFields = {
     interpretation: subjectiveJudgmentJson(strict),
+    presentMind: presentMindJson(strict),
     characterIntent: subjectiveJudgmentJson(strict),
-    realityCheck: subjectiveJudgmentJson(strict),
+    realityCheck: realityCheckJson(strict),
     dreamIntent: subjectiveJudgmentJson(strict),
     feltState: subjectiveJudgmentJson(strict),
-    presentMind: subjectiveJudgmentJson(strict),
     activeDesire: subjectiveJudgmentJson(strict),
     desiredOutcome: subjectiveJudgmentJson(strict),
     opportunity: subjectiveJudgmentJson(strict),
     fiveTurnStrategy: subjectiveJudgmentJson(strict),
     fiftyTurnStrategy: subjectiveJudgmentJson(strict),
-  };
-  const silenceVariant = {
-    type: "object",
-    ...objectKeywords,
-    properties: { action: { type: "string", enum: ["silence"] }, ...subjectiveFields },
-    required: ["action", "interpretation", "characterIntent", "realityCheck", "dreamIntent",
-      "feltState", "presentMind", "activeDesire", "desiredOutcome", "opportunity",
-      "fiveTurnStrategy", "fiftyTurnStrategy"],
-  };
-  const speakVariant = {
-    type: "object",
-    ...objectKeywords,
-    properties: {
-      action: { type: "string", enum: ["speak"] },
-      addressCharacter: handleField(choices.characters.map(({ handle }) => handle)),
-      replyToMessage: handleField(choices.messages.map(({ handle }) => handle)),
-      message: { type: "string", minLength: 1 },
-      ...subjectiveFields,
-    },
-    required: ["action", "addressCharacter", "replyToMessage", "message",
-      "interpretation", "characterIntent", "realityCheck", "dreamIntent", "feltState",
-      "presentMind", "activeDesire", "desiredOutcome", "opportunity", "fiveTurnStrategy",
-      "fiftyTurnStrategy"],
+    action: { type: "string", enum: ["speak", "silence"] },
+    message: { anyOf: [{ type: "string", minLength: 1 }, { type: "null" }] },
+    addressCharacter: handleField(choices.characters.map(({ handle }) => handle)),
+    replyToMessage: handleField(choices.messages.map(({ handle }) => handle)),
   };
   return {
     type: "object",
     ...objectKeywords,
-    properties: { decision: { anyOf: [silenceVariant, speakVariant] } },
+    properties: {
+      decision: {
+        type: "object",
+        ...objectKeywords,
+        properties: decisionFields,
+        required: [
+          "interpretation", "presentMind", "characterIntent", "realityCheck",
+          "dreamIntent", "feltState", "activeDesire", "desiredOutcome", "opportunity",
+          "fiveTurnStrategy", "fiftyTurnStrategy", "action", "message",
+          "addressCharacter", "replyToMessage",
+        ],
+      },
+    },
     required: ["decision"],
   };
 }
