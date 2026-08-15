@@ -9,7 +9,9 @@ import { REALIZER_MODE } from "./realizer-prompt.js";
 import { throwIfAborted } from "./reaction-cancelled.js";
 import {
   buildRealizerResponseSchema,
+  type PresentMind,
   type RealizerDecision,
+  type RealityCheckJudgment,
   type SubjectiveJudgment,
   type TurnContext,
 } from "./realizer-schema.js";
@@ -19,11 +21,11 @@ export type RealizerDecisionLog =
   | {
       action: "silence";
       interpretation: SubjectiveJudgment;
+      presentMind: PresentMind;
       characterIntent: SubjectiveJudgment;
-      realityCheck: SubjectiveJudgment;
+      realityCheck: RealityCheckJudgment;
       dreamIntent: SubjectiveJudgment;
       feltState: SubjectiveJudgment;
-      presentMind: SubjectiveJudgment;
       activeDesire: SubjectiveJudgment;
       desiredOutcome: SubjectiveJudgment;
       opportunity: SubjectiveJudgment;
@@ -35,11 +37,11 @@ export type RealizerDecisionLog =
       addressLabel: string | null;
       replyToLabel: string | null;
       interpretation: SubjectiveJudgment;
+      presentMind: PresentMind;
       characterIntent: SubjectiveJudgment;
-      realityCheck: SubjectiveJudgment;
+      realityCheck: RealityCheckJudgment;
       dreamIntent: SubjectiveJudgment;
       feltState: SubjectiveJudgment;
-      presentMind: SubjectiveJudgment;
       activeDesire: SubjectiveJudgment;
       desiredOutcome: SubjectiveJudgment;
       opportunity: SubjectiveJudgment;

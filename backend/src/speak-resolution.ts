@@ -25,19 +25,19 @@ export interface ResolvedRealizerDecision {
 }
 
 export function resolveRealizerDecision(
-  decision: Extract<RealizerDecision, { action: "speak" }>,
+  decision: RealizerDecision,
   candidates: readonly VisibleMessage[],
   naturalNames: NaturalNames = new Map(),
 ): ResolvedRealizerDecision | undefined {
   const choices = buildHandleChoices(candidates, naturalNames);
   let address: CharacterHandle | null = null;
-  if (decision.addressCharacter !== null) {
+  if (decision.action === "speak" && decision.addressCharacter !== null) {
     const found = choices.characters.find(({ handle }) => handle === decision.addressCharacter);
     if (found === undefined) return undefined;
     address = found;
   }
   let replyTo: MessageHandle | null = null;
-  if (decision.replyToMessage !== null) {
+  if (decision.action === "speak" && decision.replyToMessage !== null) {
     const found = choices.messages.find(({ handle }) => handle === decision.replyToMessage);
     if (found === undefined) return undefined;
     replyTo = found;

@@ -8,11 +8,11 @@ export function toRealizerDecisionLog(
 ): RealizerDecisionLog {
   const common = {
     interpretation: decision.interpretation,
+    presentMind: decision.presentMind,
     characterIntent: decision.characterIntent,
     realityCheck: decision.realityCheck,
     dreamIntent: decision.dreamIntent,
     feltState: decision.feltState,
-    presentMind: decision.presentMind,
     activeDesire: decision.activeDesire,
     desiredOutcome: decision.desiredOutcome,
     opportunity: decision.opportunity,

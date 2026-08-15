@@ -28,10 +28,13 @@ export async function finalizeSpeakOrDeliver(
   dependencies: ReactTurnDependencies,
   input: RespondInput,
   context: TurnContext,
-  decision: Extract<RealizerDecision, { action: "speak" }>,
+  decision: RealizerDecision,
   ctx: ReactionContext | undefined,
   delivery: TelegramTurnDelivery | undefined,
 ): Promise<ReactTurnResult> {
+  if (decision.action !== "speak" || decision.message === null) {
+    return { status: "silence" };
+  }
   const resolved = resolveRealizerDecision(
     decision, context.visibleMessages, context.naturalNames,
   );
