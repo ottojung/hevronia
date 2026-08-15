@@ -10,41 +10,46 @@ export interface ConstFreeJsonSchema {
 }
 
 /**
- * `presentMind` is the durable first-order cognition state: the most salient
- * mental event that arose plus a bounded list of additional first-order events.
- * Every field is required; `secondary` may be an empty array. There is
- * deliberately no contrastive `whyRejected` machinery: spontaneous cognition is
- * not selected by an evidence contest.
+ * The closed set of motive families. Every activeDesire instantiates exactly one
+ * of these; there is no "other", no generic curiosity, no conversation-process
+ * category, and no boredom/stimulation category. A proposed desire that cannot
+ * be cleanly explained as one of these is invalid.
+ */
+export const motiveSchema = z.enum([
+  "wakeHomeDream",
+  "gossip",
+  "softPower",
+  "selfProtection",
+  "attachment",
+  "amusement",
+]);
+
+export type Motive = z.infer<typeof motiveSchema>;
+
+/**
+ * `presentMind` is the durable first-order cognition state of the turn. It is
+ * always full: `immediate` names the strongest immediate reaction, `stormwindAssociation`
+ * names the cultural/story association generated from the established substrate,
+ * and `integration` names what becomes most salient when both coexist. All fields
+ * are required; there is no empty or "nothing arose" state.
  */
 export const presentMindSchema = z.object({
-  primary: z.string().trim().min(1),
-  secondary: z.array(z.string().trim().min(1)).max(4),
+  immediate: z.string().trim().min(1),
+  stormwindAssociation: z.string().trim().min(1),
+  integration: z.string().trim().min(1),
 }).strict();
 
 export type PresentMind = z.infer<typeof presentMindSchema>;
 
 /**
- * `realityCheck` explicitly distinguishes a real world-to-world mismatch from
- * no meaningful mismatch. Both fields are always required: when no grounded
- * seam exists, `status` is "none" and `content` states that plainly. The model
- * is never required to invent a seam to satisfy the schema.
- */
-export const realityCheckSchema = z.object({
-  status: z.enum(["seam", "none"]),
-  content: z.string().trim().min(1),
-}).strict();
-
-export type RealityCheck = z.infer<typeof realityCheckSchema>;
-
-/**
- * `activeDesire` distinguishes a real weak desire from the absence of a want.
- * `strength` is always present: "none" means genuinely no unsatisfied want
- * exists, while "weak"/"moderate"/"strong" mean a real desire exists. A weak
- * desire is still a desire; enactment-worth is decided by `action`, never by
- * rewriting the desire into "none".
+ * `activeDesire` is always positive and concrete. `motive` selects exactly one
+ * closed motive family, `strength` is "weak"/"moderate"/"strong", and `content`
+ * names the concrete object. There is no "none" motive, no "none" strength, and
+ * no empty state: Хевронія is never modeled as motivationally empty.
  */
 export const activeDesireSchema = z.object({
-  strength: z.enum(["none", "weak", "moderate", "strong"]),
+  motive: motiveSchema,
+  strength: z.enum(["weak", "moderate", "strong"]),
   content: z.string().trim().min(1),
 }).strict();
 
@@ -59,7 +64,7 @@ export const realizerDecisionObjectSchema = z.object({
   interpretation: z.string().trim().min(1),
   presentMind: presentMindSchema,
   characterIntent: z.string().trim().min(1),
-  realityCheck: realityCheckSchema,
+  realityCheck: z.string().trim().min(1),
   dreamIntent: z.string().trim().min(1),
   feltState: z.string().trim().min(1),
   activeDesire: activeDesireSchema,
@@ -108,4 +113,3 @@ export const realizerDecisionSchema = realizerDecisionObjectSchema.superRefine((
 });
 
 export type RealizerDecision = z.infer<typeof realizerDecisionSchema>;
-

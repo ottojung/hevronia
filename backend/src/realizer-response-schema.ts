@@ -6,7 +6,6 @@ import type { ParticipantMemoryContext } from "./participant-memory.js";
 import {
   activeDesireSchema,
   presentMindSchema,
-  realityCheckSchema,
   type RealizerDecision,
 } from "./realizer-schema.js";
 
@@ -43,7 +42,7 @@ export function buildRealizerResponseSchema(
     interpretation: z.string().trim().min(1),
     presentMind: presentMindSchema,
     characterIntent: z.string().trim().min(1),
-    realityCheck: realityCheckSchema,
+    realityCheck: z.string().trim().min(1),
     dreamIntent: z.string().trim().min(1),
     feltState: z.string().trim().min(1),
     activeDesire: activeDesireSchema,

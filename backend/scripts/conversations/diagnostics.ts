@@ -1,6 +1,6 @@
 import type { PlannerDecisionLog } from "../../src/attention-planner.js";
 import type { RealizerDecisionLog } from "../../src/realizer.js";
-import type { ActiveDesire, PresentMind, RealityCheck } from "../../src/realizer-schema.js";
+import type { ActiveDesire, PresentMind } from "../../src/realizer-schema.js";
 
 function singleLine(text: string): string {
   return text.replaceAll(/\s+/gu, " ").trim();
@@ -11,27 +11,18 @@ function formatText(label: string, text: string): string {
 }
 
 function formatPresentMind(presentMind: PresentMind): string {
-  const secondary = presentMind.secondary.length === 0
-    ? "—"
-    : presentMind.secondary.map(singleLine).join(" | ");
   return [
     "  presentMind:",
-    `    primary: ${singleLine(presentMind.primary)}`,
-    `    secondary: ${secondary}`,
-  ].join("\n");
-}
-
-function formatRealityCheck(realityCheck: RealityCheck): string {
-  return [
-    "  realityCheck:",
-    `    status: ${realityCheck.status}`,
-    `    content: ${singleLine(realityCheck.content)}`,
+    `    immediate: ${singleLine(presentMind.immediate)}`,
+    `    stormwindAssociation: ${singleLine(presentMind.stormwindAssociation)}`,
+    `    integration: ${singleLine(presentMind.integration)}`,
   ].join("\n");
 }
 
 function formatActiveDesire(activeDesire: ActiveDesire): string {
   return [
     "  activeDesire:",
+    `    motive: ${activeDesire.motive}`,
     `    strength: ${activeDesire.strength}`,
     `    content: ${singleLine(activeDesire.content)}`,
   ].join("\n");
@@ -63,7 +54,7 @@ function formatJudgments(log: Extract<RealizerDecisionLog, { action: "silence" |
     formatText("interpretation", log.interpretation),
     formatPresentMind(log.presentMind),
     formatText("characterIntent", log.characterIntent),
-    formatRealityCheck(log.realityCheck),
+    formatText("realityCheck", log.realityCheck),
     formatText("dreamIntent", log.dreamIntent),
     formatText("feltState", log.feltState),
     formatActiveDesire(log.activeDesire),
