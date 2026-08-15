@@ -42,7 +42,11 @@ function judgment(overrides: { leading?: unknown; alternative?: unknown; whyReje
   return { leading: "l", alternative: "a", whyRejected: "w", ...overrides };
 }
 
-test("provider schema root is an object, not a top-level union", () => {
+function presentMind(overrides: { primary?: unknown; secondary?: unknown } = {}) {
+  return { primary: "p", secondary: ["s"], ...overrides };
+}
+
+test("provider schema root is an object with the flat decision beneath it", () => {
   const providerSchema = providerStrategy(realizerResponseSchema).schema;
   assert.equal(providerSchema["type"], "object");
   assert.ok(providerSchema["properties"]);
@@ -51,8 +55,9 @@ test("provider schema root is an object, not a top-level union", () => {
 
   const domainStrategy = providerStrategy(realizerDecisionSchema);
   const domainSchema = domainStrategy.schema;
-  assert.equal(domainSchema["type"], undefined);
-  assert.ok(domainSchema["anyOf"]);
+  assert.equal(domainSchema["type"], "object");
+  assert.ok(domainSchema["properties"]);
+  assert.equal(domainSchema["additionalProperties"], false);
 });
 
 test("realize returns an unwrapped silence decision with the full private state", async () => {
@@ -80,24 +85,44 @@ test("the dynamic schema restricts addressCharacter and replyToMessage to visibl
 });
 
 type SubjectiveFieldName = "interpretation" | "characterIntent" | "realityCheck" | "dreamIntent"
-  | "feltState" | "presentMind" | "activeDesire" | "desiredOutcome" | "opportunity"
+  | "feltState" | "activeDesire" | "desiredOutcome" | "opportunity"
   | "fiveTurnStrategy" | "fiftyTurnStrategy";
 const subjectiveFieldNames: readonly SubjectiveFieldName[] = ["interpretation", "characterIntent",
-  "realityCheck", "dreamIntent", "feltState", "presentMind", "activeDesire", "desiredOutcome",
+  "realityCheck", "dreamIntent", "feltState", "activeDesire", "desiredOutcome",
   "opportunity", "fiveTurnStrategy", "fiftyTurnStrategy"];
 
-test("all eleven fields carry a full contrastive judgment in both speak and silence", () => {
+test("presentMind carries primary/secondary cognition, not a contrastive judgment", () => {
+  for (const decision of [realizerSpeak(), realizerSilence()]) {
+    assert.equal(typeof decision.presentMind.primary, "string");
+    assert.ok(decision.presentMind.primary.length >= 1, "presentMind.primary");
+    assert.ok(Array.isArray(decision.presentMind.secondary), "presentMind.secondary");
+  }
+});
+
+test("all ten contrastive fields carry leading/alternative/whyRejected in both speak and silence", () => {
   for (const decision of [realizerSpeak(), realizerSilence()]) {
     for (const field of subjectiveFieldNames) {
       const value = decision[field];
       assert.equal(typeof value.leading, "string");
       assert.ok(value.leading.length >= 1, `leading of ${field}`);
+      if (field === "realityCheck") continue;
       assert.equal(typeof value.alternative, "string");
       assert.ok(value.alternative.length >= 1, `alternative of ${field}`);
       assert.equal(typeof value.whyRejected, "string");
       assert.ok(value.whyRejected.length >= 1, `whyRejected of ${field}`);
     }
   }
+});
+
+test("a speak decision carries a message and silence carries no message or handles", () => {
+  const speak = realizerSpeak();
+  assert.equal(speak.action, "speak");
+  assert.ok(speak.message !== null && speak.message.length >= 1);
+  const silence = realizerSilence();
+  assert.equal(silence.action, "silence");
+  assert.equal(silence.message, null);
+  assert.equal(silence.addressCharacter, null);
+  assert.equal(silence.replyToMessage, null);
 });
 
 function parseDecision(decision: unknown) {
@@ -165,7 +190,7 @@ test("the OpenAI schema is fully inlined and strict-compatible", () => {
   assert.ok(!serialized.includes('"const"'));
   assert.ok(!serialized.includes('"minLength":0'));
   assert.ok(serialized.includes('"additionalProperties":false'));
-  assert.ok(serialized.includes('"enum":["silence"]'));
+  assert.ok(serialized.includes('"enum":["speak","silence"]'));
   assert.ok(serialized.includes("P1"));
   assert.ok(serialized.includes("M1"));
 });
@@ -184,7 +209,7 @@ test("the OpenAI provider schema nests the required judgment fields", () => {
   assert.ok(serialized.includes('"whyRejected"'));
   assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
   const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
-  assert.equal(judgments.length, 22);
+  assert.equal(judgments.length, 9);
 });
 
 test("the Gemini provider schema nests the required judgment fields", () => {
@@ -194,7 +219,7 @@ test("the Gemini provider schema nests the required judgment fields", () => {
   assert.ok(serialized.includes('"whyRejected"'));
   assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
   const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
-  assert.equal(judgments.length, 22);
+  assert.equal(judgments.length, 9);
 });
 
 test("malformed provider responses are rejected", async () => {
@@ -206,18 +231,26 @@ test("malformed provider responses are rejected", async () => {
     JSON.stringify({ decision: { action: "speak" } }),
     JSON.stringify({ decision: { action: "silence", extra: true } }),
     JSON.stringify({ decision: { action: "speak", addressCharacter: "P1" } }),
-    // a subjective field must be a contrastive object, not a plain string
+    // a subjective field must be an object, not a plain string
     JSON.stringify({ decision: { ...speak(), interpretation: "i" } }),
-    // missing Telegram message
-    JSON.stringify({ decision: { action: "speak", addressCharacter: "P1",
-      replyToMessage: null, interpretation: judgment(), characterIntent: judgment(),
-      realityCheck: judgment(), dreamIntent: judgment(), feltState: judgment(),
-      presentMind: judgment(), activeDesire: judgment(), desiredOutcome: judgment(),
-      opportunity: judgment(), fiveTurnStrategy: judgment(), fiftyTurnStrategy: judgment() } }),
+    // speak without a message
+    JSON.stringify({ decision: { ...speak(), message: null } }),
+    // speak with an empty message
+    JSON.stringify({ decision: { ...speak(), message: "   " } }),
+    // silence with a message
+    JSON.stringify({ decision: { ...realizerSilence(), message: "ага" } }),
+    // silence with an address handle
+    JSON.stringify({ decision: { ...realizerSilence(), addressCharacter: "P1" } }),
+    // silence with a reply handle
+    JSON.stringify({ decision: { ...realizerSilence(), replyToMessage: "M1" } }),
     // unexpected key at the decision level
     JSON.stringify({ decision: { ...speak(), targetChoice: "A" } }),
     // unexpected key inside a judgment
     JSON.stringify({ decision: { ...speak(), characterIntent: { ...judgment(), extra: true } } }),
+    // presentMind uses primary/secondary, not a contrastive judgment
+    JSON.stringify({ decision: { ...speak(), presentMind: judgment() } }),
+    // presentMind without a primary
+    JSON.stringify({ decision: { ...speak(), presentMind: presentMind({ primary: undefined }) } }),
     // missing alternative inside a judgment
     JSON.stringify({ decision: { ...speak(), characterIntent: judgment({ alternative: undefined }) } }),
     // null alternative inside a judgment
