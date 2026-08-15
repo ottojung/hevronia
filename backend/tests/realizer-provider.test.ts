@@ -80,13 +80,13 @@ test("the dynamic schema restricts addressCharacter and replyToMessage to visibl
 });
 
 type SubjectiveFieldName = "interpretation" | "characterIntent" | "realityCheck" | "dreamIntent"
-  | "feltState" | "activeDesire" | "desiredOutcome" | "opportunity" | "fiveTurnStrategy"
-  | "fiftyTurnStrategy";
+  | "feltState" | "presentMind" | "activeDesire" | "desiredOutcome" | "opportunity"
+  | "fiveTurnStrategy" | "fiftyTurnStrategy";
 const subjectiveFieldNames: readonly SubjectiveFieldName[] = ["interpretation", "characterIntent",
-  "realityCheck", "dreamIntent", "feltState", "activeDesire", "desiredOutcome", "opportunity",
-  "fiveTurnStrategy", "fiftyTurnStrategy"];
+  "realityCheck", "dreamIntent", "feltState", "presentMind", "activeDesire", "desiredOutcome",
+  "opportunity", "fiveTurnStrategy", "fiftyTurnStrategy"];
 
-test("all ten fields carry a full contrastive judgment in both speak and silence", () => {
+test("all eleven fields carry a full contrastive judgment in both speak and silence", () => {
   for (const decision of [realizerSpeak(), realizerSilence()]) {
     for (const field of subjectiveFieldNames) {
       const value = decision[field];
@@ -184,7 +184,7 @@ test("the OpenAI provider schema nests the required judgment fields", () => {
   assert.ok(serialized.includes('"whyRejected"'));
   assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
   const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
-  assert.equal(judgments.length, 20);
+  assert.equal(judgments.length, 22);
 });
 
 test("the Gemini provider schema nests the required judgment fields", () => {
@@ -194,7 +194,7 @@ test("the Gemini provider schema nests the required judgment fields", () => {
   assert.ok(serialized.includes('"whyRejected"'));
   assert.ok(serialized.includes('"required":["leading","alternative","whyRejected"]'));
   const judgments = (serialized.match(/"required":\["leading","alternative","whyRejected"\]/g) ?? []);
-  assert.equal(judgments.length, 20);
+  assert.equal(judgments.length, 22);
 });
 
 test("malformed provider responses are rejected", async () => {
@@ -212,8 +212,8 @@ test("malformed provider responses are rejected", async () => {
     JSON.stringify({ decision: { action: "speak", addressCharacter: "P1",
       replyToMessage: null, interpretation: judgment(), characterIntent: judgment(),
       realityCheck: judgment(), dreamIntent: judgment(), feltState: judgment(),
-      activeDesire: judgment(), desiredOutcome: judgment(), opportunity: judgment(),
-      fiveTurnStrategy: judgment(), fiftyTurnStrategy: judgment() } }),
+      presentMind: judgment(), activeDesire: judgment(), desiredOutcome: judgment(),
+      opportunity: judgment(), fiveTurnStrategy: judgment(), fiftyTurnStrategy: judgment() } }),
     // unexpected key at the decision level
     JSON.stringify({ decision: { ...speak(), targetChoice: "A" } }),
     // unexpected key inside a judgment

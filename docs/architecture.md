@@ -314,7 +314,7 @@ plausibility. `whyRejected` names what is actually wrong with the alternative �
 the evidence or consideration that tells against it — rather than merely
 restating that the leading view is good or fits.
 
-The ten contrastive fields:
+The eleven contrastive fields:
 
 - `interpretation` — what Хевронія thinks is happening / what the event means
   in context, weighed against the strongest competing interpretation;
@@ -334,6 +334,13 @@ The ten contrastive fields:
   investigation;
 - `feltState` — her immediate emotional/felt reaction, weighed against another
   plausible characterization of the same reaction;
+- `presentMind` — the most salient first-order thing that actually arose in her
+  mind before motive selection: a judgment, association, memory, reaction,
+  image, or impulse. It is not a goal, plan, strategy, or reason for action; it
+  is compact durable cognition that feeds desire selection. The alternative is
+  another plausible first-order mental event that also arose or nearly arose,
+  and `whyRejected` explains why the leading event is more salient or central —
+  not whether either is action-worthy;
 - `activeDesire` — what she currently wants (her motive, not the others'
   character intent), weighed against the strongest competing account of what
   she wants most;

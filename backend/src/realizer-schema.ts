@@ -35,6 +35,7 @@ const subjectiveFields = {
   realityCheck: subjectiveJudgmentSchema,
   dreamIntent: subjectiveJudgmentSchema,
   feltState: subjectiveJudgmentSchema,
+  presentMind: subjectiveJudgmentSchema,
   activeDesire: subjectiveJudgmentSchema,
   desiredOutcome: subjectiveJudgmentSchema,
   opportunity: subjectiveJudgmentSchema,

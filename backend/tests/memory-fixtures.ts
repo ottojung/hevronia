@@ -66,6 +66,11 @@ export function realizerSilence(): RealizerDecision {
       "This leaves you faintly curious.",
       "There is nothing new enough here to spark real interest.",
     ),
+    presentMind: judgment(
+      "A light ordinary message arrives and nothing in particular grabs you in it.",
+      "The mention of a shared ordinary moment faintly tugs at the memory of evenings at home.",
+      "The tug is faint and tied to the word choice, not to anything you want from them.",
+    ),
     activeDesire: judgment(
       "You want nothing from speaking right now.",
       "You want to keep the peace of the moment unbroken.",
@@ -125,6 +130,11 @@ export function realizerSpeak(
       "This leaves you mildly interested.",
       "This leaves you neutral and unengaged.",
       "The message has enough color to hold your attention briefly.",
+    ),
+    presentMind: judgment(
+      "You notice the light casual tone and feel a small impulse to answer in kind.",
+      "You register that they are still a stranger and hold yourself back.",
+      "The impulse is real but tied to the moment, and the stranger's weight does not decide it yet.",
     ),
     activeDesire: judgment(
       "You want to acknowledge them simply.",

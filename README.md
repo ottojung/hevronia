@@ -356,8 +356,8 @@ message, a `Планер:` line for the cheap attention filter (`yes → пер�
 реалізатору`, `no → повідомлення відфільтровано`, or `[error → передано
 реалізатору]`), a `Реалізатор:` block with Хевронія's individually labeled
 private fields (`interpretation`, `characterIntent`, `realityCheck`, `dreamIntent`,
-`feltState`, `activeDesire`, `desiredOutcome`, `opportunity`, `fiveTurnStrategy`,
-`fiftyTurnStrategy`) and her chosen addressee and reply
+`feltState`, `presentMind`, `activeDesire`, `desiredOutcome`, `opportunity`,
+`fiveTurnStrategy`, `fiftyTurnStrategy`) and her chosen addressee and reply
 attachment, and then her realized Telegram reply. The three outcomes are
 distinguishable in the transcript: filtered by the planner, passed but silenced
 by the realizer, or passed and spoken. The same content — including every

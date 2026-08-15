@@ -23,6 +23,7 @@ export type RealizerDecisionLog =
       realityCheck: SubjectiveJudgment;
       dreamIntent: SubjectiveJudgment;
       feltState: SubjectiveJudgment;
+      presentMind: SubjectiveJudgment;
       activeDesire: SubjectiveJudgment;
       desiredOutcome: SubjectiveJudgment;
       opportunity: SubjectiveJudgment;
@@ -38,6 +39,7 @@ export type RealizerDecisionLog =
       realityCheck: SubjectiveJudgment;
       dreamIntent: SubjectiveJudgment;
       feltState: SubjectiveJudgment;
+      presentMind: SubjectiveJudgment;
       activeDesire: SubjectiveJudgment;
       desiredOutcome: SubjectiveJudgment;
       opportunity: SubjectiveJudgment;

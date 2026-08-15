@@ -293,7 +293,7 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   const silenceLog: RealizerDecisionLog = {
     action: "silence",
     interpretation: judgment("i"), characterIntent: judgment("c"), realityCheck: judgment("r"),
-    dreamIntent: judgment("d"), feltState: judgment("f"),
+    dreamIntent: judgment("d"), feltState: judgment("f"), presentMind: judgment("pm"),
     activeDesire: judgment("a"), desiredOutcome: judgment("o"), opportunity: judgment("o"),
     fiveTurnStrategy: judgment("s5"), fiftyTurnStrategy: judgment("s50"),
   };
@@ -307,7 +307,7 @@ test("conversation diagnostics distinguish filtered, realizer-silence, and reali
   const speakLog: RealizerDecisionLog = {
     action: "speak", addressLabel: "character 42", replyToLabel: "M1 → Іра",
     interpretation: judgment("i"), characterIntent: judgment("c"), realityCheck: judgment("r"),
-    dreamIntent: judgment("d"), feltState: judgment("f"),
+    dreamIntent: judgment("d"), feltState: judgment("f"), presentMind: judgment("pm"),
     activeDesire: judgment("a"), desiredOutcome: judgment("o"), opportunity: judgment("o"),
     fiveTurnStrategy: judgment("s5"), fiftyTurnStrategy: judgment("s50"),
   };

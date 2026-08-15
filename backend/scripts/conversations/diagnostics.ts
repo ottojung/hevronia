@@ -43,6 +43,7 @@ function formatJudgments(log: Extract<RealizerDecisionLog, { action: "silence" |
     formatJudgment("realityCheck", log.realityCheck),
     formatJudgment("dreamIntent", log.dreamIntent),
     formatJudgment("feltState", log.feltState),
+    formatJudgment("presentMind", log.presentMind),
     formatJudgment("activeDesire", log.activeDesire),
     formatJudgment("desiredOutcome", log.desiredOutcome),
     formatJudgment("opportunity", log.opportunity),
