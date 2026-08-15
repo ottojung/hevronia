@@ -41,21 +41,26 @@ function judgment(leading: string, alternative: string, whyRejected: string): Su
 export function realizerSilence(): RealizerDecision {
   return {
     action: "silence",
+    addressCharacter: null,
+    replyToMessage: null,
+    message: null,
     interpretation: judgment(
       "You read this as an ordinary moment with nothing at stake for you.",
       "They are making a small bid for your attention.",
       "Nothing here engages you personally enough to matter.",
     ),
+    presentMind: {
+      primary: "A light ordinary message arrives and nothing in particular grabs you in it.",
+      secondary: ["The mention of a shared ordinary moment faintly tugs at the memory of evenings at home."],
+    },
     characterIntent: judgment(
       "They are just chatting idly, without any clear purpose toward you.",
       "They are quietly testing whether you are still listening.",
       "Their message names no one and asks for no response.",
     ),
-    realityCheck: judgment(
-      "Their words reach you effortlessly from a distance, as though distance no longer constrained talk.",
-      "The content itself could fit ordinary face-to-face talk back home.",
-      "It is the effortless transmission, not the subject, that diverges from remembered reality.",
-    ),
+    realityCheck: {
+      leading: "Their words reach you effortlessly from a distance, as though distance no longer constrained talk.",
+    },
     dreamIntent: judgment(
       "The dream appears to be producing ordinary low-significance social material.",
       "The quiet moment may be drawing attention to something not yet noticed.",
@@ -65,11 +70,6 @@ export function realizerSilence(): RealizerDecision {
       "This leaves you quietly indifferent.",
       "This leaves you faintly curious.",
       "There is nothing new enough here to spark real interest.",
-    ),
-    presentMind: judgment(
-      "A light ordinary message arrives and nothing in particular grabs you in it.",
-      "The mention of a shared ordinary moment faintly tugs at the memory of evenings at home.",
-      "The tug is faint and tied to the word choice, not to anything you want from them.",
     ),
     activeDesire: judgment(
       "You want nothing from speaking right now.",
@@ -100,27 +100,30 @@ export function realizerSilence(): RealizerDecision {
 }
 
 export function realizerSpeak(
-  overrides: Partial<Extract<RealizerDecision, { action: "speak" }>> = {},
-): Extract<RealizerDecision, { action: "speak" }> {
+  overrides: Partial<RealizerDecision> = {},
+): RealizerDecision {
   return {
     action: "speak",
     addressCharacter: "P1",
     replyToMessage: null,
+    message: "ага",
     interpretation: judgment(
       "You understand this as an ordinary moment worth a short reply.",
       "This is a small bid for your attention that deserves more.",
       "Their light, casual phrasing matches a short reply.",
     ),
+    presentMind: {
+      primary: "You notice the light casual tone and feel a small impulse to answer in kind.",
+      secondary: ["You register that they are still a stranger and hold yourself back."],
+    },
     characterIntent: judgment(
       "They want a quick reaction from you.",
       "They are simply passing time in company.",
       "The open phrasing invites a reply more than a report.",
     ),
-    realityCheck: judgment(
-      "Their words appear instantly from a distance, as though distance had become trivial.",
-      "The light topic would be unremarkable face-to-face back home.",
-      "What fails to fit remembered reality is the medium of contact, not the tone.",
-    ),
+    realityCheck: {
+      leading: "Their words appear instantly from a distance, as though distance had become trivial.",
+    },
     dreamIntent: judgment(
       "The dream seems to be maintaining an ordinary, unremarkable interaction.",
       "The dream may be presenting a light exchange to see how you handle it.",
@@ -130,11 +133,6 @@ export function realizerSpeak(
       "This leaves you mildly interested.",
       "This leaves you neutral and unengaged.",
       "The message has enough color to hold your attention briefly.",
-    ),
-    presentMind: judgment(
-      "You notice the light casual tone and feel a small impulse to answer in kind.",
-      "You register that they are still a stranger and hold yourself back.",
-      "The impulse is real but tied to the moment, and the stranger's weight does not decide it yet.",
     ),
     activeDesire: judgment(
       "You want to acknowledge them simply.",
@@ -161,7 +159,6 @@ export function realizerSpeak(
       "You could invest in a deeper long-term connection with them.",
       "There is no established relationship weight to justify a long-term investment.",
     ),
-    message: "ага",
     ...overrides,
   };
 }
