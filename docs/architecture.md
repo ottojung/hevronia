@@ -314,37 +314,48 @@ Fields:
 - `interpretation` — what Хевронія thinks is happening / what the event means in
   context: a concise declarative sentence;
 - `presentMind` — what actually arose in her ongoing mind, always in three
-  required parts: `immediate` = the strongest immediate first-order reaction;
-  `stormwindAssociation` = a concrete association generated through the
-  inherited cultural substrate (Stormwind, the Holy Light, an inherited story
-  shape, remembered social ontology, home, public memory, the Alliance,
-  undeath, magic, hierarchy, civic life), present every turn and able to be
-  subtle; `integration` = what becomes most salient when the immediate reaction
-  and the cultural substrate coexist. Not a goal, plan, strategy, reason for
+  required parts: `immediate` = the direct first-order reaction to the current
+  event; `culturalThought` = a concrete thought arising from the remembered
+  Warcraft-world substrate (named inherited stories, named figures, the Holy
+  Light, the Three Virtues, the Silver Hand, Lothar, Uther, Arthas, Alonsus
+  Faol, Lordain and Mereldar, the Scourge, the fall and rebuilding of Stormwind,
+  the Alliance, burial and undeath, magic, civic remembrance, war memory,
+  hierarchy, real peoples), which need not relate to the current event at all;
+  `foreground` = which thought is actually in the foreground now. There is no
+  requirement to connect the event and the cultural thought, and no forced
+  topic-relative Warcraft analogy. Not a goal, plan, strategy, reason for
   action, or a chain-of-thought dump;
 - `characterIntent` — her best supported guess about what the relevant other
   character wants from her specifically: the response, belief, feeling, role, or
   participation they are trying to produce in her;
-- `realityCheck` — a required positive string naming one concrete contrast,
-  implication, or seam between the dream-world event and remembered reality,
-  drawn from the most locally revealing angle available. When the event exposes
-  no direct mismatch, it derives a grounded conditional or social-ontological
-  contrast from established Stormwind reality. There is no `none` value and the
-  model is never allowed to output "nothing unusual";
+- `realityRelation` — how the dream-world event relates to remembered reality.
+  Shape: `kind` is exactly one of `difference` (a grounded world-to-world
+  difference), `correspondence` (something closely resembles remembered
+  reality), or `distortion` (something recognizable appears flattened,
+  gamified, displaced, or simplified); `content` names the concrete relation.
+  There is no `none` value and no requirement to manufacture a mismatch;
 - `dreamIntent` — her more distant, suspicious strategic hypothesis about what
   the dream — the process that continues to keep her from waking — may gain by
   producing the event or the wider visible pattern. It is inferential, may be
   mundane, is a hypothesis about the dream (not a motive or a command), and does
-  not by itself create a desire or a discrepancy investigation;
+  not by itself create a desire or a discrepancy investigation. It does not
+  default to home-substitution and draws from a varied set of mechanisms tied to
+  the actual event;
 - `feltState` — her immediate emotional/felt reaction, part of the immediate
   subjective state alongside `presentMind`;
 - `activeDesire` — what she actually wants right now, always positive and
   concrete. Shape: `motive` names exactly one of the closed motive families —
   `wakeHomeDream`, `gossip`, `softPower`, `selfProtection`, `attachment`, or
   `amusement`; `strength` is "weak"/"moderate"/"strong"; `content` names the
-  concrete object. There is no `none` motive, no `none` strength, and no
-  catch-all "other". A weak desire is still a desire; action-worth is not
-  decided here. A thought may not invent a new kind of goal: repetition,
+  concrete object; `basis` names the concrete admission fact that shows why this
+  desire genuinely belongs to its motive family. There is no `none` motive, no
+  `none` strength, and no catch-all "other". A weak desire is still a desire;
+  action-worth is not decided here, and amusement with weak strength is
+  rejected. Never make the current event fit a motive merely because one must
+  exist: candidates must pass their motive's hard gate, and when none pass, the
+  preferred fallback is soft power through a concrete remembered Warcraft-world
+  story, figure, image, or distinction — one of her easiest and most natural
+  soft-power moves. A thought may not invent a new kind of goal: repetition,
   boredom, awkwardness, and conversation-process commentary are never goal
   objects and never soft-power objects;
 - `desiredOutcome` — the state, result, or experience that would satisfy the
