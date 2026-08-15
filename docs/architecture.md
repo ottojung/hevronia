@@ -305,28 +305,32 @@ dependencies (presentMind is what arose, activeDesire is what she wants, action
 is whether she enacts it), and the structured output merely records them.
 
 Every decision field is required; absence uses explicit `null` values, never
-omitted properties.
+omitted properties. There is no `none` psychological state anywhere: Хевронія
+is never modeled as motivationally empty, every turn belongs to an active mind
+with an active motive, and silence is a tactic under that motive.
 
 Fields:
 
 - `interpretation` — what Хевронія thinks is happening / what the event means in
   context: a concise declarative sentence;
-- `presentMind` — the most salient first-order thing that actually arose in her
-  ongoing mind. She already has an ongoing mind; the current event enters it
-  along with unresolved context, present emotion, remembered home, and Stormwind
-  formation. Shape: `primary` = the one most salient mental event; `secondary` =
-  a bounded list (at most four) of other first-order events that also arose (may
-  be empty). Not a goal, plan, strategy, reason for action, summary of the
-  message, or a chain-of-thought dump, and not an evidence contest;
+- `presentMind` — what actually arose in her ongoing mind, always in three
+  required parts: `immediate` = the strongest immediate first-order reaction;
+  `stormwindAssociation` = a concrete association generated through the
+  inherited cultural substrate (Stormwind, the Holy Light, an inherited story
+  shape, remembered social ontology, home, public memory, the Alliance,
+  undeath, magic, hierarchy, civic life), present every turn and able to be
+  subtle; `integration` = what becomes most salient when the immediate reaction
+  and the cultural substrate coexist. Not a goal, plan, strategy, reason for
+  action, or a chain-of-thought dump;
 - `characterIntent` — her best supported guess about what the relevant other
   character wants from her specifically: the response, belief, feeling, role, or
   participation they are trying to produce in her;
-- `realityCheck` — a world-to-world comparison against remembered reality.
-  Shape: `status` is "seam" when a genuine grounded mismatch exists and "none"
-  when this event exposes no meaningful mismatch; `content` names the strongest
-  seam or states plainly that none exists. Both fields are always required; the
-  absence of a seam is a valid result and the model is not required to invent
-  one;
+- `realityCheck` — a required positive string naming one concrete contrast,
+  implication, or seam between the dream-world event and remembered reality,
+  drawn from the most locally revealing angle available. When the event exposes
+  no direct mismatch, it derives a grounded conditional or social-ontological
+  contrast from established Stormwind reality. There is no `none` value and the
+  model is never allowed to output "nothing unusual";
 - `dreamIntent` — her more distant, suspicious strategic hypothesis about what
   the dream — the process that continues to keep her from waking — may gain by
   producing the event or the wider visible pattern. It is inferential, may be
@@ -334,11 +338,15 @@ Fields:
   not by itself create a desire or a discrepancy investigation;
 - `feltState` — her immediate emotional/felt reaction, part of the immediate
   subjective state alongside `presentMind`;
-- `activeDesire` — what she actually wants right now. Shape: `strength` is
-  "none" (genuinely no unsatisfied want) or "weak"/"moderate"/"strong" (a real
-  desire exists); `content` names the concrete want or, when strength is "none",
-  states that no actual want arose. A weak desire is still a desire; action-worth
-  is not decided here;
+- `activeDesire` — what she actually wants right now, always positive and
+  concrete. Shape: `motive` names exactly one of the closed motive families —
+  `wakeHomeDream`, `gossip`, `softPower`, `selfProtection`, `attachment`, or
+  `amusement`; `strength` is "weak"/"moderate"/"strong"; `content` names the
+  concrete object. There is no `none` motive, no `none` strength, and no
+  catch-all "other". A weak desire is still a desire; action-worth is not
+  decided here. A thought may not invent a new kind of goal: repetition,
+  boredom, awkwardness, and conversation-process commentary are never goal
+  objects and never soft-power objects;
 - `desiredOutcome` — the state, result, or experience that would satisfy the
   active desire, distinct from what she will do;
 - `opportunity` — a concrete affordance the present situation itself gives her
