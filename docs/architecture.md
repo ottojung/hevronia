@@ -315,19 +315,25 @@ Fields:
   context: a concise declarative sentence;
 - `presentMind` — what actually arose in her ongoing mind, always in three
   required parts: `immediate` = the direct first-order reaction to the current
-  event; `culturalThought` = a concrete thought arising from the remembered
-  Warcraft-world substrate (named inherited stories, named figures, the Holy
-  Light, the Three Virtues, the Silver Hand, Lothar, Uther, Arthas, Alonsus
-  Faol, Lordain and Mereldar, the Scourge, the fall and rebuilding of Stormwind,
-  the Alliance, burial and undeath, magic, civic remembrance, war memory,
-  hierarchy, real peoples), which need not relate to the current event at all;
-  `foreground` = which thought is actually in the foreground now. There is no
-  requirement to connect the event and the cultural thought, and no forced
-  topic-relative Warcraft analogy. Not a goal, plan, strategy, reason for
-  action, or a chain-of-thought dump;
+  event; `culturalThought` = a concrete high-information thought from the
+  remembered Warcraft-world substrate, carrying `content` (the material itself)
+  and `whyNow` (why this material is mentally active now — associative or
+  ongoing pull, never target novelty); `foreground` = which thought is actually
+  in the foreground now. The cultural thought need not relate to the current
+  event at all, and there is no forced topic-relative Warcraft analogy. Not a
+  goal, plan, strategy, reason for action, or a chain-of-thought dump;
 - `characterIntent` — her best supported guess about what the relevant other
   character wants from her specifically: the response, belief, feeling, role, or
   participation they are trying to produce in her;
+- `interactionFrame` — what the other character is socially doing and how she
+  relates to it. Shape: `kind` is exactly one of `open` (a broad harmless social
+  opening that leaves her freedom and infringes nothing), `offered` (a specific
+  topic or question that proposes a direction without assigning her a function),
+  or `imposed` (an attempt to assign her a role, labor, obligation, identity, or
+  constrained participation that infringes her autonomy); `stance` is exactly
+  `accept`, `reshape`, or `reject`; `reason` names the concrete basis. An
+  imposed frame may directly activate selfProtection; an open or offered frame
+  never does merely because she dislikes the topic;
 - `realityRelation` — how the dream-world event relates to remembered reality.
   Shape: `kind` is exactly one of `difference` (a grounded world-to-world
   difference), `correspondence` (something closely resembles remembered
@@ -339,8 +345,9 @@ Fields:
   producing the event or the wider visible pattern. It is inferential, may be
   mundane, is a hypothesis about the dream (not a motive or a command), and does
   not by itself create a desire or a discrepancy investigation. It does not
-  default to home-substitution and draws from a varied set of mechanisms tied to
-  the actual event;
+  default to home-substitution, draws from a varied set of mechanisms tied to
+  the actual event, and does not paraphrase the same established hypothesis turn
+  after turn;
 - `feltState` — her immediate emotional/felt reaction, part of the immediate
   subjective state alongside `presentMind`;
 - `activeDesire` — what she actually wants right now, always positive and
@@ -348,16 +355,17 @@ Fields:
   `wakeHomeDream`, `gossip`, `softPower`, `selfProtection`, `attachment`, or
   `amusement`; `strength` is "weak"/"moderate"/"strong"; `content` names the
   concrete object; `basis` names the concrete admission fact that shows why this
-  desire genuinely belongs to its motive family. There is no `none` motive, no
-  `none` strength, and no catch-all "other". A weak desire is still a desire;
-  action-worth is not decided here, and amusement with weak strength is
-  rejected. Never make the current event fit a motive merely because one must
-  exist: candidates must pass their motive's hard gate, and when none pass, the
-  preferred fallback is soft power through a concrete remembered Warcraft-world
-  story, figure, image, or distinction — one of her easiest and most natural
-  soft-power moves. A thought may not invent a new kind of goal: repetition,
-  boredom, awkwardness, and conversation-process commentary are never goal
-  objects and never soft-power objects;
+  desire genuinely belongs to its motive family; `whyNow` names why this
+  particular object has motivational pull now, distinct from having content
+  available. There is no `none` motive, no `none` strength, and no catch-all
+  "other". A weak desire is still a desire; action-worth is not decided here,
+  and amusement with weak strength is rejected. Never make the current event fit
+  a motive merely because one must exist: candidates must pass their motive's
+  hard gate, a fresh soft-power cognitive delta is necessary but not sufficient,
+  and the fact that another story is untold is never itself a new soft-power
+  desire. A thought may not invent a new kind of goal: repetition, boredom,
+  awkwardness, and conversation-process commentary are never goal objects and
+  never soft-power objects;
 - `desiredOutcome` — the state, result, or experience that would satisfy the
   active desire, distinct from what she will do;
 - `opportunity` — a concrete affordance the present situation itself gives her
