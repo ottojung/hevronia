@@ -11,7 +11,6 @@ import {
   buildRealizerResponseSchema,
   type PresentMind,
   type RealizerDecision,
-  type RealityCheckJudgment,
   type SubjectiveJudgment,
   type TurnContext,
 } from "./realizer-schema.js";
@@ -23,7 +22,7 @@ export type RealizerDecisionLog =
       interpretation: SubjectiveJudgment;
       presentMind: PresentMind;
       characterIntent: SubjectiveJudgment;
-      realityCheck: RealityCheckJudgment;
+      realityCheck: SubjectiveJudgment;
       dreamIntent: SubjectiveJudgment;
       feltState: SubjectiveJudgment;
       activeDesire: SubjectiveJudgment;
@@ -39,7 +38,7 @@ export type RealizerDecisionLog =
       interpretation: SubjectiveJudgment;
       presentMind: PresentMind;
       characterIntent: SubjectiveJudgment;
-      realityCheck: RealityCheckJudgment;
+      realityCheck: SubjectiveJudgment;
       dreamIntent: SubjectiveJudgment;
       feltState: SubjectiveJudgment;
       activeDesire: SubjectiveJudgment;
