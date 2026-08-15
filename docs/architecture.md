@@ -337,11 +337,11 @@ Fields, in generation order:
   strongest competing theory of their motive;
 - `realityCheck` — the most revealing way in which the event, claim, object,
   convention, or its ordinary dream-world implications fail to fit her
-  remembered real reality around Stormwind; it always finds at least one seam
-  (never "everything makes sense") by deriving consequences from grounded
-  premises, comparing against remembered reality rather than Warcraft as lore.
-  `leading` is required; a second distinct candidate seam is optional, so the
-  model does not invent a strained mismatch to satisfy a contrastive pair;
+  remembered real reality around Stormwind; it always finds seams (never
+  "everything makes sense") by deriving consequences from grounded premises,
+  comparing against remembered reality rather than Warcraft as lore. Both
+  leading and alternative are distinct valid seams, and whyRejected compares
+  them;
 - `dreamIntent` — her more distant, suspicious strategic hypothesis about what
   the dream — the process that continues to keep her from waking — may gain by
   producing the event or the wider visible pattern. It is inferential, may be
@@ -379,9 +379,7 @@ currently wins, instead of emitting the first plausible interpretation, motive,
 feeling, desire, outcome, opportunity, or strategy that occurs to it.
 `presentMind` is the deliberate exception: first-order cognition records what
 arose rather than which thought wins an argument, so it carries no
-`whyRejected`. `realityCheck` requires a leading seam but treats a second
-candidate seam as optional, so the model does not invent a strained mismatch
-merely to fill a contrastive pair.
+`whyRejected`.
 
 For `speak`, the realizer additionally chooses an `addressCharacter` handle (if
 any), an independent `replyToMessage` handle (if any Telegram reply
